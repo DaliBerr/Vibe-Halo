@@ -21,11 +21,31 @@ const EXPANDED = Object.freeze({
   maxHeight: 636,
 });
 
-function validDecisionPayload(payload, currentId) {
-  return !!payload && typeof payload === "object"
-    && typeof payload.approvalId === "string"
-    && payload.approvalId === currentId
-    && (payload.behavior === "allow" || payload.behavior === "deny");
+function validAnswersPayload(value) {
+  if (value === undefined) return true;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entries = Object.entries(value);
+  if (entries.length > 10) return false;
+  return entries.every(([key, answer]) => {
+    if (typeof key !== "string" || !key || key.length > 120) return false;
+    const values = Array.isArray(answer) ? answer : [answer];
+    return values.length > 0 && values.length <= 20
+      && values.every(item => typeof item === "string" && item.length > 0 && item.length <= 2000);
+  });
+}
+
+function validDecisionPayload(payload, current) {
+  const currentId = typeof current === "string" ? current : current?.id;
+  const optionId = payload?.optionId || payload?.behavior;
+  if (!payload || typeof payload !== "object"
+    || typeof payload.approvalId !== "string"
+    || payload.approvalId !== currentId
+    || typeof optionId !== "string"
+    || optionId.length < 1
+    || optionId.length > 80
+    || !validAnswersPayload(payload.answers)) return false;
+  if (typeof current === "string") return optionId === "allow" || optionId === "deny";
+  return Array.isArray(current?.options) && current.options.some(option => option?.id === optionId);
 }
 
 function validCopyPayload(payload) {
@@ -196,8 +216,8 @@ class IslandController {
     }
 
     this.handleIpc("island:decision", (event, payload) => {
-      if (!this.validSender(event) || !validDecisionPayload(payload, this.approvals.current?.id)) return;
-      this.approvals.resolve(payload.approvalId, payload.behavior);
+      if (!this.validSender(event) || !validDecisionPayload(payload, this.approvals.current)) return;
+      this.approvals.resolve(payload.approvalId, payload.optionId, { answers: payload.answers });
     });
     this.handleIpc("island:close", (event, payload) => {
       if (!this.validSender(event) || !payload || typeof payload.id !== "string") return;
@@ -408,7 +428,7 @@ class IslandController {
   closeCurrent() {
     const state = this.state();
     if (!state.current) return;
-    if (state.current.type === "approval") this.approvals.resolve(state.current.id, "no-decision");
+    if (state.current.type === "approval" || state.current.type === "elicitation") this.approvals.resolve(state.current.id, "native");
     else if (state.current.type === "input-request") this.inputRequests.dismiss(state.current.id);
     else this.completions.clear("window-close");
   }
@@ -437,6 +457,7 @@ module.exports = {
   easeOutCubic,
   interpolateBounds,
   validCopyPayload,
+  validAnswersPayload,
   validDecisionPayload,
   validViewPayload,
 };

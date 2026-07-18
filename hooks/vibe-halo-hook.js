@@ -15,9 +15,26 @@ const RUNTIME_PATH = path.join(process.env.VIBE_HALO_RUNTIME_DIR || path.join(os
 const PERMISSION_TIMEOUT_MS = 130_000;
 const EVENT_TIMEOUT_MS = 2_000;
 const STDIN_LIMIT = 1024 * 1024;
+const AGENT_IDS = new Set([
+  "codex", "zcode", "qwen-code", "copilot-cli", "claude-code", "codebuddy",
+  "gemini-cli", "antigravity", "cursor-agent", "kiro", "kimi-code", "codewhale",
+  "qoder", "qoderwork", "reasonix",
+]);
+const PASSIVE_PERMISSION_AGENTS = new Set(["kimi-code", "qoder", "qoderwork"]);
 
-function noDecisionOutput() {
-  return "{}";
+function parseAgentId(argv = process.argv.slice(2)) {
+  const index = argv.indexOf("--agent");
+  const value = index >= 0 ? cleanText(argv[index + 1], 80).toLowerCase() : "codex";
+  return AGENT_IDS.has(value) ? value : "codex";
+}
+
+function parseEventArg(argv = process.argv.slice(2)) {
+  const index = argv.indexOf("--event");
+  return index >= 0 ? cleanText(argv[index + 1], 80) : "";
+}
+
+function noDecisionOutput(agentId = "codex") {
+  return ["copilot-cli", "claude-code", "codebuddy"].includes(agentId) ? "" : "{}";
 }
 
 function processAlive(pid) {
@@ -157,11 +174,11 @@ function collectPidChain() {
   }
 }
 
-function normalizeSessionId(payload) {
-  const raw = cleanText(payload?.session_id, 240);
-  if (raw) return raw.startsWith("codex:") ? raw : `codex:${raw}`;
+function normalizeSessionId(payload, agentId = "codex") {
+  const raw = cleanText(payload?.session_id || payload?.sessionId || payload?.conversation_id || payload?.conversationId, 240);
+  if (raw) return raw.startsWith(`${agentId}:`) ? raw : `${agentId}:${raw}`;
   const transcript = cleanText(payload?.transcript_path, 2000);
-  return transcript ? `codex:${crypto.createHash("sha1").update(transcript).digest("hex").slice(0, 20)}` : "codex:unknown";
+  return transcript ? `${agentId}:${crypto.createHash("sha1").update(transcript).digest("hex").slice(0, 20)}` : `${agentId}:unknown`;
 }
 
 function textFromContent(content) {
@@ -195,27 +212,50 @@ function extractAssistantOutput(transcriptPath) {
   return "";
 }
 
-function buildBody(payload) {
-  const event = cleanText(payload?.hook_event_name, 80);
-  if (!["PermissionRequest", "Stop", "UserPromptSubmit"].includes(event)) return null;
+function normalizeEvent(payload) {
+  const raw = cleanText(payload?.hook_event_name || payload?.hookEventName || payload?.event || payload?.type, 80);
+  const compact = raw.toLowerCase().replace(/[.\-\s]/g, "");
+  if (["permissionrequest", "pretooluse", "permission_request", "permission"].includes(compact)) return "PermissionRequest";
+  if (["elicitation", "clarify", "askuserquestion"].includes(compact)) return "Elicitation";
+  if (["stop", "sessionend", "session_end", "taskcomplete", "agentstop", "afteragent", "postinvocation", "agent_end"].includes(compact)) return "Stop";
+  if (["userpromptsubmit", "userpromptsubmitted", "message_submit", "beforesubmitprompt", "beforeagent", "sessionstart", "preinvocation"].includes(compact)) return "UserPromptSubmit";
+  return raw;
+}
+
+function buildBody(payload, agentId = "codex") {
+  let event = normalizeEvent(payload);
+  const rawToolName = cleanText(payload?.tool_name || payload?.toolName || payload?.tool?.name, 160);
+  if (event === "PermissionRequest" && rawToolName === "AskUserQuestion" && ["claude-code", "codebuddy"].includes(agentId)) {
+    event = "Elicitation";
+  }
+  if (!["PermissionRequest", "Elicitation", "Stop", "UserPromptSubmit"].includes(event)) return null;
   const meta = readSessionMeta(payload?.transcript_path);
   const processMeta = collectPidChain();
   const body = {
     event,
-    agent_id: "codex",
-    session_id: normalizeSessionId(payload),
-    cwd: cleanText(payload?.cwd, 2000),
+    agent_id: agentId,
+    session_id: normalizeSessionId(payload, agentId),
+    cwd: cleanText(payload?.cwd || payload?.working_directory || payload?.workingDirectory, 2000),
     transcript_path: cleanText(payload?.transcript_path, 4000),
     codex_session_role: classifyRole(payload, meta),
     source_pid: processMeta.sourcePid,
     pid_chain: processMeta.pidChain,
   };
-  if (event === "PermissionRequest") {
-    const input = normalizeToolInput(payload?.tool_input) || {};
-    body.tool_name = cleanText(payload?.tool_name, 160) || "Unknown";
+  if (event === "PermissionRequest" || event === "Elicitation") {
+    const input = normalizeToolInput(payload?.tool_input || payload?.toolInput || payload?.input || payload?.arguments) || {};
+    body.tool_name = rawToolName || (event === "Elicitation" ? "Elicitation" : "Unknown");
     body.tool_input = input;
     body.tool_input_description = cleanText(payload?.tool_input_description || input.description, 1000);
-    body.tool_use_id = cleanText(payload?.tool_use_id || payload?.toolUseId, 240);
+    body.tool_use_id = cleanText(payload?.tool_use_id || payload?.toolUseId || payload?.request_id || payload?.requestId, 240);
+    body.request_id = cleanText(payload?.request_id || payload?.requestId || body.tool_use_id, 240);
+    if (event === "Elicitation") body.questions = Array.isArray(input.questions) ? input.questions : [];
+    const permissionSuggestions = payload?.permission_suggestions || payload?.permissionSuggestions;
+    if (Array.isArray(permissionSuggestions)) {
+      body.permission_suggestions = permissionSuggestions.slice(0, 20)
+        .map(item => normalizeToolInput(item))
+        .filter(item => item && typeof item === "object" && !Array.isArray(item));
+    }
+    if (payload?.always === true || payload?.allow_always === true) body.always = true;
     body.tool_input_fingerprint = crypto.createHash("sha256").update(stableStringify(input)).digest("hex");
   } else if (event === "Stop") {
     body.assistant_last_output = extractAssistantOutput(payload?.transcript_path);
@@ -261,45 +301,68 @@ function post(runtime, endpoint, body, timeoutMs) {
   });
 }
 
-function sanitizePermissionResponse(raw) {
+function sanitizePermissionResponse(raw, agentId = "codex") {
+  if (!raw && ["copilot-cli", "claude-code", "codebuddy"].includes(agentId)) return "";
   try {
     const parsed = JSON.parse(raw);
+    if (agentId === "copilot-cli") {
+      if (!parsed || !["allow", "deny"].includes(parsed.behavior)) return "";
+      const output = { behavior: parsed.behavior };
+      if (parsed.behavior === "deny" && typeof parsed.message === "string") output.message = cleanText(parsed.message, 500);
+      return JSON.stringify(output);
+    }
     const decision = parsed?.hookSpecificOutput?.hookEventName === "PermissionRequest"
+      || parsed?.hookSpecificOutput?.hookEventName === "Elicitation"
       ? parsed.hookSpecificOutput.decision
       : null;
-    if (!decision || !["allow", "deny"].includes(decision.behavior)) return noDecisionOutput();
+    if (!decision || !["allow", "deny"].includes(decision.behavior)) return noDecisionOutput(agentId);
     const safe = { behavior: decision.behavior };
     if (decision.behavior === "deny" && typeof decision.message === "string") {
       safe.message = cleanText(decision.message, 500);
     }
-    return JSON.stringify({ hookSpecificOutput: { hookEventName: "PermissionRequest", decision: safe } });
+    if (["claude-code", "codebuddy"].includes(agentId) && decision.behavior === "allow") {
+      if (decision.updatedInput && typeof decision.updatedInput === "object") safe.updatedInput = normalizeToolInput(decision.updatedInput);
+      if (Array.isArray(decision.updatedPermissions)) safe.updatedPermissions = decision.updatedPermissions.slice(0, 20).map(item => normalizeToolInput(item));
+    }
+    return JSON.stringify({ hookSpecificOutput: {
+      hookEventName: parsed.hookSpecificOutput.hookEventName === "Elicitation" ? "Elicitation" : "PermissionRequest",
+      decision: safe,
+    } });
   } catch {
-    return noDecisionOutput();
+    return noDecisionOutput(agentId);
   }
 }
 
-async function run(payload) {
-  const event = cleanText(payload?.hook_event_name, 80);
-  if (!["PermissionRequest", "Stop", "UserPromptSubmit"].includes(event)) return "";
+async function run(payload, options = {}) {
+  const agentId = options.agentId || "codex";
+  const event = normalizeEvent(payload);
+  if (!["PermissionRequest", "Elicitation", "Stop", "UserPromptSubmit"].includes(event)) return "";
   const runtime = readRuntime();
-  if (!runtime) return event === "PermissionRequest" ? noDecisionOutput() : "";
-  const body = buildBody(payload);
-  if (!body) return event === "PermissionRequest" ? noDecisionOutput() : "";
-  const endpoint = body.event === "PermissionRequest" ? "/permission" : "/event";
-  const result = await post(runtime, endpoint, body, body.event === "PermissionRequest" ? PERMISSION_TIMEOUT_MS : EVENT_TIMEOUT_MS);
-  if (body.event !== "PermissionRequest") return "";
-  return result.ok ? sanitizePermissionResponse(result.body) : noDecisionOutput();
+  const permissionLike = (event === "PermissionRequest" || event === "Elicitation") && !PASSIVE_PERMISSION_AGENTS.has(agentId);
+  if (!runtime) return permissionLike ? noDecisionOutput(agentId) : "";
+  const body = buildBody(payload, agentId);
+  if (!body) return permissionLike ? noDecisionOutput(agentId) : "";
+  const endpoint = (body.event === "PermissionRequest" || body.event === "Elicitation") && !PASSIVE_PERMISSION_AGENTS.has(agentId)
+    ? "/permission"
+    : "/event";
+  const result = await post(runtime, endpoint, body, endpoint === "/permission" ? PERMISSION_TIMEOUT_MS : EVENT_TIMEOUT_MS);
+  if (endpoint !== "/permission") return "";
+  return result.ok ? sanitizePermissionResponse(result.body, agentId) : noDecisionOutput(agentId);
 }
 
 async function main() {
-  const payload = await readStdinJson();
-  const output = await run(payload || {});
+  const agentId = parseAgentId();
+  const payload = await readStdinJson() || {};
+  const event = parseEventArg();
+  if (event && !payload.hook_event_name && !payload.hookEventName && !payload.event) payload.hook_event_name = event;
+  const output = await run(payload, { agentId });
   if (output) process.stdout.write(`${output}\n`);
 }
 
 if (require.main === module) {
   main().then(() => process.exit(0), () => {
-    process.stdout.write(`${noDecisionOutput()}\n`);
+    const output = noDecisionOutput(parseAgentId());
+    if (output) process.stdout.write(`${output}\n`);
     process.exit(0);
   });
 }
@@ -309,7 +372,10 @@ module.exports = {
   classifyRole,
   extractAssistantOutput,
   normalizeSessionId,
+  normalizeEvent,
   normalizeToolInput,
+  parseAgentId,
+  parseEventArg,
   sanitizePermissionResponse,
   run,
 };

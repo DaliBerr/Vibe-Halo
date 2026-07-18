@@ -135,8 +135,12 @@ header { min-width: 0; display: flex; align-items: flex-start; justify-content: 
 .question-text { font-size: 14px; line-height: 1.55; }
 .option-list { margin-top: 11px; display: grid; gap: 7px; }
 .option-row { padding: 8px 10px; border-radius: 10px; background: var(--surface-soft); }
+.option-input-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.option-input-row input { margin: 3px 0 0; accent-color: var(--primary); }
 .option-label { font-size: 13px; font-weight: 650; }
 .option-description { margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.answer-text { width: 100%; min-height: 72px; margin-top: 11px; padding: 10px 12px; resize: vertical; border: 1px solid var(--border); border-radius: 10px; outline: none; background: var(--surface-soft); color: var(--text); font: inherit; user-select: text; }
+.answer-text:focus { border-color: var(--border-strong); }
 
 .raw-details { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
 .raw-details summary { width: fit-content; color: var(--muted); cursor: pointer; font-size: 13px; }
@@ -144,6 +148,10 @@ header { min-width: 0; display: flex; align-items: flex-start; justify-content: 
 
 footer { min-height: 40px; display: flex; align-items: center; gap: 10px; }
 .spacer { flex: 1; }
+.actions { display: flex; align-items: center; gap: 10px; }
+.overflow-actions { position: relative; }
+.overflow-menu { position: absolute; right: 0; bottom: 48px; z-index: 2; min-width: 180px; padding: 8px; display: grid; gap: 7px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-raised); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24); }
+.overflow-menu button { width: 100%; }
 footer button { min-width: 84px; height: 40px; padding: 0 18px; border: 1px solid transparent; border-radius: 11px; cursor: pointer; font-size: 14px; font-weight: 660; }
 .secondary { background: var(--surface-soft); color: var(--muted); }
 .danger { background: rgba(255, 84, 96, 0.13); border-color: rgba(255, 114, 124, 0.28); color: var(--danger); }

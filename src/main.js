@@ -16,10 +16,12 @@ const {
   Tray,
 } = require("electron");
 const { APP_ID, APP_NAME } = require("./constants");
+const { agent, listAgents } = require("./agent-registry");
 const { ApprovalStore } = require("./approval-store");
 const { CodexInputMonitor } = require("./codex-input-monitor");
 const { CompletionStore } = require("./completion-store");
 const { HookManager } = require("./hook-manager");
+const { IntegrationManager } = require("./integration-manager");
 const { IslandController } = require("./island-controller");
 const { InputRequestStore } = require("./input-request-store");
 const { createLogger } = require("./logger");
@@ -44,8 +46,27 @@ function createHookManager(logger) {
   });
 }
 
+function integrationAssetPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "app.asar.unpacked", "hooks", "integrations")
+    : path.join(__dirname, "..", "hooks", "integrations");
+}
+
+function createIntegrationManager(logger, settings) {
+  const codexManager = createHookManager(logger);
+  return new IntegrationManager({
+    assetRoot: integrationAssetPath(),
+    backupRoot: path.join(app.getPath("userData"), "integration-backups"),
+    codexManager,
+    executablePath: process.execPath,
+    hookScriptPath: hookScriptPath(),
+    logger,
+    settings,
+  });
+}
+
 if (process.argv.includes("--uninstall-hooks")) {
-  try { createHookManager({ info() {}, warn() {}, error() {} }).uninstall(); }
+  try { createIntegrationManager({ info() {}, warn() {}, error() {} }, null).uninstallAll(); }
   catch {}
   app.exit(0);
 } else {
@@ -64,6 +85,7 @@ function startApplication() {
   let server = null;
   let inputMonitor = null;
   let hookManager = null;
+  let integrationManager = null;
   let settings = null;
   let logger = null;
   let quitting = false;
@@ -95,12 +117,19 @@ function startApplication() {
       pendingCount: 0,
       lastError: null,
     };
+    const integrations = listAgents().map(descriptor => {
+      const state = settings.getIntegration(descriptor.id);
+      const status = integrationManager.status(descriptor.id);
+      const verification = state.verification === "live" ? "本机实测" : (state.verification === "contract" ? "契约测试通过、未在本机实测" : "未验证");
+      return `${descriptor.name}：${state.disabledByUser ? "用户停用" : (status.disabled ? "客户端已禁用 Hook" : (status.healthy ? "健康" : (status.detected ? "需修复" : "未检测")))}；${verification}`;
+    });
     return [
       `应用：${APP_NAME} ${app.getVersion()}`,
       `本地服务：${local.listening ? `127.0.0.1:${local.port}` : "未运行"}`,
       `审批：${settings.get("approvalEnabled") ? "启用" : "停用"}`,
       `等待输入提醒：${settings.get("inputReminderEnabled") ? "启用" : "停用"}`,
-      `Codex 集成：${settings.get("integrationInstalled") ? "已安装" : "已卸载"}`,
+      "客户端集成：",
+      ...integrations.map(value => `  ${value}`),
       `待审批：${approvals.size}`,
       `等待输入：${inputRequests.size}`,
       `Codex 目录：${hook.codexHomeExists ? "已找到" : "未找到"}`,
@@ -126,15 +155,35 @@ function startApplication() {
     if (!tray) return;
     const hook = hookManager.status();
     const local = server ? server.status() : { listening: false, port: null };
+    const descriptors = listAgents();
+    const statuses = new Map(descriptors.map(descriptor => [descriptor.id, integrationManager.status(descriptor.id)]));
+    const healthyCount = descriptors.filter(descriptor => statuses.get(descriptor.id).healthy).length;
+    const detectedCount = descriptors.filter(descriptor => statuses.get(descriptor.id).detected).length;
     const statusLabel = !local.listening
       ? "服务未运行"
-      : !settings.get("integrationInstalled")
-        ? "Codex 集成已卸载"
       : hook.feature === "false"
         ? "Codex Hooks 已禁用"
         : hook.trust.pendingCount > 0
           ? "Codex Hook 待审核"
-        : hook.healthy ? "Codex 审批服务正常" : "Codex Hook 需要修复";
+        : `客户端集成 ${healthyCount}/${detectedCount} 健康`;
+    const integrationItems = descriptors.map(descriptor => {
+      const state = settings.getIntegration(descriptor.id);
+      const status = statuses.get(descriptor.id);
+      const suffix = state.disabledByUser ? "（已停用）" : status.disabled ? "（客户端禁用）" : status.healthy ? "（健康）" : status.detected ? "（需修复）" : "（未检测）";
+      return {
+        label: `${descriptor.name} ${suffix}`,
+        type: "checkbox",
+        checked: !state.disabledByUser,
+        enabled: status.detected || state.disabledByUser,
+        click: item => {
+          const result = item.checked ? integrationManager.enable(descriptor.id) : integrationManager.disable(descriptor.id);
+          if (!result?.ok && item.checked) {
+            dialog.showMessageBox({ type: "warning", title: APP_NAME, message: `${descriptor.name} 集成未能启用。`, detail: result?.reason || "未知错误" });
+          }
+          rebuildTray();
+        },
+      };
+    });
     const items = [
       { label: statusLabel, enabled: false },
       { type: "separator" },
@@ -161,6 +210,36 @@ function startApplication() {
         checked: settings.get("openAtLogin"),
         click: item => { setLogin(item.checked); rebuildTray(); },
       },
+      {
+        label: "客户端集成",
+        submenu: [
+          ...integrationItems,
+          { type: "separator" },
+          {
+            label: "重新扫描",
+            click: () => { integrationManager.scan({ install: true }); rebuildTray(); },
+          },
+          {
+            label: "修复全部",
+            click: () => { integrationManager.repairAll(); rebuildTray(); },
+          },
+          {
+            label: "卸载全部…",
+            click: async () => {
+              const result = await dialog.showMessageBox({
+                type: "warning", buttons: ["取消", "卸载全部"], defaultId: 0, cancelId: 0,
+                title: APP_NAME, message: "移除所有 Vibe Halo 客户端集成？",
+                detail: "第三方配置和首次备份会保留；所有客户端将回到原生流程。",
+              });
+              if (result.response === 1) {
+                integrationManager.uninstallAll();
+                for (const descriptor of listAgents()) settings.setIntegration(descriptor.id, { disabledByUser: true, installed: false, healthy: false, reason: "disabled-by-user" });
+                rebuildTray();
+              }
+            },
+          },
+        ],
+      },
     ];
     if (hook.feature === "false") {
       items.push({
@@ -176,8 +255,8 @@ function startApplication() {
           });
           if (result.response === 1) {
             hookManager.enableFeature();
-            settings.set("integrationInstalled", true);
-            hookManager.install();
+            settings.setIntegration("codex", { disabledByUser: false });
+            integrationManager.enable("codex");
             rebuildTray();
           }
         },
@@ -204,8 +283,8 @@ function startApplication() {
       {
         label: "修复 Codex Hook",
         click: async () => {
-          settings.set("integrationInstalled", true);
-          const result = hookManager.install();
+          settings.setIntegration("codex", { disabledByUser: false });
+          const result = integrationManager.enable("codex");
           rebuildTray();
           await dialog.showMessageBox({
             type: result.ok ? "info" : "error",
@@ -233,26 +312,6 @@ function startApplication() {
           if (result.response === 2) shell.openPath(path.dirname(logger.filePath));
         },
       },
-      {
-        label: "卸载 Codex 集成…",
-        click: async () => {
-          const result = await dialog.showMessageBox({
-            type: "warning",
-            buttons: ["取消", "卸载集成"],
-            defaultId: 0,
-            cancelId: 0,
-            title: APP_NAME,
-            message: "移除 Vibe Halo 的 Codex Hook？",
-            detail: "这不会退出应用；之后 Codex 将使用原生审批。可随时通过“修复 Codex Hook”重新安装。",
-          });
-          if (result.response === 1) {
-            hookManager.uninstall();
-            settings.set("integrationInstalled", false);
-            settings.set("approvalEnabled", false);
-            rebuildTray();
-          }
-        },
-      },
       { type: "separator" },
       { label: "退出", click: () => { quitting = true; app.quit(); } },
     );
@@ -260,23 +319,40 @@ function startApplication() {
     tray.setToolTip(`${APP_NAME} — ${statusLabel}`);
   }
 
-  function handleCodexEvent(data) {
+  function handleAgentEvent(data) {
     if (data.codex_session_role === "subagent") return;
-    const sessionId = typeof data.session_id === "string" ? data.session_id : "codex:unknown";
+    const descriptor = agent(data.agentId || data.agent_id) || agent("codex");
+    const agentId = descriptor.id;
+    const agentName = descriptor.name;
+    const sessionId = typeof data.sessionId === "string" ? data.sessionId
+      : (typeof data.session_id === "string" ? data.session_id : `${agentId}:unknown`);
     if (data.event === "UserPromptSubmit") {
-      completions.clear("new-prompt", sessionId);
-      inputRequests.clearSession(sessionId, "new-prompt");
+      completions.clear("new-prompt", sessionId, agentId);
+      inputRequests.clearSession(sessionId, "new-prompt", agentId);
+      return;
+    }
+    if (data.event === "PermissionRequest" && descriptor.capabilities.passiveApproval) {
+      if (!settings.get("inputReminderEnabled")) return;
+      const requestId = typeof data.requestId === "string" ? data.requestId : (typeof data.request_id === "string" ? data.request_id : data.toolUseId || Date.now());
+      inputRequests.enqueue({
+        agentId, agentName, requestKey: `${agentId}:${sessionId}:permission:${requestId}`, sessionId,
+        title: `${agentName} 等待原生审批`,
+        content: `请在 ${agentName} 客户端中完成 ${data.toolName || data.tool_name || "工具"} 审批。`,
+        cwd: data.cwd, sourcePid: data.sourcePid, pidChain: data.pidChain,
+      });
       return;
     }
     if (data.event !== "Stop") return;
-    inputRequests.clearSession(sessionId, "session-stopped");
+    inputRequests.clearSession(sessionId, "session-stopped", agentId);
     if (approvals.size > 0 || inputRequests.size > 0) return;
     const cwd = typeof data.cwd === "string" ? data.cwd : "";
     completions.show({
       sessionId,
+      agentId,
+      agentName,
       title: typeof data.session_title === "string" && data.session_title.trim()
         ? data.session_title.trim()
-        : (cwd ? path.basename(cwd) : "Codex 已完成"),
+        : (cwd ? path.basename(cwd) : `${agentName} 已完成`),
       output: typeof data.assistant_last_output === "string" ? data.assistant_last_output : "任务已完成",
       cwd,
       sourcePid: Number.isInteger(data.source_pid) ? data.source_pid : null,
@@ -295,16 +371,19 @@ function startApplication() {
   app.whenReady().then(async () => {
     logger = createLogger(path.join(app.getPath("userData"), "logs"));
     settings = new SettingsStore(path.join(app.getPath("userData"), "settings.json"));
-    hookManager = createHookManager(logger);
+    integrationManager = createIntegrationManager(logger, settings);
+    hookManager = integrationManager.codexManager;
     if (!settings.get("initialized")) {
       setLogin(true);
       settings.set("initialized", true);
     }
 
-    const hookResult = settings.get("integrationInstalled")
-      ? hookManager.install()
-      : { ok: true, reason: "integration-disabled" };
-    if (!hookResult.ok) logger.warn("Codex Hook not installed", { reason: hookResult.reason });
+    const integrationResults = integrationManager.scan({ install: true });
+    for (const result of integrationResults) {
+      if (result.detected && !result.disabledByUser && !result.installResult?.ok) {
+        logger.warn("Client integration not installed", { agentId: result.agent.id, reason: result.installResult?.reason || result.reason });
+      }
+    }
 
     island = new IslandController({
       BrowserWindow,
@@ -324,7 +403,7 @@ function startApplication() {
       logger,
       onRequested: request => {
         if (!settings.get("inputReminderEnabled")) return false;
-        return !!inputRequests.enqueue(request).entry;
+        return !!inputRequests.enqueue({ ...request, agentId: "codex", agentName: "Codex" }).entry;
       },
       onResolved: request => inputRequests.resolve(request.requestKey),
     });
@@ -334,7 +413,7 @@ function startApplication() {
       approvalStore: approvals,
       isApprovalEnabled: () => settings.get("approvalEnabled"),
       logger,
-      onEvent: handleCodexEvent,
+      onEvent: handleAgentEvent,
     });
     await server.start();
 
@@ -348,6 +427,14 @@ function startApplication() {
     logger.info("Application ready", { version: app.getVersion(), packaged: app.isPackaged });
     if (process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-approval")) {
       const demo = approvals.enqueue({
+        agentId: "codex",
+        agentName: "Codex",
+        kind: "approval",
+        options: [
+          { id: "allow", label: "允许一次", tone: "primary" },
+          { id: "deny", label: "拒绝", tone: "danger" },
+          { id: "native", label: "在客户端处理", tone: "secondary", overflow: true },
+        ],
         sessionId: "codex:demo",
         toolUseId: "demo-tool",
         toolName: "PowerShell",

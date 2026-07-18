@@ -3,7 +3,6 @@
 const crypto = require("crypto");
 const { EventEmitter } = require("events");
 const { APPROVAL_TIMEOUT_MS } = require("./constants");
-const { buildDecisionOutput, noDecisionOutput } = require("./codex-output");
 
 function stableStringify(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -23,12 +22,20 @@ function publicEntry(entry) {
   if (!entry) return null;
   return {
     id: entry.id,
-    type: "approval",
+    type: entry.kind === "elicitation" ? "elicitation" : "approval",
+    agentId: entry.agentId,
+    agentName: entry.agentName,
     sessionId: entry.sessionId,
+    requestId: entry.requestId,
     toolName: entry.toolName,
     toolInput: entry.toolInput,
     description: entry.description,
     cwd: entry.cwd,
+    options: entry.options.map(option => ({ ...option })),
+    questions: entry.questions.map(question => ({
+      ...question,
+      options: question.options.map(option => ({ ...option })),
+    })),
     createdAt: entry.createdAt,
   };
 }
@@ -58,9 +65,11 @@ class ApprovalStore extends EventEmitter {
   }
 
   buildKey(request) {
-    const session = safeText(request.sessionId, 240) || "codex:unknown";
-    const identity = safeText(request.toolUseId, 240) || safeText(request.fingerprint, 128) || fingerprint(request.toolInput);
-    return `${session}\u0000${identity}`;
+    const agentId = safeText(request.agentId, 80) || "unknown";
+    const session = safeText(request.sessionId, 240) || `${agentId}:unknown`;
+    const identity = safeText(request.requestId, 240) || safeText(request.toolUseId, 240)
+      || safeText(request.fingerprint, 128) || fingerprint(request.toolInput);
+    return `${agentId}\u0000${session}\u0000${identity}`;
   }
 
   enqueue(request, waiter) {
@@ -77,7 +86,11 @@ class ApprovalStore extends EventEmitter {
       id: this.createId(),
       key,
       state: "pending",
-      sessionId: safeText(request.sessionId, 240) || "codex:unknown",
+      agentId: safeText(request.agentId, 80) || "unknown",
+      agentName: safeText(request.agentName, 120) || safeText(request.agentId, 80) || "Agent",
+      kind: request.kind === "elicitation" ? "elicitation" : "approval",
+      sessionId: safeText(request.sessionId, 240) || `${safeText(request.agentId, 80) || "unknown"}:unknown`,
+      requestId: safeText(request.requestId, 240),
       toolUseId: safeText(request.toolUseId, 240),
       toolName: safeText(request.toolName, 160) || "Unknown",
       toolInput: request.toolInput && typeof request.toolInput === "object" ? request.toolInput : {},
@@ -85,6 +98,28 @@ class ApprovalStore extends EventEmitter {
       cwd: safeText(request.cwd, 2000),
       sourcePid: Number.isInteger(request.sourcePid) ? request.sourcePid : null,
       pidChain: Array.isArray(request.pidChain) ? request.pidChain.filter(Number.isInteger).slice(0, 32) : [],
+      options: (Array.isArray(request.options) && request.options.length ? request.options : [
+        { id: "allow", label: "允许一次", tone: "primary" },
+        { id: "deny", label: "拒绝", tone: "danger" },
+        { id: "native", label: "在客户端处理", tone: "secondary" },
+      ]).slice(0, 12).map(option => ({
+        id: safeText(option?.id, 80),
+        label: safeText(option?.label, 160),
+        tone: ["primary", "danger", "secondary"].includes(option?.tone) ? option.tone : "secondary",
+        overflow: option?.overflow === true,
+      })).filter(option => option.id && option.label),
+      questions: Array.isArray(request.questions) ? request.questions.slice(0, 10).map(question => ({
+        id: safeText(question?.id, 120),
+        header: safeText(question?.header, 120),
+        question: safeText(question?.question, 1000),
+        multiSelect: question?.multiSelect === true,
+        allowText: question?.allowText !== false,
+        options: Array.isArray(question?.options) ? question.options.slice(0, 20).map(option => ({
+          id: safeText(option?.id, 120),
+          label: safeText(option?.label, 240),
+          description: safeText(option?.description, 600),
+        })).filter(option => option.id && option.label) : [],
+      })).filter(question => question.id && question.question) : [],
       createdAt: this.now(),
       waiters: new Set([waiter]),
       timer: null,
@@ -102,25 +137,30 @@ class ApprovalStore extends EventEmitter {
     if (!entry || entry.state !== "pending") return false;
     entry.waiters.delete(waiter);
     if (entry.waiters.size > 0) return true;
-    this.finalize(entry, "disconnected", noDecisionOutput(), "all-waiters-disconnected", false);
+    this.finalize(entry, "disconnected", null, "all-waiters-disconnected", false);
     return true;
   }
 
-  resolve(id, behavior, message) {
+  resolve(id, optionId, payload = {}) {
     const entry = this.entries.find(item => item.id === id);
     if (!entry || entry.state !== "pending") return false;
-    if (behavior !== "allow" && behavior !== "deny" && behavior !== "no-decision") return false;
-    const output = behavior === "no-decision"
-      ? noDecisionOutput()
-      : buildDecisionOutput(behavior, behavior === "deny" ? (message || "Denied in Vibe Halo") : undefined);
-    this.finalize(entry, "resolved", output, behavior, true);
+    const normalized = optionId === "no-decision" ? "native" : safeText(optionId, 80);
+    if (normalized !== "native" && !entry.options.some(option => option.id === normalized)) return false;
+    const decision = {
+      optionId: normalized,
+      message: safeText(typeof payload === "string" ? payload : payload?.message, 500),
+    };
+    if (payload && typeof payload === "object" && payload.answers && typeof payload.answers === "object") {
+      decision.answers = payload.answers;
+    }
+    this.finalize(entry, "resolved", decision, normalized, true);
     return true;
   }
 
   expire(id) {
     const entry = this.entries.find(item => item.id === id);
     if (!entry || entry.state !== "pending") return false;
-    this.finalize(entry, "expired", noDecisionOutput(), "timeout", true);
+    this.finalize(entry, "expired", { optionId: "native" }, "timeout", true);
     return true;
   }
 
@@ -144,7 +184,7 @@ class ApprovalStore extends EventEmitter {
 
   shutdown() {
     for (const entry of [...this.entries]) {
-      this.finalize(entry, "resolved", noDecisionOutput(), "shutdown", true);
+      this.finalize(entry, "resolved", { optionId: "native" }, "shutdown", true);
     }
   }
 }

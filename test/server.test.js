@@ -136,3 +136,51 @@ test("accepts completion events and cleans its runtime file", async () => {
   await server.stop();
   assert.equal(fs.existsSync(runtimePath), false);
 });
+
+test("routes ZCode, Copilot and OpenCode through their exact codecs", async () => {
+  const { approvals, server } = await fixture();
+
+  const zcodePending = request(server, "/permission", permission({ agent_id: "zcode", session_id: "zcode:s", tool_use_id: "z1" }));
+  await waitFor(() => approvals.size === 1);
+  approvals.resolve(approvals.current.id, "allow");
+  assert.deepEqual(JSON.parse((await zcodePending).body), {
+    hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "allow" } },
+  });
+
+  const copilotPending = request(server, "/permission", permission({ agent_id: "copilot-cli", session_id: "copilot:s", tool_use_id: "c1" }));
+  await waitFor(() => approvals.size === 1);
+  approvals.resolve(approvals.current.id, "deny");
+  assert.deepEqual(JSON.parse((await copilotPending).body), { behavior: "deny", message: "Denied in Vibe Halo" });
+
+  const openCodePending = request(server, "/permission", permission({
+    agent_id: "opencode", session_id: "opencode:s", request_id: "o1", tool_use_id: undefined, always: true,
+  }));
+  await waitFor(() => approvals.size === 1);
+  assert.deepEqual(approvals.snapshot().current.options.map(value => value.id), ["once", "always", "reject", "native"]);
+  approvals.resolve(approvals.current.id, "always");
+  assert.deepEqual(JSON.parse((await openCodePending).body), { decision: "always" });
+});
+
+test("validates option ids, answers, unknown agents and passive reminders", async () => {
+  const { approvals, events, server } = await fixture();
+  const questions = [{ id: "q1", question: "Pick", options: [{ id: "a", label: "A" }] }];
+  const pending = request(server, "/permission", permission({
+    agent_id: "hermes", event: "Elicitation", session_id: "hermes:s", request_id: "h1",
+    tool_name: "clarify", tool_input: { questions }, questions,
+  }));
+  await waitFor(() => approvals.size === 1);
+  assert.equal(approvals.resolve(approvals.current.id, "unknown"), false);
+  assert.equal(approvals.resolve(approvals.current.id, "submit", { answers: { q1: "a" } }), true);
+  assert.deepEqual(JSON.parse((await pending).body), { decision: "allow", answers: { q1: "a" } });
+
+  const unknown = await request(server, "/permission", permission({ agent_id: "missing" }));
+  assert.equal(unknown.status, 400);
+  assert.equal(unknown.body, "{}");
+
+  const passive = await request(server, "/event", {
+    agent_id: "kimi-code", event: "PermissionRequest", session_id: "kimi:s", request_id: "k1", tool_name: "Shell",
+  });
+  assert.equal(passive.status, 204);
+  assert.equal(events.at(-1).kind, "attention");
+  assert.equal(events.at(-1).passive, true);
+});

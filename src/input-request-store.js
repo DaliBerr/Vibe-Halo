@@ -18,12 +18,12 @@ function publicItem(item) {
 
 function cleanQuestions(value) {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 3).map((question, index) => ({
+  return value.slice(0, 10).map((question, index) => ({
     header: clean(question?.header, 80),
     id: clean(question?.id, 120) || `question_${index + 1}`,
     question: clean(question?.question, 600) || "Codex 正在等待你的输入。",
     options: Array.isArray(question?.options)
-      ? question.options.slice(0, 4).map(option => ({
+      ? question.options.slice(0, 20).map(option => ({
         label: clean(option?.label, 120),
         description: clean(option?.description, 300),
       })).filter(option => option.label)
@@ -58,6 +58,8 @@ class InputRequestStore extends EventEmitter {
     const item = {
       id: crypto.randomUUID(),
       type: "input-request",
+      agentId: clean(input.agentId, 80) || "codex",
+      agentName: clean(input.agentName, 120) || "Codex",
       requestKey,
       sessionId: clean(input.sessionId, 240) || "codex:unknown",
       title: clean(input.title, 240) || "Codex 等待你的选择",
@@ -65,7 +67,7 @@ class InputRequestStore extends EventEmitter {
       questions: cleanQuestions(input.questions),
       cwd: clean(input.cwd, 2000),
       questionCount: Number.isInteger(input.questionCount)
-        ? Math.max(0, Math.min(input.questionCount, 3))
+        ? Math.max(0, Math.min(input.questionCount, 10))
         : 0,
       sourcePid: Number.isInteger(input.sourcePid) ? input.sourcePid : null,
       pidChain: Array.isArray(input.pidChain) ? input.pidChain.filter(Number.isInteger).slice(0, 32) : [],
@@ -125,16 +127,17 @@ class InputRequestStore extends EventEmitter {
     return true;
   }
 
-  clearSession(sessionId, reason = "session-cleared") {
+  clearSession(sessionId, reason = "session-cleared", agentId = null) {
     const normalized = clean(sessionId, 240);
     if (!normalized) return false;
-    const removed = this.queue.filter(item => item.sessionId === normalized);
+    const normalizedAgent = clean(agentId, 80);
+    const removed = this.queue.filter(item => item.sessionId === normalized && (!normalizedAgent || item.agentId === normalizedAgent));
     if (removed.length === 0) return false;
     for (const item of removed) {
       this.byRequestKey.delete(item.requestKey);
       if (item.timer) this.clearTimer(item.timer);
     }
-    this.queue = this.queue.filter(item => item.sessionId !== normalized);
+    this.queue = this.queue.filter(item => item.sessionId !== normalized || (normalizedAgent && item.agentId !== normalizedAgent));
     this.emit("changed", this.snapshot(), reason);
     return true;
   }

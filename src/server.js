@@ -10,7 +10,12 @@ const {
   TOKEN_HEADER,
 } = require("./constants");
 const { clearRuntime, writeRuntime } = require("./runtime-config");
-const { noDecisionOutput } = require("./codex-output");
+const {
+  agent,
+  encodeDecision,
+  noDecisionOutput,
+  normalizeRequest,
+} = require("./agent-registry");
 
 function safeEqual(left, right) {
   if (typeof left !== "string" || typeof right !== "string") return false;
@@ -60,17 +65,12 @@ function text(value, max) {
 }
 
 function normalizePermission(data) {
-  return {
-    sessionId: text(data.session_id, 240) || "codex:unknown",
-    toolUseId: text(data.tool_use_id, 240),
-    fingerprint: text(data.tool_input_fingerprint, 128),
-    toolName: text(data.tool_name, 160) || "Unknown",
-    toolInput: data.tool_input && typeof data.tool_input === "object" && !Array.isArray(data.tool_input) ? data.tool_input : {},
-    description: text(data.tool_input_description, 1000),
-    cwd: text(data.cwd, 2000),
-    sourcePid: integer(data.source_pid),
-    pidChain: Array.isArray(data.pid_chain) ? data.pid_chain.map(integer).filter(Boolean).slice(0, 32) : [],
-  };
+  return normalizeRequest("codex", data);
+}
+
+function sendAdapterDecision(res, status, agentId, body) {
+  const output = typeof body === "string" ? body : noDecisionOutput(agentId);
+  return send(res, output ? status : 204, output);
 }
 
 class IslandServer {
@@ -135,37 +135,51 @@ class IslandServer {
     const parsed = await readBody(req);
     if (!parsed.ok) {
       this.logger.warn("Rejected request body", { route: req.url, reason: parsed.reason });
-      if (req.url === "/permission") return send(res, parsed.reason === "too-large" ? 413 : 400, noDecisionOutput());
+      if (req.url === "/permission") return send(res, parsed.reason === "too-large" ? 413 : 400, "{}");
       return send(res, parsed.reason === "too-large" ? 413 : 400, { error: parsed.reason });
     }
     const data = parsed.value;
-    if (!data || data.agent_id !== "codex") return send(res, 400, req.url === "/permission" ? noDecisionOutput() : { error: "invalid-agent" });
+    const agentId = text(data?.agent_id || data?.agentId, 80).toLowerCase();
+    const adapter = agent(agentId);
+    if (!data || !adapter) return send(res, 400, req.url === "/permission" ? "{}" : { error: "invalid-agent" });
+    const normalized = normalizeRequest(agentId, data);
+    if (!normalized) return sendAdapterDecision(res, 400, agentId, noDecisionOutput(agentId));
     if (req.url === "/event") {
-      if (data.event !== "Stop" && data.event !== "UserPromptSubmit") return send(res, 400, { error: "invalid-event" });
+      const accepted = adapter.events.includes(normalized.event)
+        || (adapter.capabilities.passiveApproval && normalized.event === "PermissionRequest");
+      if (!accepted || (normalized.event === "PermissionRequest" && adapter.capabilities.approval)) {
+        return send(res, 400, { error: "invalid-event" });
+      }
       send(res, 204, "");
-      try { this.onEvent(data); } catch (error) { this.logger.error("Event handler failed", { message: error.message }); }
+      try { this.onEvent({ ...data, ...normalized }); } catch (error) { this.logger.error("Event handler failed", { message: error.message }); }
       return;
     }
-    if (data.event !== "PermissionRequest") return send(res, 400, noDecisionOutput());
-    if (!this.isApprovalEnabled() || data.codex_session_role === "subagent" || data.headless === true) {
-      this.logger.info("Permission fell back to Codex", {
+    if ((normalized.kind !== "approval" && normalized.kind !== "elicitation") || !adapter.capabilities.approval) {
+      return sendAdapterDecision(res, 400, agentId, noDecisionOutput(agentId));
+    }
+    if (!this.isApprovalEnabled(agentId) || data.codex_session_role === "subagent" || data.headless === true) {
+      this.logger.info("Permission fell back to native client", {
+        agentId,
         reason: !this.isApprovalEnabled() ? "disabled" : "headless",
         tool: text(data.tool_name, 160),
       });
-      return send(res, 200, noDecisionOutput());
+      return sendAdapterDecision(res, 200, agentId, noDecisionOutput(agentId));
     }
 
     let completed = false;
     const waiter = {
-      complete: output => {
+      complete: decision => {
         if (completed) return;
         completed = true;
-        send(res, 200, output);
+        let output;
+        try { output = encodeDecision(agentId, decision, normalized); }
+        catch { output = noDecisionOutput(agentId); }
+        sendAdapterDecision(res, 200, agentId, output);
       },
     };
-    const result = this.approvalStore.enqueue(normalizePermission(data), waiter);
+    const result = this.approvalStore.enqueue(normalized, waiter);
     const entry = result.entry;
-    this.logger.info("Permission queued", { approvalId: entry.id, tool: entry.toolName, duplicate: result.duplicate });
+    this.logger.info("Permission queued", { agentId, approvalId: entry.id, tool: entry.toolName, duplicate: result.duplicate });
     res.once("close", () => {
       if (!completed) {
         completed = true;
@@ -188,4 +202,4 @@ class IslandServer {
   }
 }
 
-module.exports = { IslandServer, normalizePermission, readBody, safeEqual, send };
+module.exports = { IslandServer, normalizePermission, readBody, safeEqual, send, sendAdapterDecision };

@@ -23,6 +23,8 @@ function fixture() {
 
 function request(overrides = {}) {
   return {
+    agentId: "codex",
+    agentName: "Codex",
     sessionId: "codex:s1",
     toolUseId: "tool-1",
     toolName: "Bash",
@@ -46,7 +48,7 @@ test("keeps FIFO order and requires explicit id", () => {
   assert.equal(store.current.id, "id-1");
   assert.equal(store.resolve("missing", "allow"), false);
   assert.equal(store.resolve("id-1", "allow"), true);
-  assert.equal(JSON.parse(first[0]).hookSpecificOutput.decision.behavior, "allow");
+  assert.deepEqual(first[0], { optionId: "allow", message: "" });
   assert.equal(store.current.id, "id-2");
   assert.equal(store.resolve("id-1", "deny"), false);
 });
@@ -61,7 +63,7 @@ test("deduplicates identical requests and fans out one decision", () => {
   store.resolve("id-1", "deny");
   assert.equal(left.length, 1);
   assert.equal(right.length, 1);
-  assert.equal(JSON.parse(left[0]).hookSpecificOutput.decision.behavior, "deny");
+  assert.deepEqual(left[0], { optionId: "deny", message: "" });
 });
 
 test("expires to no-decision after the configured timer", () => {
@@ -69,8 +71,16 @@ test("expires to no-decision after the configured timer", () => {
   const outputs = [];
   store.enqueue(request(), waiter(outputs));
   timers[0].callback();
-  assert.deepEqual(outputs, ["{}"]);
+  assert.deepEqual(outputs, [{ optionId: "native" }]);
   assert.equal(store.size, 0);
+});
+
+test("isolates duplicate identities by agent", () => {
+  const { store } = fixture();
+  store.enqueue(request(), waiter([]));
+  store.enqueue(request({ agentId: "zcode", agentName: "ZCode" }), waiter([]));
+  assert.equal(store.size, 2);
+  assert.equal(store.snapshot().current.agentId, "codex");
 });
 
 test("only removes a request after all duplicate connections disconnect", () => {

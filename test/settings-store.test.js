@@ -17,10 +17,13 @@ test("persists integration ownership independently from approval toggle", () => 
     first.set("integrationInstalled", false);
     first.set("approvalEnabled", false);
     first.set("inputReminderEnabled", false);
+    first.setIntegration("zcode", { disabledByUser: true, detected: true, reason: "disabled-by-user" });
     const second = new SettingsStore(filePath);
     assert.equal(second.get("integrationInstalled"), false);
     assert.equal(second.get("approvalEnabled"), false);
     assert.equal(second.get("inputReminderEnabled"), false);
+    assert.equal(second.getIntegration("zcode").disabledByUser, true);
+    assert.equal(second.getIntegration("zcode").detected, true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

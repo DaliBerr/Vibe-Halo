@@ -1,0 +1,7 @@
+{
+  "id": "vibe-halo",
+  "name": "Vibe Halo",
+  "description": "Forward completion and prompt lifecycle events to Vibe Halo.",
+  "activation": { "onStartup": true },
+  "configSchema": { "type": "object", "additionalProperties": false, "properties": {} }
+}

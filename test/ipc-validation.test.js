@@ -5,10 +5,13 @@ const assert = require("node:assert/strict");
 const { validCopyPayload, validDecisionPayload, validViewPayload } = require("../src/island-controller");
 
 test("decision payload must match current approval and allowlisted behavior", () => {
-  assert.equal(validDecisionPayload({ approvalId: "a", behavior: "allow" }, "a"), true);
-  assert.equal(validDecisionPayload({ approvalId: "other", behavior: "allow" }, "a"), false);
-  assert.equal(validDecisionPayload({ approvalId: "a", behavior: "always" }, "a"), false);
-  assert.equal(validDecisionPayload(null, "a"), false);
+  const current = { id: "a", options: [{ id: "allow" }, { id: "native" }] };
+  assert.equal(validDecisionPayload({ approvalId: "a", optionId: "allow" }, current), true);
+  assert.equal(validDecisionPayload({ approvalId: "a", optionId: "native" }, current), true);
+  assert.equal(validDecisionPayload({ approvalId: "other", optionId: "allow" }, current), false);
+  assert.equal(validDecisionPayload({ approvalId: "a", optionId: "always" }, current), false);
+  assert.equal(validDecisionPayload({ approvalId: "a", optionId: "allow", answers: { q: "x".repeat(2001) } }, current), false);
+  assert.equal(validDecisionPayload(null, current), false);
 });
 
 test("copy payload rejects oversized and non-string values", () => {

@@ -1,0 +1,8 @@
+{
+  "name": "vibe-halo-opencode",
+  "version": "0.2.0",
+  "type": "module",
+  "main": "index.mjs",
+  "private": true,
+  "license": "AGPL-3.0-only"
+}

@@ -80,12 +80,13 @@ function psSingleQuote(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-function buildHookCommand(executablePath, hookScriptPath) {
+function buildHookCommand(executablePath, hookScriptPath, args = []) {
   // Electron executables are Windows GUI-subsystem programs. PowerShell's
   // call operator returns immediately for them, dropping the blocking hook's
   // stdin/stdout contract. cmd.exe /c acts as the console parent, waits for
   // ELECTRON_RUN_AS_NODE to finish, and forwards both streams back to Codex.
-  const childCommand = `${cmdQuote(executablePath)} ${cmdQuote(hookScriptPath)}`;
+  const tail = Array.isArray(args) ? args.map(cmdQuote).join(" ") : "";
+  const childCommand = `${cmdQuote(executablePath)} ${cmdQuote(hookScriptPath)}${tail ? ` ${tail}` : ""}`;
   return `$env:ELECTRON_RUN_AS_NODE='1'; cmd.exe /d /s /c ${psSingleQuote(childCommand)}`;
 }
 

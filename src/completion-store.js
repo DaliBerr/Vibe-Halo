@@ -24,6 +24,8 @@ class CompletionStore extends EventEmitter {
     const item = {
       id: crypto.randomUUID(),
       type: "completion",
+      agentId: clean(input.agentId, 80) || "codex",
+      agentName: clean(input.agentName, 120) || "Codex",
       sessionId: clean(input.sessionId, 240),
       title: clean(input.title, 240) || "Codex 已完成",
       output: clean(input.output, 6000),
@@ -57,9 +59,10 @@ class CompletionStore extends EventEmitter {
     return true;
   }
 
-  clear(reason = "cleared", sessionId = null) {
+  clear(reason = "cleared", sessionId = null, agentId = null) {
     if (!this.current) return false;
     if (sessionId && this.current.sessionId !== sessionId) return false;
+    if (agentId && this.current.agentId !== agentId) return false;
     if (this.current.timer) this.clearTimer(this.current.timer);
     this.current = null;
     this.emit("changed", this.snapshot(), reason);

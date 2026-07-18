@@ -1,0 +1,11 @@
+name: vibe-halo
+version: "0.2.0"
+description: "Forward Hermes approvals, clarification prompts, and completion events to Vibe Halo."
+author: "Vibe Halo contributors"
+
+hooks:
+  - on_session_start
+  - pre_llm_call
+  - post_llm_call
+  - pre_tool_call
+  - on_session_end

@@ -1,7 +1,7 @@
 {
   "name": "vibe-halo",
-  "version": "0.1.6",
-  "description": "A Windows dynamic-island approval and input-reminder surface for Codex.",
+  "version": "0.2.0",
+  "description": "A Windows dynamic-island approval, input, and completion surface for AI coding clients.",
   "main": "src/main.js",
   "type": "commonjs",
   "license": "AGPL-3.0-only",

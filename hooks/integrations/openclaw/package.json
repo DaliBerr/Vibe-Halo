@@ -1,0 +1,8 @@
+{
+  "name": "vibe-halo",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "openclaw": { "extensions": ["./index.js"] }
+}

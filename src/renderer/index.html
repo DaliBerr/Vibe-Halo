@@ -47,8 +47,11 @@
       <footer>
         <button id="copy" class="secondary" type="button">复制内容</button>
         <span class="spacer"></span>
-        <button id="deny" class="danger" type="button">拒绝</button>
-        <button id="allow" class="primary" type="button">允许</button>
+        <div id="overflow-actions" class="overflow-actions" hidden>
+          <button id="overflow-toggle" class="secondary" type="button" aria-label="更多操作">更多</button>
+          <div id="overflow-menu" class="overflow-menu" hidden></div>
+        </div>
+        <div id="actions" class="actions"></div>
       </footer>
     </section>
   </main>

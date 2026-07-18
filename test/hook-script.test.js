@@ -6,6 +6,8 @@ const {
   buildBody,
   classifyRole,
   normalizeSessionId,
+  parseAgentId,
+  parseEventArg,
   sanitizePermissionResponse,
 } = require("../hooks/vibe-halo-hook");
 
@@ -23,6 +25,47 @@ test("builds a bounded PermissionRequest body", () => {
   assert.equal(body.tool_name, "Bash");
   assert.equal(body.tool_input.ignored.length, 4000);
   assert.match(body.tool_input_fingerprint, /^[a-f0-9]{64}$/);
+});
+
+test("normalizes generic client argv and payload fields", () => {
+  assert.equal(parseAgentId(["--agent", "zcode", "--event", "PermissionRequest"]), "zcode");
+  assert.equal(parseAgentId(["--agent", "unknown"]), "codex");
+  assert.equal(parseEventArg(["--agent", "zcode", "--event", "Stop"]), "Stop");
+  const body = buildBody({
+    hookEventName: "PermissionRequest", sessionId: "s", requestId: "r", toolName: "Shell", toolInput: { command: "dir" },
+    permissionSuggestions: [{ type: "setMode", mode: "acceptEdits", destination: "session" }],
+  }, "claude-code");
+  assert.equal(body.agent_id, "claude-code");
+  assert.equal(body.session_id, "claude-code:s");
+  assert.equal(body.request_id, "r");
+  assert.deepEqual(body.permission_suggestions, [{ type: "setMode", mode: "acceptEdits", destination: "session" }]);
+});
+
+test("sanitizes client-specific stdout without inventing decisions", () => {
+  assert.equal(sanitizePermissionResponse('{"behavior":"allow","extra":true}', "copilot-cli"), '{"behavior":"allow"}');
+  assert.equal(sanitizePermissionResponse("{}", "copilot-cli"), "");
+  const claude = sanitizePermissionResponse(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: "Elicitation",
+      decision: { behavior: "allow", updatedInput: { answers: { Pick: "A" } }, unsafe: true },
+    },
+  }), "claude-code");
+  assert.deepEqual(JSON.parse(claude), {
+    hookSpecificOutput: {
+      hookEventName: "Elicitation",
+      decision: { behavior: "allow", updatedInput: { answers: { Pick: "A" } } },
+    },
+  });
+  const permission = sanitizePermissionResponse(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: "PermissionRequest",
+      decision: { behavior: "allow", updatedPermissions: [{ type: "setMode", mode: "acceptEdits" }] },
+    },
+  }), "claude-code");
+  assert.deepEqual(JSON.parse(permission).hookSpecificOutput.decision.updatedPermissions, [
+    { type: "setMode", mode: "acceptEdits" },
+  ]);
+  assert.equal(sanitizePermissionResponse("invalid", "claude-code"), "");
 });
 
 test("classifies non-root roles as subagents", () => {
