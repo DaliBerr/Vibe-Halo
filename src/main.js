@@ -27,6 +27,10 @@ const { InputRequestStore } = require("./input-request-store");
 const { createLogger } = require("./logger");
 const { IslandServer } = require("./server");
 const { SettingsStore } = require("./settings-store");
+const { ShutdownCoordinator } = require("./shutdown-coordinator");
+const { UpdateManager } = require("./update-manager");
+const { autoUpdater } = require("electron-updater");
+const appMetadata = require("../package.json");
 
 app.setName(APP_NAME);
 if (process.platform === "win32") app.setAppUserModelId(APP_ID);
@@ -88,10 +92,85 @@ function startApplication() {
   let integrationManager = null;
   let settings = null;
   let logger = null;
-  let quitting = false;
+  let updateManager = null;
+  let shutdownCoordinator = null;
   const approvals = new ApprovalStore();
   const completions = new CompletionStore();
   const inputRequests = new InputRequestStore();
+
+  function shutdownServices(reason = "quit") {
+    if (!shutdownCoordinator) {
+      shutdownCoordinator = new ShutdownCoordinator({
+        logger: logger || { warn() {} },
+        steps: [
+          {
+            name: "server",
+            run: async () => {
+              const activeServer = server;
+              server = null;
+              if (activeServer) await activeServer.stop();
+              else approvals.shutdown();
+            },
+          },
+          { name: "updater", run: () => updateManager?.stop() },
+          {
+            name: "input-monitor",
+            run: () => {
+              inputMonitor?.stop();
+              inputMonitor = null;
+            },
+          },
+          {
+            name: "notifications",
+            run: () => {
+              inputRequests.clear("shutdown");
+              completions.clear("shutdown");
+            },
+          },
+          {
+            name: "island",
+            run: () => {
+              island?.destroy();
+              island = null;
+            },
+          },
+          {
+            name: "tray",
+            run: () => {
+              tray?.destroy();
+              tray = null;
+            },
+          },
+        ],
+      });
+    }
+    return shutdownCoordinator.run(reason);
+  }
+
+  function requestQuit() {
+    shutdownServices("quit").finally(() => app.quit());
+  }
+
+  async function installDownloadedUpdate() {
+    if (!updateManager || updateManager.snapshot().status !== "downloaded") return;
+    if (approvals.size > 0 || inputRequests.size > 0) {
+      const result = await dialog.showMessageBox({
+        type: "warning",
+        buttons: ["稍后", "交回客户端并更新"],
+        defaultId: 0,
+        cancelId: 0,
+        title: APP_NAME,
+        message: "当前仍有客户端请求等待处理。",
+        detail: "继续更新会将待处理审批或问题安全交回客户端原生流程，然后重启 Vibe Halo。",
+      });
+      if (result.response !== 1) return;
+    }
+    const installed = await updateManager.install();
+    if (!installed && shutdownCoordinator?.complete) {
+      try { app.relaunch(); } catch {}
+      app.exit(1);
+    }
+  }
 
   function setLogin(enabled) {
     try {
@@ -123,8 +202,16 @@ function startApplication() {
       const verification = state.verification === "live" ? "本机实测" : (state.verification === "contract" ? "契约测试通过、未在本机实测" : "未验证");
       return `${descriptor.name}：${state.disabledByUser ? "用户停用" : (status.disabled ? "客户端已禁用 Hook" : (status.healthy ? "健康" : (status.detected ? "需修复" : "未检测")))}；${verification}`;
     });
+    const update = updateManager?.snapshot() || {
+      enabled: false,
+      status: "disabled",
+      availableVersion: "",
+      percent: null,
+      error: "",
+    };
     return [
       `应用：${APP_NAME} ${app.getVersion()}`,
+      `自动更新：${update.enabled ? update.status : "此构建未启用"}${update.availableVersion ? `，版本=${update.availableVersion}` : ""}${update.percent != null ? `，进度=${update.percent}%` : ""}${update.error ? `，错误=${update.error}` : ""}`,
       `本地服务：${local.listening ? `127.0.0.1:${local.port}` : "未运行"}`,
       `审批：${settings.get("approvalEnabled") ? "启用" : "停用"}`,
       `等待输入提醒：${settings.get("inputReminderEnabled") ? "启用" : "停用"}`,
@@ -184,8 +271,33 @@ function startApplication() {
         },
       };
     });
+    const update = updateManager?.snapshot() || { enabled: false, status: "disabled" };
+    const updateItems = [{ label: `版本 ${app.getVersion()}`, enabled: false }];
+    if (update.enabled) {
+      if (update.status === "checking") {
+        updateItems.push({ label: "正在检查更新…", enabled: false });
+      } else if (update.status === "available") {
+        updateItems.push({ label: `正在准备下载 ${update.availableVersion || "新版本"}…`, enabled: false });
+      } else if (update.status === "downloading") {
+        updateItems.push({ label: `正在下载 ${update.availableVersion || "新版本"} ${update.percent ?? 0}%`, enabled: false });
+      } else if (update.status === "downloaded") {
+        updateItems.push({
+          label: `重启并更新到 ${update.availableVersion || "新版本"}`,
+          click: () => installDownloadedUpdate(),
+        });
+      } else if (update.status === "installing") {
+        updateItems.push({ label: "正在重启并更新…", enabled: false });
+      } else {
+        updateItems.push({
+          label: update.status === "error" ? "重新检查更新" : "检查更新",
+          click: () => updateManager.check({ manual: true }),
+        });
+      }
+    }
     const items = [
       { label: statusLabel, enabled: false },
+      { type: "separator" },
+      ...updateItems,
       { type: "separator" },
       {
         label: "启用审批",
@@ -313,7 +425,7 @@ function startApplication() {
         },
       },
       { type: "separator" },
-      { label: "退出", click: () => { quitting = true; app.quit(); } },
+      { label: "退出", click: () => requestQuit() },
     );
     tray.setContextMenu(Menu.buildFromTemplate(items));
     tray.setToolTip(`${APP_NAME} — ${statusLabel}`);
@@ -417,6 +529,36 @@ function startApplication() {
     });
     await server.start();
 
+    const updateEnabled = app.isPackaged
+      && process.platform === "win32"
+      && process.env.VIBE_HALO_TEST !== "1"
+      && appMetadata.autoUpdateEnabled === true;
+    updateManager = new UpdateManager({
+      updater: autoUpdater,
+      enabled: updateEnabled,
+      currentVersion: app.getVersion(),
+      logger,
+      beforeInstall: () => shutdownServices("update"),
+    });
+    updateManager.on("changed", (snapshot, reason) => {
+      rebuildTray();
+      if (reason === "downloaded" && tray && process.platform === "win32") {
+        try {
+          tray.displayBalloon({
+            title: `${APP_NAME} 更新已就绪`,
+            content: `${snapshot.availableVersion || "新版本"} 已下载，可从托盘重启更新。`,
+          });
+        } catch {}
+      }
+    });
+    updateManager.on("manual-result", result => {
+      if (result.kind === "up-to-date") {
+        dialog.showMessageBox({ type: "info", title: APP_NAME, message: `当前已是最新版本 ${app.getVersion()}。` });
+      } else if (result.kind === "error") {
+        dialog.showMessageBox({ type: "warning", title: APP_NAME, message: "暂时无法检查更新。", detail: "Vibe Halo 会继续正常运行，你可以稍后从托盘重试。" });
+      }
+    });
+
     tray = new Tray(trayImage());
     tray.on("click", () => {
       if (approvals.current) island.expand(approvals.current.id);
@@ -424,6 +566,7 @@ function startApplication() {
       else if (completions.current) island.expand(completions.current.id);
     });
     rebuildTray();
+    updateManager.start();
     logger.info("Application ready", { version: app.getVersion(), packaged: app.isPackaged });
     if (process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-approval")) {
       const demo = approvals.enqueue({
@@ -467,32 +610,17 @@ function startApplication() {
     }
     if (process.argv.includes("--smoke-test")) {
       const smokeDelay = process.env.VIBE_HALO_SCREENSHOT ? 2600 : 1500;
-      setTimeout(() => { quitting = true; app.quit(); }, smokeDelay);
+      setTimeout(() => requestQuit(), smokeDelay);
     }
   }).catch(error => {
     try { logger?.error("Startup failed", { message: error.message }); } catch {}
     dialog.showErrorBox(APP_NAME, `启动失败：${error.message}`);
-    quitting = true;
-    app.quit();
+    requestQuit();
   });
 
   app.on("before-quit", event => {
-    if (quitting && !server) return;
-    if (!quitting) quitting = true;
-    if (server) {
-      event.preventDefault();
-      const activeServer = server;
-      server = null;
-      activeServer.stop().finally(() => {
-        inputMonitor?.stop();
-        inputRequests.clear("shutdown");
-        island?.destroy();
-        tray?.destroy();
-        app.quit();
-      });
-    } else {
-      inputMonitor?.stop();
-      inputRequests.clear("shutdown");
-    }
+    if (shutdownCoordinator?.complete) return;
+    event.preventDefault();
+    requestQuit();
   });
 }

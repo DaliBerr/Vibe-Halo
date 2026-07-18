@@ -137,6 +137,20 @@ test("accepts completion events and cleans its runtime file", async () => {
   assert.equal(fs.existsSync(runtimePath), false);
 });
 
+test("shutdown returns pending approvals to the client native flow", async () => {
+  const { approvals, server } = await fixture();
+  const pending = request(server, "/permission", permission({ tool_use_id: "shutdown-tool" }));
+  await waitFor(() => approvals.size === 1);
+  servers.splice(servers.indexOf(server), 1);
+
+  await server.stop();
+  const response = await pending;
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body, "{}");
+  assert.equal(approvals.size, 0);
+});
+
 test("routes ZCode, Copilot and OpenCode through their exact codecs", async () => {
   const { approvals, server } = await fixture();
 
