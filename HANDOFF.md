@@ -1,12 +1,12 @@
 # Vibe Halo Project Handoff
 
 Updated: 2026-07-18
-Current version: `0.2.3`
+Current version: `0.3.0`
 Source directory: `C:\Tools\Clawd-island`
 
 ## Current Scope
 
-Vibe Halo is a Windows-first Electron dynamic-island interface for AI coding clients. Version 0.2.3 adds a centered mini-island, non-destructive collapse control to every expanded island and replaces the font-based compact chevron with a geometrically aligned SVG icon while retaining one window, one global approval FIFO, loopback-only transport, strict renderer isolation, and fail-open behavior.
+Vibe Halo is a Windows-first Electron dynamic-island interface for AI coding clients. Version 0.3.0 adds a gated, explicit-restart updater for signed public builds while retaining the centered mini-island, one window, one global approval FIFO, loopback-only transport, strict renderer isolation, and fail-open behavior.
 
 - Dynamic-island approvals: Codex, ZCode, Qwen Code, Copilot CLI, Claude Code, CodeBuddy, Hermes, and OpenCode.
 - Exact interactive answers: ZCode `AskUserQuestion`, Claude/CodeBuddy Elicitation, and Hermes clarify.
@@ -14,7 +14,7 @@ Vibe Halo is a Windows-first Electron dynamic-island interface for AI coding cli
 - Completion/status notifications: Gemini CLI, Antigravity, Cursor Agent, Kiro, CodeWhale, Pi, OpenClaw, Reasonix, and the approval clients.
 - Codex `request_user_input` remains a read-only reminder because Codex does not expose a stable command-hook answer protocol.
 
-The application does not contain desktop pets, remote approvals, a theme system, automatic updates, or the old Clawd on Desk multi-agent state machine.
+The application does not contain desktop pets, remote approvals, a theme system, or the old Clawd on Desk multi-agent state machine.
 
 ## Architecture
 
@@ -25,6 +25,8 @@ The application does not contain desktop pets, remote approvals, a theme system,
 - `src/server.js`: authenticated `127.0.0.1` gateway with a 256 KiB request limit and adapter routing.
 - `src/approval-store.js`: semantic decisions, `agentId`-isolated deduplication, connection fan-out, and the shared FIFO.
 - `src/main.js`: service wiring, auto-scan, diagnostics, tray integration manager, and notification lifecycle.
+- `src/update-manager.js`: signed-build gating, background update checks/downloads, bounded status, and explicit restart installation.
+- `src/shutdown-coordinator.js`: idempotent ordered shutdown that returns pending decisions to native client flows before update installation.
 - `src/island-controller.js` and `src/renderer/`: current-item IPC validation, dynamic actions, overflow menu, interactive forms, sizing, focus, and animation.
 
 ## Safety Invariants
@@ -38,7 +40,8 @@ The application does not contain desktop pets, remote approvals, a theme system,
 ## Verification Status
 
 - Automated suite: 19 adapters, codecs, forms, global FIFO, server authentication/bounds, command-hook E2E, offline fallback, installers, backups, idempotence, explicit disables, safe uninstall, IPC, sizing, stores, and legacy regressions.
-- Windows unpacked build: 0.2.3 launches, creates a valid process-owned runtime identity, and loads all unpacked managed assets.
+- Automatic-update suite: signed-build gating, scheduler state, download/install transitions, sanitized errors, ordered fail-open shutdown, external signing staging/injection, and signed-byte metadata regeneration.
+- Windows unpacked build: 0.3.0 launches and exits cleanly in an isolated smoke profile, contains LICENSE/NOTICE and the updater module, and remains auto-update-disabled unless a trusted publisher is supplied at build time. Signed release verification is gated on SignPath Foundation approval.
 - Codex: trusted Hook health detected; command Hook single-allow path returned the exact Codex protocol.
 - ZCode 3.3.0: native process hooks use `cmd.exe` plus explicit arguments and a waiting, no-new-window PowerShell launcher. This is required because a direct PowerShell invocation detaches the packaged GUI-subsystem Electron process and returns empty stdout to ZCode before the Hook decision is ready. Health checks repair that legacy launcher, invalid wildcard matchers, and malformed 0.2.0 shell-command entries. Real approval, completion, structured `AskUserQuestion`, exact `updatedInput.answers` round-trips, immediate single-choice submission, and the final allow response are verified against the running app.
 - Cursor 2.2.44: auto-detected; installed Hook `stop` and `beforeSubmitPrompt` protocols verified against the running app, including same-session notification cleanup.
@@ -57,7 +60,9 @@ npm run build
 ```
 
 - Electron 41, CommonJS, native HTML/CSS/JavaScript, x64 NSIS.
-- Artifact: `dist/Vibe-Halo-Setup-0.2.3-x64.exe`.
+- Artifact: `dist/Vibe-Halo-Setup-0.3.0-x64.exe`.
+- Local artifacts are intentionally unsigned and update-disabled. The tagged GitHub workflow signs the app EXE and NSIS elevation helper, then the generated uninstaller and final installer in order, and finally regenerates `latest.yml` and the blockmap from the signed installer.
+- Version 0.2.3 requires one final manual bootstrap install of signed 0.3.0. SignPath has not yet been applied for, so no public auto-update release may be created until approval and publisher verification are complete.
 - Keep `LICENSE`, `NOTICE.md`, and upstream attribution in every release.
 - `dist/`, `node_modules/`, `.smoke/`, logs, and contributor-local `AGENTS.local.md` are not committed.
 - After moving source or installing a different build, run integration repair and review changed Codex Hook commands in `/hooks`.

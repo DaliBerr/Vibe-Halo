@@ -28,6 +28,8 @@ Codex 0.129.0 及之后版本会要求用户审核新安装或发生变化的 co
 - 展开态顶部中央的箭头可将灵动岛收回紧凑状态，不会关闭通知，也不会对待处理请求作出决定；`Esc` 保留相同行为。
 - 本地服务只监听 `127.0.0.1`，每次启动生成新令牌并写入 `~/.vibe-halo/runtime.json`。
 - 托盘“客户端集成”菜单可逐项停用/启用、重新扫描、修复或卸载全部；用户停用项不会在下次启动自动重装。
+- 经过 SignPath 签名的公开版本会从 GitHub Releases 后台检查并下载稳定更新；下载完成后必须由用户在托盘中明确选择“重启并更新”，不会在普通退出时自动安装。
+- 更新重启前会先把所有待处理审批和交互安全交回客户端原生流程。0.2.3 本身不含更新器，因此需要最后一次手动安装签名的 0.3.0 引导版。
 
 ## 项目结构
 
@@ -40,7 +42,10 @@ Codex 0.129.0 及之后版本会要求用户审核新安装或发生变化的 co
 - `src/input-request-store.js`：等待输入提醒的 FIFO、去重和生命周期。
 - `src/server.js`：带令牌的 loopback HTTP 网关。
 - `src/island-controller.js`：单一 Electron 灵动岛窗口和受限 IPC。
+- `src/update-manager.js`：仅主进程可见的检查、下载和显式重启更新状态机。
+- `src/shutdown-coordinator.js`：普通退出与更新共用的幂等安全关闭顺序。
 - `src/hook-manager.js`：Hook 配置备份、迁移、修复与恢复。
+- `docs/RELEASING.md`：SignPath、GitHub Actions 和签名发布流程。
 - `test/`：协议、队列、服务器、Hook 和显示器回退测试。
 
 ## 许可证
