@@ -175,6 +175,12 @@ class IslandServer {
         try { output = encodeDecision(agentId, decision, normalized); }
         catch { output = noDecisionOutput(agentId); }
         sendAdapterDecision(res, 200, agentId, output);
+        this.logger.info("Permission response sent", {
+          agentId,
+          approvalId: entry?.id || null,
+          optionId: text(decision?.optionId, 80) || "native",
+          tool: normalized.toolName,
+        });
       },
     };
     const result = this.approvalStore.enqueue(normalized, waiter);

@@ -128,9 +128,13 @@ function commandFor(executablePath, scriptPath, agentId, event) {
 }
 
 function processCommandFor(executablePath, scriptPath, agentId, event) {
+  const escapePowerShell = value => String(value).replace(/'/g, "''");
+  const nativeArgs = `"${String(scriptPath)}" --agent "${agentId}" --event "${event}"`;
   const ps = [
+    "$ProgressPreference='SilentlyContinue'",
     "$env:ELECTRON_RUN_AS_NODE='1'",
-    `& '${String(executablePath).replace(/'/g, "''")}' '${String(scriptPath).replace(/'/g, "''")}' --agent '${agentId}' --event '${event}'`,
+    `$process=Start-Process -FilePath '${escapePowerShell(executablePath)}' -ArgumentList '${escapePowerShell(nativeArgs)}' -NoNewWindow -Wait -PassThru`,
+    "exit $process.ExitCode",
   ].join("; ");
   const encoded = Buffer.from(ps, "utf16le").toString("base64");
   return `set VIBE_HALO_HOOK=${MARKER}&&powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encoded}`;
@@ -151,6 +155,10 @@ function isHealthyZcodeProcessHook(value, event) {
   if (!Array.isArray(value.args) || value.args.length !== 4) return false;
   if (value.args[0] !== "/d" || value.args[1] !== "/s" || value.args[2] !== "/c") return false;
   if (typeof value.args[3] !== "string" || !value.args[3].includes(`VIBE_HALO_HOOK=${MARKER}`)) return false;
+  const encoded = value.args[3].match(/-EncodedCommand\s+([A-Za-z0-9+/=]+)\s*$/)?.[1];
+  if (!encoded) return false;
+  const powershell = Buffer.from(encoded, "base64").toString("utf16le");
+  if (!powershell.includes("Start-Process") || !powershell.includes("-NoNewWindow") || !powershell.includes("-Wait") || !powershell.includes("-PassThru")) return false;
   return value.timeoutMs === (event === "PermissionRequest" ? 135000 : 10000);
 }
 

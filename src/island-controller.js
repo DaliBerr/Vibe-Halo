@@ -216,8 +216,24 @@ class IslandController {
     }
 
     this.handleIpc("island:decision", (event, payload) => {
-      if (!this.validSender(event) || !validDecisionPayload(payload, this.approvals.current)) return;
-      this.approvals.resolve(payload.approvalId, payload.optionId, { answers: payload.answers });
+      if (!this.validSender(event)) {
+        this.logger.warn("Rejected renderer decision", { reason: "invalid-sender" });
+        return;
+      }
+      const current = this.approvals.current;
+      if (!validDecisionPayload(payload, current)) {
+        this.logger.warn("Rejected renderer decision", { reason: "invalid-payload", currentId: current?.id || null });
+        return;
+      }
+      const accepted = this.approvals.resolve(payload.approvalId, payload.optionId, { answers: payload.answers });
+      this.logger.info("Renderer decision received", {
+        accepted,
+        agentId: current.agentId,
+        approvalId: current.id,
+        answerCount: payload.answers && typeof payload.answers === "object" ? Object.keys(payload.answers).length : 0,
+        optionId: payload.optionId,
+        tool: current.toolName,
+      });
     });
     this.handleIpc("island:close", (event, payload) => {
       if (!this.validSender(event) || !payload || typeof payload.id !== "string") return;

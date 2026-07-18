@@ -359,16 +359,19 @@ async function main() {
   const payload = await readStdinJson() || {};
   const event = parseEventArg();
   if (event && !payload.hook_event_name && !payload.hookEventName && !payload.event) payload.hook_event_name = event;
-  const output = await run(payload, { agentId });
-  if (output) process.stdout.write(`${output}\n`);
+  return run(payload, { agentId });
+}
+
+function exitWithOutput(output) {
+  if (!output) {
+    process.exit(0);
+    return;
+  }
+  process.stdout.write(`${output}\n`, () => process.exit(0));
 }
 
 if (require.main === module) {
-  main().then(() => process.exit(0), () => {
-    const output = noDecisionOutput(parseAgentId());
-    if (output) process.stdout.write(`${output}\n`);
-    process.exit(0);
-  });
+  main().then(exitWithOutput, () => exitWithOutput(noDecisionOutput(parseAgentId())));
 }
 
 module.exports = {

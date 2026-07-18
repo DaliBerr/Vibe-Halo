@@ -163,6 +163,22 @@ test("installed ZCode process hooks run without a shell and deliver every manage
     hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "allow" } },
   });
 
+  // ZCode reads the decision from a child-process pipe. Exercise repeated real
+  // process exits so stdout must be flushed before the managed Hook terminates.
+  for (let index = 0; index < 5; index += 1) {
+    const repeated = runProcessHook(entry("PermissionRequest"), root, {
+      session_id: "zcode-process",
+      request_id: `permission-repeat-${index}`,
+      tool_name: "Shell",
+      tool_input: { command: "dir" },
+    });
+    await waitFor(() => approvals.size === 1);
+    approvals.resolve(approvals.current.id, "allow");
+    assert.deepEqual(JSON.parse(await repeated), {
+      hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "allow" } },
+    });
+  }
+
   const questions = [{ header: "方案", question: "选择哪个方案？", options: [
     { label: "方案 A", description: "保守" },
     { label: "方案 B", description: "均衡" },
