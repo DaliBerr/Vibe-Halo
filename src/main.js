@@ -1,0 +1,411 @@
+"use strict";
+
+const fs = require("fs");
+const path = require("path");
+const {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  ipcMain,
+  Menu,
+  nativeImage,
+  nativeTheme,
+  screen,
+  shell,
+  Tray,
+} = require("electron");
+const { APP_ID, APP_NAME } = require("./constants");
+const { ApprovalStore } = require("./approval-store");
+const { CodexInputMonitor } = require("./codex-input-monitor");
+const { CompletionStore } = require("./completion-store");
+const { HookManager } = require("./hook-manager");
+const { IslandController } = require("./island-controller");
+const { InputRequestStore } = require("./input-request-store");
+const { createLogger } = require("./logger");
+const { IslandServer } = require("./server");
+const { SettingsStore } = require("./settings-store");
+
+app.setName(APP_NAME);
+if (process.platform === "win32") app.setAppUserModelId(APP_ID);
+if (process.env.VIBE_HALO_USER_DATA) app.setPath("userData", process.env.VIBE_HALO_USER_DATA);
+
+function hookScriptPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "app.asar.unpacked", "hooks", "vibe-halo-hook.js")
+    : path.join(__dirname, "..", "hooks", "vibe-halo-hook.js");
+}
+
+function createHookManager(logger) {
+  return new HookManager({
+    executablePath: process.execPath,
+    hookScriptPath: hookScriptPath(),
+    logger,
+  });
+}
+
+if (process.argv.includes("--uninstall-hooks")) {
+  try { createHookManager({ info() {}, warn() {}, error() {} }).uninstall(); }
+  catch {}
+  app.exit(0);
+} else {
+  startApplication();
+}
+
+function startApplication() {
+  const gotLock = process.env.VIBE_HALO_TEST === "1" || app.requestSingleInstanceLock();
+  if (!gotLock) {
+    app.quit();
+    return;
+  }
+
+  let tray = null;
+  let island = null;
+  let server = null;
+  let inputMonitor = null;
+  let hookManager = null;
+  let settings = null;
+  let logger = null;
+  let quitting = false;
+  const approvals = new ApprovalStore();
+  const completions = new CompletionStore();
+  const inputRequests = new InputRequestStore();
+
+  function setLogin(enabled) {
+    try {
+      if (process.env.VIBE_HALO_TEST !== "1") {
+        app.setLoginItemSettings({ openAtLogin: !!enabled, path: process.execPath });
+      }
+      settings.set("openAtLogin", !!enabled);
+      return true;
+    } catch (error) {
+      logger.warn("Failed to update login item", { message: error.message });
+      return false;
+    }
+  }
+
+  function diagnosticText() {
+    const hook = hookManager.status();
+    const local = server ? server.status() : { listening: false, port: null, runtimePath: "-" };
+    const input = inputMonitor ? inputMonitor.status() : {
+      running: false,
+      sessionsFound: false,
+      sessionsDir: "-",
+      trackedFiles: 0,
+      pendingCount: 0,
+      lastError: null,
+    };
+    return [
+      `应用：${APP_NAME} ${app.getVersion()}`,
+      `本地服务：${local.listening ? `127.0.0.1:${local.port}` : "未运行"}`,
+      `审批：${settings.get("approvalEnabled") ? "启用" : "停用"}`,
+      `等待输入提醒：${settings.get("inputReminderEnabled") ? "启用" : "停用"}`,
+      `Codex 集成：${settings.get("integrationInstalled") ? "已安装" : "已卸载"}`,
+      `待审批：${approvals.size}`,
+      `等待输入：${inputRequests.size}`,
+      `Codex 目录：${hook.codexHomeExists ? "已找到" : "未找到"}`,
+      `Hooks 功能：${hook.feature}`,
+      `Hook 事件：${Object.entries(hook.events).map(([key, value]) => `${key}=${value ? "ok" : "missing"}`).join(", ")}`,
+      `Hook 信任：${Object.entries(hook.trust.events).map(([key, value]) => `${key}=${value}`).join(", ")}`,
+      `运行时：${local.runtimePath}`,
+      `会话监控：${input.running ? "运行中" : "未运行"}, 目录=${input.sessionsFound ? "已找到" : "未找到"}, 文件=${input.trackedFiles}, 待响应=${input.pendingCount}`,
+      `会话目录：${input.sessionsDir}`,
+      `会话监控错误：${input.lastError || "无"}`,
+      `日志：${logger.filePath}`,
+    ].join("\n");
+  }
+
+  function trayImage() {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect x="2" y="5" width="28" height="22" rx="11" fill="#111318"/><circle cx="10" cy="16" r="3" fill="#72e5a5"/><path d="M17 12h7M17 16h7M17 20h5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>`;
+    const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+    const image = nativeImage.createFromDataURL(dataUrl);
+    return image.isEmpty() ? nativeImage.createEmpty() : image.resize({ width: 16, height: 16 });
+  }
+
+  function rebuildTray() {
+    if (!tray) return;
+    const hook = hookManager.status();
+    const local = server ? server.status() : { listening: false, port: null };
+    const statusLabel = !local.listening
+      ? "服务未运行"
+      : !settings.get("integrationInstalled")
+        ? "Codex 集成已卸载"
+      : hook.feature === "false"
+        ? "Codex Hooks 已禁用"
+        : hook.trust.pendingCount > 0
+          ? "Codex Hook 待审核"
+        : hook.healthy ? "Codex 审批服务正常" : "Codex Hook 需要修复";
+    const items = [
+      { label: statusLabel, enabled: false },
+      { type: "separator" },
+      {
+        label: "启用审批",
+        type: "checkbox",
+        checked: settings.get("approvalEnabled"),
+        click: item => { settings.set("approvalEnabled", item.checked); rebuildTray(); },
+      },
+      {
+        label: "等待输入提醒",
+        type: "checkbox",
+        checked: settings.get("inputReminderEnabled"),
+        click: item => {
+          settings.set("inputReminderEnabled", item.checked);
+          if (item.checked) inputMonitor?.replayPending();
+          else inputRequests.clear("disabled");
+          rebuildTray();
+        },
+      },
+      {
+        label: "开机启动",
+        type: "checkbox",
+        checked: settings.get("openAtLogin"),
+        click: item => { setLogin(item.checked); rebuildTray(); },
+      },
+    ];
+    if (hook.feature === "false") {
+      items.push({
+        label: "启用 Codex Hooks…",
+        click: async () => {
+          const result = await dialog.showMessageBox({
+            type: "question",
+            buttons: ["取消", "启用"],
+            defaultId: 1,
+            cancelId: 0,
+            title: APP_NAME,
+            message: "Codex config.toml 明确禁用了 Hooks。是否将 hooks 设置为 true？",
+          });
+          if (result.response === 1) {
+            hookManager.enableFeature();
+            settings.set("integrationInstalled", true);
+            hookManager.install();
+            rebuildTray();
+          }
+        },
+      });
+    }
+    if (hook.trust.pendingCount > 0) {
+      items.push({
+        label: "审核 Codex Hook…",
+        click: async () => {
+          const result = await dialog.showMessageBox({
+            type: "warning",
+            buttons: ["关闭", "复制 /hooks"],
+            defaultId: 1,
+            cancelId: 0,
+            title: APP_NAME,
+            message: "Codex 尚未信任 Vibe Halo Hook",
+            detail: "请在 Codex 的输入框中执行 /hooks，找到用户级 ~/.codex/hooks.json，并审核、信任 Vibe Halo 的 PermissionRequest、Stop 和 UserPromptSubmit 条目。Codex 官方目前没有可供本地安装器调用的安全信任 API。",
+          });
+          if (result.response === 1) clipboard.writeText("/hooks");
+        },
+      });
+    }
+    items.push(
+      {
+        label: "修复 Codex Hook",
+        click: async () => {
+          settings.set("integrationInstalled", true);
+          const result = hookManager.install();
+          rebuildTray();
+          await dialog.showMessageBox({
+            type: result.ok ? "info" : "error",
+            title: APP_NAME,
+            message: result.ok ? "Codex Hook 配置已检查并修复。" : "无法修复 Codex Hook。",
+            detail: result.reason || (hookManager.status().trust.pendingCount > 0
+              ? "配置已写入，但仍需在 Codex 输入 /hooks，审核并信任 Vibe Halo 条目。"
+              : `Hooks 功能状态：${result.feature}`),
+          });
+        },
+      },
+      {
+        label: "诊断信息",
+        click: async () => {
+          const detail = diagnosticText();
+          const result = await dialog.showMessageBox({
+            type: "info",
+            buttons: ["关闭", "复制", "打开日志目录"],
+            defaultId: 0,
+            title: `${APP_NAME} 诊断`,
+            message: "运行状态",
+            detail,
+          });
+          if (result.response === 1) clipboard.writeText(detail);
+          if (result.response === 2) shell.openPath(path.dirname(logger.filePath));
+        },
+      },
+      {
+        label: "卸载 Codex 集成…",
+        click: async () => {
+          const result = await dialog.showMessageBox({
+            type: "warning",
+            buttons: ["取消", "卸载集成"],
+            defaultId: 0,
+            cancelId: 0,
+            title: APP_NAME,
+            message: "移除 Vibe Halo 的 Codex Hook？",
+            detail: "这不会退出应用；之后 Codex 将使用原生审批。可随时通过“修复 Codex Hook”重新安装。",
+          });
+          if (result.response === 1) {
+            hookManager.uninstall();
+            settings.set("integrationInstalled", false);
+            settings.set("approvalEnabled", false);
+            rebuildTray();
+          }
+        },
+      },
+      { type: "separator" },
+      { label: "退出", click: () => { quitting = true; app.quit(); } },
+    );
+    tray.setContextMenu(Menu.buildFromTemplate(items));
+    tray.setToolTip(`${APP_NAME} — ${statusLabel}`);
+  }
+
+  function handleCodexEvent(data) {
+    if (data.codex_session_role === "subagent") return;
+    const sessionId = typeof data.session_id === "string" ? data.session_id : "codex:unknown";
+    if (data.event === "UserPromptSubmit") {
+      completions.clear("new-prompt", sessionId);
+      inputRequests.clearSession(sessionId, "new-prompt");
+      return;
+    }
+    if (data.event !== "Stop") return;
+    inputRequests.clearSession(sessionId, "session-stopped");
+    if (approvals.size > 0 || inputRequests.size > 0) return;
+    const cwd = typeof data.cwd === "string" ? data.cwd : "";
+    completions.show({
+      sessionId,
+      title: typeof data.session_title === "string" && data.session_title.trim()
+        ? data.session_title.trim()
+        : (cwd ? path.basename(cwd) : "Codex 已完成"),
+      output: typeof data.assistant_last_output === "string" ? data.assistant_last_output : "任务已完成",
+      cwd,
+      sourcePid: Number.isInteger(data.source_pid) ? data.source_pid : null,
+      pidChain: Array.isArray(data.pid_chain) ? data.pid_chain : [],
+    });
+  }
+
+  app.on("second-instance", () => {
+    if (tray && process.platform === "win32") {
+      try { tray.displayBalloon({ title: APP_NAME, content: "Vibe Halo 已在后台运行。" }); } catch {}
+    }
+  });
+
+  app.on("window-all-closed", event => event?.preventDefault?.());
+
+  app.whenReady().then(async () => {
+    logger = createLogger(path.join(app.getPath("userData"), "logs"));
+    settings = new SettingsStore(path.join(app.getPath("userData"), "settings.json"));
+    hookManager = createHookManager(logger);
+    if (!settings.get("initialized")) {
+      setLogin(true);
+      settings.set("initialized", true);
+    }
+
+    const hookResult = settings.get("integrationInstalled")
+      ? hookManager.install()
+      : { ok: true, reason: "integration-disabled" };
+    if (!hookResult.ok) logger.warn("Codex Hook not installed", { reason: hookResult.reason });
+
+    island = new IslandController({
+      BrowserWindow,
+      clipboard,
+      completionStore: completions,
+      inputRequestStore: inputRequests,
+      ipcMain,
+      logger,
+      nativeTheme,
+      approvalStore: approvals,
+      screen,
+      onChanged: () => rebuildTray(),
+    });
+    island.create();
+
+    inputMonitor = new CodexInputMonitor({
+      logger,
+      onRequested: request => {
+        if (!settings.get("inputReminderEnabled")) return false;
+        return !!inputRequests.enqueue(request).entry;
+      },
+      onResolved: request => inputRequests.resolve(request.requestKey),
+    });
+    inputMonitor.start();
+
+    server = new IslandServer({
+      approvalStore: approvals,
+      isApprovalEnabled: () => settings.get("approvalEnabled"),
+      logger,
+      onEvent: handleCodexEvent,
+    });
+    await server.start();
+
+    tray = new Tray(trayImage());
+    tray.on("click", () => {
+      if (approvals.current) island.expand(approvals.current.id);
+      else if (inputRequests.current) island.expand(inputRequests.current.id);
+      else if (completions.current) island.expand(completions.current.id);
+    });
+    rebuildTray();
+    logger.info("Application ready", { version: app.getVersion(), packaged: app.isPackaged });
+    if (process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-approval")) {
+      const demo = approvals.enqueue({
+        sessionId: "codex:demo",
+        toolUseId: "demo-tool",
+        toolName: "PowerShell",
+        description: "运行完整测试套件并读取结果。这个说明故意较长，用于确认高 DPI 和多行文字下操作按钮仍保持可见。",
+        toolInput: {
+          command: "npm test -- --test-reporter=spec --test-concurrency=1",
+          cwd: "C:\\Projects\\demo-with-a-longer-workspace-name",
+          timeout_ms: 120000,
+          description: "运行完整测试套件并读取结果。这个说明故意较长，用于确认高 DPI 和多行文字下操作按钮仍保持可见。",
+          environment: { CI: "1", FORCE_COLOR: "0" },
+        },
+        cwd: "C:\\Projects\\demo",
+        sourcePid: process.pid,
+        pidChain: [process.pid],
+      }, { complete() {} }).entry;
+      if (process.argv.includes("--demo-expanded")) {
+        setTimeout(() => island.expand(demo.id), 180);
+      }
+      if (process.env.VIBE_HALO_SCREENSHOT) {
+        setTimeout(async () => {
+          try {
+            const image = await island.window.webContents.capturePage();
+            fs.mkdirSync(path.dirname(process.env.VIBE_HALO_SCREENSHOT), { recursive: true });
+            fs.writeFileSync(process.env.VIBE_HALO_SCREENSHOT, image.toPNG());
+          } catch (error) {
+            logger.warn("Demo screenshot failed", { message: error.message });
+          }
+        }, 1400);
+      }
+    }
+    if (process.argv.includes("--smoke-test")) {
+      const smokeDelay = process.env.VIBE_HALO_SCREENSHOT ? 2600 : 1500;
+      setTimeout(() => { quitting = true; app.quit(); }, smokeDelay);
+    }
+  }).catch(error => {
+    try { logger?.error("Startup failed", { message: error.message }); } catch {}
+    dialog.showErrorBox(APP_NAME, `启动失败：${error.message}`);
+    quitting = true;
+    app.quit();
+  });
+
+  app.on("before-quit", event => {
+    if (quitting && !server) return;
+    if (!quitting) quitting = true;
+    if (server) {
+      event.preventDefault();
+      const activeServer = server;
+      server = null;
+      activeServer.stop().finally(() => {
+        inputMonitor?.stop();
+        inputRequests.clear("shutdown");
+        island?.destroy();
+        tray?.destroy();
+        app.quit();
+      });
+    } else {
+      inputMonitor?.stop();
+      inputRequests.clear("shutdown");
+    }
+  });
+}

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>Vibe Halo</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="island" class="island compact" role="dialog" aria-live="polite">
+    <section id="compact" class="compact-view" tabindex="0">
+      <span id="pulse" class="pulse"></span>
+      <span id="compact-title" class="compact-title">Codex</span>
+      <span id="count" class="count" hidden></span>
+      <span class="chevron" aria-hidden="true">⌄</span>
+    </section>
+
+    <section id="expanded" class="expanded-view" hidden>
+      <header>
+        <div class="identity">
+          <span class="codex-mark">C</span>
+          <div class="identity-copy">
+            <div id="title" class="title"></div>
+            <div id="subtitle" class="subtitle"></div>
+          </div>
+        </div>
+        <button id="close" class="icon-button" type="button" aria-label="关闭">×</button>
+      </header>
+
+      <div id="description" class="description" hidden></div>
+
+      <section id="content-panel" class="content-panel">
+        <div id="primary-block" class="primary-block">
+          <div id="primary-label" class="section-label" hidden></div>
+          <pre id="primary-code" class="primary-code" hidden></pre>
+          <div id="primary-prose" class="primary-prose" hidden></div>
+        </div>
+        <div id="question-list" class="question-list" hidden></div>
+        <dl id="metadata" class="metadata" hidden></dl>
+        <details id="raw-details" class="raw-details" hidden>
+          <summary>查看完整参数</summary>
+          <pre id="raw-content" class="raw-content"></pre>
+        </details>
+      </section>
+
+      <footer>
+        <button id="copy" class="secondary" type="button">复制内容</button>
+        <span class="spacer"></span>
+        <button id="deny" class="danger" type="button">拒绝</button>
+        <button id="allow" class="primary" type="button">允许</button>
+      </footer>
+    </section>
+  </main>
+  <script src="./renderer.js"></script>
+</body>
+</html>

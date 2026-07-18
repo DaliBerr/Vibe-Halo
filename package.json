@@ -1,0 +1,52 @@
+{
+  "name": "vibe-halo",
+  "version": "0.1.5",
+  "description": "A Windows dynamic-island approval and input-reminder surface for Codex.",
+  "main": "src/main.js",
+  "type": "commonjs",
+  "license": "AGPL-3.0-only",
+  "author": "Vibe Halo contributors",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "build": "electron-builder --win nsis:x64",
+    "build:dir": "electron-builder --win dir:x64"
+  },
+  "devDependencies": {
+    "electron": "^41.0.2",
+    "electron-builder": "^26.8.1"
+  },
+  "dependencies": {
+    "koffi": "^2.15.2"
+  },
+  "build": {
+    "appId": "com.vibe.halo",
+    "productName": "Vibe Halo",
+    "artifactName": "Vibe-Halo-Setup-${version}-${arch}.${ext}",
+    "asar": true,
+    "asarUnpack": [
+      "hooks/**/*"
+    ],
+    "files": [
+      "src/**/*",
+      "hooks/**/*",
+      "LICENSE",
+      "NOTICE.md",
+      "README.md"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh"
+    }
+  }
+}
