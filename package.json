@@ -1,6 +1,6 @@
 {
   "name": "vibe-halo",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A Windows dynamic-island approval and input-reminder surface for Codex.",
   "main": "src/main.js",
   "type": "commonjs",
