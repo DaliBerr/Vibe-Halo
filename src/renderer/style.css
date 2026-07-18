@@ -77,9 +77,29 @@ button { font: inherit; }
 .input-request .pulse { background: #ffbf69; box-shadow: 0 0 0 0 rgba(255, 191, 105, 0.55); }
 .compact-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 660; }
 .count { min-width: 22px; padding: 3px 7px; border-radius: 11px; background: var(--surface-soft); color: var(--muted); text-align: center; font-size: 12px; }
-.chevron { color: var(--muted); font-size: 16px; transform: translateY(-1px); }
+.compact-chevron {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.chevron-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
 
 .expanded-view {
+  position: relative;
   height: 100%;
   min-height: 0;
   padding: 24px;
@@ -89,6 +109,27 @@ button { font: inherit; }
   transform-origin: top center;
   animation: expanded-enter 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+.collapse-button {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 46px;
+  height: 18px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: #08090b;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 3px 9px rgba(0, 0, 0, 0.28);
+  color: rgba(255, 255, 255, 0.74);
+  cursor: pointer;
+}
+.collapse-button:hover { background: #15171b; color: rgba(255, 255, 255, 0.92); }
+.collapse-button:focus-visible { outline: 2px solid rgba(114, 167, 255, 0.7); outline-offset: -2px; }
+.collapse-button .chevron-icon { width: 11px; height: 11px; }
 
 header { min-width: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .identity { display: flex; align-items: center; min-width: 0; gap: 13px; }
@@ -158,6 +199,7 @@ footer button { min-width: 84px; height: 40px; padding: 0 18px; border: 1px soli
 .primary { background: var(--primary); color: var(--primary-text); }
 button:hover { filter: brightness(1.12); }
 button:active { transform: translateY(1px); }
+.collapse-button:active { transform: translateX(-50%) translateY(1px); }
 
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(114, 229, 165, 0); }

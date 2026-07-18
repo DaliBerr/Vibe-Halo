@@ -16,6 +16,7 @@ const questionList = document.getElementById("question-list");
 const metadata = document.getElementById("metadata");
 const rawDetails = document.getElementById("raw-details");
 const rawContent = document.getElementById("raw-content");
+const collapseButton = document.getElementById("collapse");
 const closeButton = document.getElementById("close");
 const copyButton = document.getElementById("copy");
 const actions = document.getElementById("actions");
@@ -297,6 +298,10 @@ compact.addEventListener("keydown", event => {
   if (event.key === "Enter" || event.key === " ") compact.click();
 });
 closeButton.addEventListener("click", () => state?.current && window.islandAPI.close(state.current.id));
+collapseButton.addEventListener("click", () => {
+  if (!state?.current || !state.mode.endsWith("expanded")) return;
+  window.islandAPI.view(state.current.id, "collapse");
+});
 copyButton.addEventListener("click", () => {
   window.islandAPI.copy(copyText);
   copyButton.textContent = "已复制";
