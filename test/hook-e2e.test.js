@@ -7,8 +7,10 @@ const { spawn } = require("child_process");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { ApprovalStore } = require("../src/approval-store");
+const { IntegrationManager, readJson } = require("../src/integration-manager");
 const { IslandServer } = require("../src/server");
 
+const HOOK_SCRIPT = path.resolve(__dirname, "..", "hooks", "vibe-halo-hook.js");
 const roots = [];
 const servers = [];
 test.afterEach(async () => {
@@ -17,10 +19,9 @@ test.afterEach(async () => {
 });
 
 function runHook(runtimeDir, payload, agentId = "codex") {
-const script = path.resolve(__dirname, "..", "hooks", "vibe-halo-hook.js");
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [script, "--agent", agentId], {
-    env: { ...process.env, VIBE_HALO_RUNTIME_DIR: runtimeDir },
+    const child = spawn(process.execPath, [HOOK_SCRIPT, "--agent", agentId], {
+      env: { ...process.env, VIBE_HALO_RUNTIME_DIR: runtimeDir },
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -35,6 +36,42 @@ const script = path.resolve(__dirname, "..", "hooks", "vibe-halo-hook.js");
     });
     child.stdin.end(JSON.stringify(payload));
   });
+}
+
+function runProcessHook(entry, runtimeDir, payload) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(entry.command, entry.args, {
+      env: { ...process.env, VIBE_HALO_RUNTIME_DIR: runtimeDir },
+      windowsHide: true,
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on("data", chunk => stdout.push(chunk));
+    child.stderr.on("data", chunk => stderr.push(chunk));
+    child.on("error", reject);
+    child.on("exit", code => {
+      if (code !== 0) return reject(new Error(`process hook exited ${code}: ${Buffer.concat(stderr)}`));
+      resolve(Buffer.concat(stdout).toString("utf8").trim());
+    });
+    child.stdin.end(JSON.stringify(payload));
+  });
+}
+
+function installZcodeHooks(root) {
+  const home = path.join(root, "home");
+  const configPath = path.join(home, ".zcode", "cli", "config.json");
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, "{}\n");
+  const manager = new IntegrationManager({
+    homeDir: home,
+    backupRoot: path.join(root, "backups"),
+    executablePath: process.execPath,
+    hookScriptPath: HOOK_SCRIPT,
+  });
+  assert.equal(manager.install("zcode").ok, true);
+  return readJson(configPath).hooks.events;
 }
 
 function waitFor(predicate, timeoutMs = 5000) {
@@ -93,6 +130,79 @@ test("generic command hook handles ZCode and Copilot wire formats", async () => 
   await waitFor(() => approvals.size === 1);
   approvals.resolve(approvals.current.id, "allow");
   assert.deepEqual(JSON.parse(await copilotOutput), { behavior: "allow" });
+});
+
+test("installed ZCode process hooks run without a shell and deliver every managed event", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-halo-zcode-process-"));
+  roots.push(root);
+  const approvals = new ApprovalStore({ timeoutMs: 10_000 });
+  const events = [];
+  const server = new IslandServer({
+    approvalStore: approvals,
+    runtimePath: path.join(root, "runtime.json"),
+    onEvent: event => events.push(event),
+  });
+  await server.start();
+  servers.push(server);
+  const installed = installZcodeHooks(root);
+  const managedEntry = event => installed[event].find(item => item.hooks?.[0]?.command === "cmd.exe");
+  const entry = event => managedEntry(event).hooks[0];
+
+  assert.equal(managedEntry("PermissionRequest").matcher, undefined);
+  assert.equal(managedEntry("SessionStart").matcher, undefined);
+
+  const permission = runProcessHook(entry("PermissionRequest"), root, {
+    session_id: "zcode-process",
+    request_id: "permission-1",
+    tool_name: "Shell",
+    tool_input: { command: "dir" },
+  });
+  await waitFor(() => approvals.size === 1);
+  approvals.resolve(approvals.current.id, "allow");
+  assert.deepEqual(JSON.parse(await permission), {
+    hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "allow" } },
+  });
+
+  const questions = [{ header: "方案", question: "选择哪个方案？", options: [
+    { label: "方案 A", description: "保守" },
+    { label: "方案 B", description: "均衡" },
+    { label: "方案 C", description: "激进" },
+  ] }];
+  const question = runProcessHook(entry("PermissionRequest"), root, {
+    session_id: "zcode-process",
+    request_id: "question-1",
+    tool_name: "AskUserQuestion",
+    tool_input: { questions },
+  });
+  await waitFor(() => approvals.size === 1);
+  assert.equal(approvals.current.kind, "elicitation");
+  assert.deepEqual(approvals.current.questions[0].options.map(option => option.label), ["方案 A", "方案 B", "方案 C"]);
+  approvals.resolve(approvals.current.id, "submit", { answers: { question_1: "option_2" } });
+  assert.deepEqual(JSON.parse(await question), {
+    hookSpecificOutput: {
+      hookEventName: "PermissionRequest",
+      decision: {
+        behavior: "allow",
+        updatedInput: { questions, answers: { "选择哪个方案？": "方案 B" } },
+      },
+    },
+  });
+
+  for (const event of ["UserPromptSubmit", "Stop", "SessionStart"]) {
+    assert.equal(await runProcessHook(entry(event), root, { session_id: `zcode-${event}` }), "");
+  }
+  await waitFor(() => events.length === 3);
+  assert.deepEqual(events.map(event => event.event), ["UserPromptSubmit", "Stop", "UserPromptSubmit"]);
+  assert.deepEqual(events.map(event => event.agentId), ["zcode", "zcode", "zcode"]);
+
+  const offlineRoot = path.join(root, "offline");
+  fs.mkdirSync(offlineRoot, { recursive: true });
+  assert.equal(await runProcessHook(entry("PermissionRequest"), offlineRoot, {
+    session_id: "zcode-offline",
+    request_id: "permission-offline",
+    tool_name: "Shell",
+    tool_input: { command: "dir" },
+  }), "{}");
 });
 
 test("clients with empty-stdout fallback remain native when Vibe Halo is offline", async () => {

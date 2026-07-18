@@ -60,7 +60,8 @@ const AGENTS = Object.freeze([
   }),
   descriptor("zcode", "ZCode", "approval", {
     configHome: ".zcode", executableNames: ["ZCode.exe", "zcode"], configPaths: [".zcode/cli/config.json"],
-    liveVerification: "local", events: ["PermissionRequest", "Stop", "UserPromptSubmit", "SessionStart"],
+    capabilities: { elicitation: true }, liveVerification: "local",
+    events: ["PermissionRequest", "Stop", "UserPromptSubmit", "SessionStart"],
   }),
   descriptor("qwen-code", "Qwen Code", "approval", {
     configHome: ".qwen", executableNames: ["qwen.exe", "qwen"], configPaths: [".qwen/settings.json"],
@@ -243,8 +244,13 @@ function normalizeRequest(agentId, data) {
   const requestId = cleanText(data.request_id || data.requestId || data.tool_use_id || data.toolUseId, 240);
   const questions = normalizeQuestions(data.questions || toolInput.questions);
   const permissionSuggestions = normalizePermissionSuggestions(data.permission_suggestions || data.permissionSuggestions);
-  const elicitation = event === "Elicitation" && descriptorValue.capabilities.elicitation;
-  const approval = event === "PermissionRequest" && descriptorValue.capabilities.approval;
+  const toolName = cleanText(data.tool_name || data.toolName, 160) || (event === "Elicitation" ? "Elicitation" : "Unknown");
+  const zcodeQuestion = descriptorValue.id === "zcode"
+    && event === "PermissionRequest"
+    && toolName === "AskUserQuestion"
+    && questions.length > 0;
+  const elicitation = (event === "Elicitation" || zcodeQuestion) && descriptorValue.capabilities.elicitation;
+  const approval = event === "PermissionRequest" && descriptorValue.capabilities.approval && !zcodeQuestion;
   const passive = event === "PermissionRequest" && descriptorValue.capabilities.passiveApproval;
   return {
     agentId: descriptorValue.id,
@@ -255,7 +261,7 @@ function normalizeRequest(agentId, data) {
     requestId,
     toolUseId: cleanText(data.tool_use_id || data.toolUseId, 240),
     fingerprint: cleanText(data.tool_input_fingerprint || data.fingerprint, 128),
-    toolName: cleanText(data.tool_name || data.toolName, 160) || (elicitation ? "Elicitation" : "Unknown"),
+    toolName,
     toolInput,
     description: cleanText(data.tool_input_description || data.description || toolInput.description, 1000),
     cwd: cleanText(data.cwd || data.working_directory || data.workingDirectory, 2000),
@@ -313,6 +319,21 @@ function encodeDecision(agentId, decision, request = {}) {
     }
     if (id !== "allow" && id !== "deny") return noDecisionOutput(agentId);
     return JSON.stringify(id === "deny" ? { decision: "deny", message: denyMessage } : { decision: "allow" });
+  }
+  if (id === "submit" && agentId === "zcode") {
+    const answers = validateAnswers(request.questions, decision.answers);
+    if (!answers) return noDecisionOutput(agentId);
+    const byQuestion = {};
+    for (const question of request.questions || []) {
+      const selected = Array.isArray(answers[question.id]) ? answers[question.id] : [answers[question.id]];
+      const values = selected.map(value => question.options?.find(option => option.id === value)?.label || value);
+      byQuestion[question.question] = values.join(", ");
+    }
+    const updatedInput = { ...(request.toolInput || {}), answers: byQuestion };
+    return JSON.stringify({ hookSpecificOutput: {
+      hookEventName: "PermissionRequest",
+      decision: { behavior: "allow", updatedInput },
+    } });
   }
   if (id === "submit" && (agentId === "claude-code" || agentId === "codebuddy")) {
     const answers = validateAnswers(request.questions, decision.answers);

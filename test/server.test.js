@@ -161,6 +161,32 @@ test("routes ZCode, Copilot and OpenCode through their exact codecs", async () =
   assert.deepEqual(JSON.parse((await openCodePending).body), { decision: "always" });
 });
 
+test("routes ZCode AskUserQuestion through the interactive form codec", async () => {
+  const { approvals, server } = await fixture();
+  const questions = [{ header: "Mode", question: "Choose mode?", options: [
+    { label: "Safe", description: "Minimal changes" },
+    { label: "Fast", description: "Move quickly" },
+    { label: "Custom", description: "Manual choice" },
+  ] }];
+  const pending = request(server, "/permission", permission({
+    agent_id: "zcode", session_id: "zcode:q", request_id: "zq1", tool_use_id: undefined,
+    tool_name: "AskUserQuestion", tool_input: { questions }, questions,
+  }));
+  await waitFor(() => approvals.size === 1);
+  assert.equal(approvals.current.kind, "elicitation");
+  assert.equal(approvals.current.options[0].id, "submit");
+  assert.equal(approvals.resolve(approvals.current.id, "submit", { answers: { question_1: "option_2" } }), true);
+  assert.deepEqual(JSON.parse((await pending).body), {
+    hookSpecificOutput: {
+      hookEventName: "PermissionRequest",
+      decision: {
+        behavior: "allow",
+        updatedInput: { questions, answers: { "Choose mode?": "Fast" } },
+      },
+    },
+  });
+});
+
 test("validates option ids, answers, unknown agents and passive reminders", async () => {
   const { approvals, events, server } = await fixture();
   const questions = [{ id: "q1", question: "Pick", options: [{ id: "a", label: "A" }] }];
