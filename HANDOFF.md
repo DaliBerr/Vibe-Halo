@@ -1,12 +1,12 @@
 # Vibe Halo Project Handoff
 
 Updated: 2026-07-18
-Current version: `0.2.2`
+Current version: `0.2.3`
 Source directory: `C:\Tools\Clawd-island`
 
 ## Current Scope
 
-Vibe Halo is a Windows-first Electron dynamic-island interface for AI coding clients. Version 0.2.2 makes a single ZCode choice submit immediately, guarantees that packaged ZCode process Hooks keep their stdin/stdout pipe open until Electron exits, and adds bounded decision-delivery diagnostics while retaining one window, one global approval FIFO, loopback-only transport, strict renderer isolation, and fail-open behavior.
+Vibe Halo is a Windows-first Electron dynamic-island interface for AI coding clients. Version 0.2.3 adds a centered mini-island, non-destructive collapse control to every expanded island and replaces the font-based compact chevron with a geometrically aligned SVG icon while retaining one window, one global approval FIFO, loopback-only transport, strict renderer isolation, and fail-open behavior.
 
 - Dynamic-island approvals: Codex, ZCode, Qwen Code, Copilot CLI, Claude Code, CodeBuddy, Hermes, and OpenCode.
 - Exact interactive answers: ZCode `AskUserQuestion`, Claude/CodeBuddy Elicitation, and Hermes clarify.
@@ -38,7 +38,7 @@ The application does not contain desktop pets, remote approvals, a theme system,
 ## Verification Status
 
 - Automated suite: 19 adapters, codecs, forms, global FIFO, server authentication/bounds, command-hook E2E, offline fallback, installers, backups, idempotence, explicit disables, safe uninstall, IPC, sizing, stores, and legacy regressions.
-- Windows unpacked build: 0.2.2 launches, creates a valid process-owned runtime identity, and loads all unpacked managed assets.
+- Windows unpacked build: 0.2.3 launches, creates a valid process-owned runtime identity, and loads all unpacked managed assets.
 - Codex: trusted Hook health detected; command Hook single-allow path returned the exact Codex protocol.
 - ZCode 3.3.0: native process hooks use `cmd.exe` plus explicit arguments and a waiting, no-new-window PowerShell launcher. This is required because a direct PowerShell invocation detaches the packaged GUI-subsystem Electron process and returns empty stdout to ZCode before the Hook decision is ready. Health checks repair that legacy launcher, invalid wildcard matchers, and malformed 0.2.0 shell-command entries. Real approval, completion, structured `AskUserQuestion`, exact `updatedInput.answers` round-trips, immediate single-choice submission, and the final allow response are verified against the running app.
 - Cursor 2.2.44: auto-detected; installed Hook `stop` and `beforeSubmitPrompt` protocols verified against the running app, including same-session notification cleanup.
@@ -57,7 +57,7 @@ npm run build
 ```
 
 - Electron 41, CommonJS, native HTML/CSS/JavaScript, x64 NSIS.
-- Artifact: `dist/Vibe-Halo-Setup-0.2.2-x64.exe`.
+- Artifact: `dist/Vibe-Halo-Setup-0.2.3-x64.exe`.
 - Keep `LICENSE`, `NOTICE.md`, and upstream attribution in every release.
 - `dist/`, `node_modules/`, `.smoke/`, logs, and contributor-local `AGENTS.local.md` are not committed.
 - After moving source or installing a different build, run integration repair and review changed Codex Hook commands in `/hooks`.

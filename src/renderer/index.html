@@ -13,10 +13,19 @@
       <span id="pulse" class="pulse"></span>
       <span id="compact-title" class="compact-title">Codex</span>
       <span id="count" class="count" hidden></span>
-      <span class="chevron" aria-hidden="true">⌄</span>
+      <span class="compact-chevron" aria-hidden="true">
+        <svg class="chevron-icon" viewBox="0 0 16 16" focusable="false">
+          <path d="M3.5 5.75 8 10.25l4.5-4.5"></path>
+        </svg>
+      </span>
     </section>
 
     <section id="expanded" class="expanded-view" hidden>
+      <button id="collapse" class="collapse-button" type="button" aria-label="收起灵动岛" title="收起">
+        <svg class="chevron-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="m3.5 10.25 4.5-4.5 4.5 4.5"></path>
+        </svg>
+      </button>
       <header>
         <div class="identity">
           <span class="codex-mark">C</span>
