@@ -41,6 +41,18 @@ test("normalizes generic client argv and payload fields", () => {
   assert.deepEqual(body.permission_suggestions, [{ type: "setMode", mode: "acceptEdits", destination: "session" }]);
 });
 
+test("keeps bounded ZCode AskUserQuestion fields for native-like rendering", () => {
+  const questions = [{ header: "Plan", question: "Pick one?", options: [
+    { label: "A", description: "First" }, { label: "B", description: "Second" }, { label: "C", description: "Third" },
+  ] }];
+  const body = buildBody({
+    hook_event_name: "PermissionRequest", session_id: "z", request_id: "zq",
+    tool_name: "AskUserQuestion", tool_input: { questions },
+  }, "zcode");
+  assert.equal(body.event, "PermissionRequest");
+  assert.deepEqual(body.questions, questions);
+});
+
 test("sanitizes client-specific stdout without inventing decisions", () => {
   assert.equal(sanitizePermissionResponse('{"behavior":"allow","extra":true}', "copilot-cli"), '{"behavior":"allow"}');
   assert.equal(sanitizePermissionResponse("{}", "copilot-cli"), "");
@@ -54,6 +66,18 @@ test("sanitizes client-specific stdout without inventing decisions", () => {
     hookSpecificOutput: {
       hookEventName: "Elicitation",
       decision: { behavior: "allow", updatedInput: { answers: { Pick: "A" } } },
+    },
+  });
+  const zcode = sanitizePermissionResponse(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: "PermissionRequest",
+      decision: { behavior: "allow", updatedInput: { questions: [], answers: { Pick: "A" } }, unsafe: true },
+    },
+  }), "zcode");
+  assert.deepEqual(JSON.parse(zcode), {
+    hookSpecificOutput: {
+      hookEventName: "PermissionRequest",
+      decision: { behavior: "allow", updatedInput: { questions: [], answers: { Pick: "A" } } },
     },
   });
   const permission = sanitizePermissionResponse(JSON.stringify({

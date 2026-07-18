@@ -1,6 +1,6 @@
 {
   "name": "vibe-halo",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A Windows dynamic-island approval, input, and completion surface for AI coding clients.",
   "main": "src/main.js",
   "type": "commonjs",

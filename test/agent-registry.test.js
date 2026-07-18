@@ -30,7 +30,7 @@ test("declares the requested capability layers", () => {
   for (const id of ["codex", "zcode", "qwen-code", "copilot-cli", "claude-code", "codebuddy", "hermes", "opencode"]) {
     assert.equal(agent(id).capabilities.approval, true, id);
   }
-  for (const id of ["claude-code", "codebuddy", "hermes"]) assert.equal(agent(id).capabilities.elicitation, true, id);
+  for (const id of ["zcode", "claude-code", "codebuddy", "hermes"]) assert.equal(agent(id).capabilities.elicitation, true, id);
   for (const id of ["kimi-code", "qoder", "qoderwork"]) assert.equal(agent(id).capabilities.passiveApproval, true, id);
 });
 
@@ -91,6 +91,35 @@ test("validates and encodes Claude and Hermes elicitation answers", () => {
   assert.deepEqual(claude.hookSpecificOutput.decision.updatedInput.answers, { Pick: "a" });
   const hermes = JSON.parse(encodeDecision("hermes", { optionId: "submit", answers: { q1: "a" } }, normalized));
   assert.deepEqual(hermes, { decision: "allow", answers: { q1: "a" } });
+});
+
+test("presents ZCode AskUserQuestion as an interactive form and returns exact updatedInput", () => {
+  const normalized = normalizeRequest("zcode", {
+    event: "PermissionRequest", session_id: "z", request_id: "zr", tool_name: "AskUserQuestion",
+    tool_input: { questions: [{ header: "方式", question: "请选择实现方式？", options: [
+      { label: "直接迁移", description: "复用现有协议" },
+      { label: "重新实现", description: "采用新协议" },
+      { label: "暂不处理", description: "保持现状" },
+    ] }] },
+  });
+  assert.equal(normalized.kind, "elicitation");
+  assert.equal(normalized.options[0].id, "submit");
+  assert.deepEqual(normalized.questions[0].options.map(option => option.label), ["直接迁移", "重新实现", "暂不处理"]);
+  assert.deepEqual(JSON.parse(encodeDecision("zcode", {
+    optionId: "submit", answers: { question_1: "option_2" },
+  }, normalized)), {
+    hookSpecificOutput: {
+      hookEventName: "PermissionRequest",
+      decision: {
+        behavior: "allow",
+        updatedInput: {
+          questions: normalized.toolInput.questions,
+          answers: { "请选择实现方式？": "重新实现" },
+        },
+      },
+    },
+  });
+  assert.equal(encodeDecision("zcode", { optionId: "native" }, normalized), "{}");
 });
 
 test("bounds forms to 10 questions and 20 options", () => {

@@ -248,7 +248,9 @@ function buildBody(payload, agentId = "codex") {
     body.tool_input_description = cleanText(payload?.tool_input_description || input.description, 1000);
     body.tool_use_id = cleanText(payload?.tool_use_id || payload?.toolUseId || payload?.request_id || payload?.requestId, 240);
     body.request_id = cleanText(payload?.request_id || payload?.requestId || body.tool_use_id, 240);
-    if (event === "Elicitation") body.questions = Array.isArray(input.questions) ? input.questions : [];
+    if (event === "Elicitation" || (agentId === "zcode" && rawToolName === "AskUserQuestion")) {
+      body.questions = Array.isArray(input.questions) ? input.questions : [];
+    }
     const permissionSuggestions = payload?.permission_suggestions || payload?.permissionSuggestions;
     if (Array.isArray(permissionSuggestions)) {
       body.permission_suggestions = permissionSuggestions.slice(0, 20)
@@ -320,8 +322,10 @@ function sanitizePermissionResponse(raw, agentId = "codex") {
     if (decision.behavior === "deny" && typeof decision.message === "string") {
       safe.message = cleanText(decision.message, 500);
     }
-    if (["claude-code", "codebuddy"].includes(agentId) && decision.behavior === "allow") {
+    if (["zcode", "claude-code", "codebuddy"].includes(agentId) && decision.behavior === "allow") {
       if (decision.updatedInput && typeof decision.updatedInput === "object") safe.updatedInput = normalizeToolInput(decision.updatedInput);
+    }
+    if (["claude-code", "codebuddy"].includes(agentId) && decision.behavior === "allow") {
       if (Array.isArray(decision.updatedPermissions)) safe.updatedPermissions = decision.updatedPermissions.slice(0, 20).map(item => normalizeToolInput(item));
     }
     return JSON.stringify({ hookSpecificOutput: {

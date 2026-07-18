@@ -7,7 +7,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   IntegrationManager,
+  commandFor,
   containsMarker,
+  isHealthyZcodeIntegration,
   readJson,
   stripJsonComments,
 } = require("../src/integration-manager");
@@ -59,9 +61,17 @@ test("installs exact ZCode process hooks, backs up once, and preserves third-par
   assert.equal(config.theme, "dark");
   assert.equal(config.hooks.enabled, true);
   assert.equal(config.hooks.maxOutputBytes, 32768);
-  assert.equal(config.hooks.events.PermissionRequest[0].hooks[0].type, "process");
+  const permissionEntry = config.hooks.events.PermissionRequest[0];
+  const permissionHook = permissionEntry.hooks[0];
+  assert.equal(permissionEntry.matcher, undefined);
+  assert.deepEqual(permissionHook.args.slice(0, 3), ["/d", "/s", "/c"]);
+  assert.equal(permissionHook.type, "process");
+  assert.equal(permissionHook.command, "cmd.exe");
+  assert.equal(permissionHook.args[3].includes("VIBE_HALO_HOOK=vibe-halo-hook.js"), true);
+  assert.equal(permissionHook.timeoutMs, 135000);
   assert.equal(config.hooks.events.Stop.some(entry => entry.hooks?.[0]?.command === "third-party"), true);
   assert.equal(containsMarker(config), true);
+  assert.equal(isHealthyZcodeIntegration(config), true);
   const once = fs.readFileSync(configPath, "utf8");
   assert.equal(manager.install("zcode").ok, true);
   assert.equal(fs.readFileSync(configPath, "utf8"), once);
@@ -72,6 +82,60 @@ test("installs exact ZCode process hooks, backs up once, and preserves third-par
   assert.equal(cleaned.theme, "dark");
   assert.equal(cleaned.hooks.events.Stop[0].hooks[0].command, "third-party");
   assert.equal(containsMarker(cleaned), false);
+});
+
+test("migrates malformed managed ZCode shell commands and reports them unhealthy before repair", () => {
+  const { home, manager } = fixture();
+  const configPath = path.join(home, ".zcode", "cli", "config.json");
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  const legacyManaged = {
+    type: "process",
+    command: commandFor("C:\\Program Files\\Vibe Halo\\Vibe Halo.exe", "C:\\Program Files\\Vibe Halo\\vibe-halo-hook.js", "zcode", "PermissionRequest"),
+    timeoutMs: 135000,
+  };
+  fs.writeFileSync(configPath, `${JSON.stringify({
+    keep: true,
+    hooks: {
+      enabled: true,
+      events: {
+        PermissionRequest: [{ matcher: "*", hooks: [legacyManaged] }],
+        Stop: [{ hooks: [{ type: "process", command: "third-party.exe", args: ["--keep"] }] }],
+      },
+    },
+  }, null, 2)}\n`);
+
+  const before = manager.status("zcode");
+  assert.equal(before.installed, true);
+  assert.equal(before.healthy, false);
+  assert.equal(before.reason, "invalid-zcode-process-hook");
+
+  assert.equal(manager.install("zcode").ok, true);
+  const repaired = readJson(configPath);
+  assert.equal(repaired.keep, true);
+  assert.equal(repaired.hooks.events.Stop.some(entry => entry.hooks?.[0]?.command === "third-party.exe"), true);
+  assert.equal(JSON.stringify(repaired).includes("cmd.exe /d /s /c"), false);
+  assert.equal(isHealthyZcodeIntegration(repaired), true);
+  assert.equal(repaired.hooks.events.PermissionRequest.some(entry => containsMarker(entry) && entry.matcher === undefined), true);
+});
+
+test("repairs ZCode's invalid star matcher so approval hooks match every tool", () => {
+  const { home, manager } = fixture();
+  const configPath = path.join(home, ".zcode", "cli", "config.json");
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, "{}\n");
+  assert.equal(manager.install("zcode").ok, true);
+  const config = readJson(configPath);
+  config.hooks.events.PermissionRequest.find(containsMarker).matcher = "*";
+  fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+
+  assert.equal(manager.status("zcode").healthy, false);
+  assert.equal(manager.install("zcode").ok, true);
+  const repaired = readJson(configPath);
+  const managed = repaired.hooks.events.PermissionRequest.find(containsMarker);
+  assert.equal(managed.matcher, undefined);
+  assert.doesNotThrow(() => new RegExp(managed.matcher || ".*"));
+  assert.equal(new RegExp(managed.matcher || ".*").test("Bash"), true);
+  assert.equal(isHealthyZcodeIntegration(repaired), true);
 });
 
 test("does not bypass explicit ZCode or Qwen hook disabling", () => {

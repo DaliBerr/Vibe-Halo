@@ -123,12 +123,49 @@ function removeManaged(value) {
 }
 
 function commandFor(executablePath, scriptPath, agentId, event) {
+  const command = processCommandFor(executablePath, scriptPath, agentId, event);
+  return `cmd.exe /d /s /c "${command}"`;
+}
+
+function processCommandFor(executablePath, scriptPath, agentId, event) {
   const ps = [
     "$env:ELECTRON_RUN_AS_NODE='1'",
     `& '${String(executablePath).replace(/'/g, "''")}' '${String(scriptPath).replace(/'/g, "''")}' --agent '${agentId}' --event '${event}'`,
   ].join("; ");
   const encoded = Buffer.from(ps, "utf16le").toString("base64");
-  return `cmd.exe /d /s /c "set VIBE_HALO_HOOK=${MARKER}&&powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encoded}"`;
+  return `set VIBE_HALO_HOOK=${MARKER}&&powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encoded}`;
+}
+
+function zcodeProcessHook(executablePath, scriptPath, event) {
+  return {
+    type: "process",
+    command: "cmd.exe",
+    args: ["/d", "/s", "/c", processCommandFor(executablePath, scriptPath, "zcode", event)],
+    timeoutMs: event === "PermissionRequest" ? 135000 : 10000,
+  };
+}
+
+function isHealthyZcodeProcessHook(value, event) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (value.type !== "process" || String(value.command).toLowerCase() !== "cmd.exe") return false;
+  if (!Array.isArray(value.args) || value.args.length !== 4) return false;
+  if (value.args[0] !== "/d" || value.args[1] !== "/s" || value.args[2] !== "/c") return false;
+  if (typeof value.args[3] !== "string" || !value.args[3].includes(`VIBE_HALO_HOOK=${MARKER}`)) return false;
+  return value.timeoutMs === (event === "PermissionRequest" ? 135000 : 10000);
+}
+
+function isHealthyZcodeIntegration(config) {
+  if (!config || config.hooks?.enabled !== true) return false;
+  const eventMap = config.hooks?.events;
+  if (!eventMap || typeof eventMap !== "object" || Array.isArray(eventMap)) return false;
+  return EVENTS.zcode.every(event => {
+    const entries = eventMap[event];
+    return Array.isArray(entries) && entries.some(entry => (
+      !entry?.matcher
+      && Array.isArray(entry?.hooks)
+      && entry.hooks.some(hook => containsMarker(hook) && isHealthyZcodeProcessHook(hook, event))
+    ));
+  });
 }
 
 function nestedEntry(command, event, agentId) {
@@ -156,8 +193,7 @@ function addJsonHooks(agentId, config, executablePath, scriptPath) {
     for (const event of events) {
       const other = Array.isArray(eventMap[event]) ? eventMap[event].filter(item => !containsMarker(item)) : [];
       other.push({
-        ...(event === "Stop" || event === "UserPromptSubmit" ? {} : { matcher: "*" }),
-        hooks: [{ type: "process", command: commandFor(executablePath, scriptPath, agentId, event), timeoutMs: event === "PermissionRequest" ? 135000 : 10000 }],
+        hooks: [zcodeProcessHook(executablePath, scriptPath, event)],
       });
       eventMap[event] = other;
     }
@@ -451,7 +487,11 @@ class IntegrationManager {
       const config = readJson(target);
       const disabled = explicitDisabled(agentId, config);
       const installed = containsMarker(config);
-      return { ...detection, installed, healthy: installed && !disabled, disabled, reason: disabled ? "hooks-explicitly-disabled" : (installed ? "healthy" : "missing") };
+      const healthy = installed && !disabled && (agentId !== "zcode" || isHealthyZcodeIntegration(config));
+      const reason = disabled
+        ? "hooks-explicitly-disabled"
+        : (!installed ? "missing" : (healthy ? "healthy" : "invalid-zcode-process-hook"));
+      return { ...detection, installed, healthy, disabled, reason };
     } catch (error) {
       return { ...detection, installed: false, healthy: false, disabled: false, reason: error.message };
     }
@@ -562,9 +602,13 @@ module.exports = {
   commandFor,
   containsMarker,
   explicitDisabled,
+  isHealthyZcodeIntegration,
+  isHealthyZcodeProcessHook,
+  processCommandFor,
   readJson,
   removeManaged,
   removeTomlBlock,
   replaceTomlBlock,
   stripJsonComments,
+  zcodeProcessHook,
 };
