@@ -5,7 +5,9 @@ const assert = require("node:assert/strict");
 const {
   BOUNDS_ANIMATION_MS,
   COMPACT,
+  COMPACT_CONTENT,
   EXPANDED,
+  SHADOW_GUTTER,
   calculateBounds,
   easeOutCubic,
   interpolateBounds,
@@ -16,6 +18,9 @@ const display = {
 };
 
 test("centers the larger compact island with its transparent gutter at work-area top", () => {
+  assert.deepEqual(SHADOW_GUTTER, { top: 8, right: 24, bottom: 28, left: 24 });
+  assert.equal(COMPACT.width - SHADOW_GUTTER.left - SHADOW_GUTTER.right, COMPACT_CONTENT.width);
+  assert.equal(COMPACT.height - SHADOW_GUTTER.top - SHADOW_GUTTER.bottom, COMPACT_CONTENT.height);
   const bounds = calculateBounds("approval-compact", null, display);
   assert.deepEqual(bounds, {
     x: 100 + Math.round((1600 - COMPACT.width) / 2),
@@ -57,8 +62,8 @@ test("rejects displays without a usable work area", () => {
 });
 
 test("interpolates window bounds with a bounded ease-out curve", () => {
-  const from = { x: 100, y: 40, width: 316, height: 68 };
-  const to = { x: -60, y: 40, width: 636, height: 496 };
+  const from = { x: 100, y: 40, width: 348, height: 88 };
+  const to = { x: -60, y: 40, width: 668, height: 516 };
   assert.equal(BOUNDS_ANIMATION_MS, 220);
   assert.deepEqual(interpolateBounds(from, to, 0), from);
   assert.deepEqual(interpolateBounds(from, to, 1), to);
@@ -66,8 +71,8 @@ test("interpolates window bounds with a bounded ease-out curve", () => {
   assert.deepEqual(interpolateBounds(from, to, 0.5), {
     x: -40,
     y: 40,
-    width: 596,
-    height: 443,
+    width: 628,
+    height: 463,
   });
   assert.deepEqual(interpolateBounds(from, to, Number.NaN), from);
 });

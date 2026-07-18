@@ -4,17 +4,21 @@ const path = require("path");
 const { formatApprovalInput } = require("./approval-presenter");
 const { locateDisplay } = require("./window-locator");
 
-const TRANSPARENT_GUTTER = 8;
+const SHADOW_GUTTER = Object.freeze({ top: 8, right: 24, bottom: 28, left: 24 });
 const BOUNDS_ANIMATION_MS = 220;
 const BOUNDS_FRAME_MS = 16;
-const COMPACT = Object.freeze({ width: 316, height: 68 });
+const COMPACT_CONTENT = Object.freeze({ width: 300, height: 52 });
+const COMPACT = Object.freeze({
+  width: COMPACT_CONTENT.width + SHADOW_GUTTER.left + SHADOW_GUTTER.right,
+  height: COMPACT_CONTENT.height + SHADOW_GUTTER.top + SHADOW_GUTTER.bottom,
+});
 const EXPANDED = Object.freeze({
-  width: 636,
-  height: 496,
-  minWidth: 576,
-  maxWidth: 776,
-  minHeight: 336,
-  maxHeight: 616,
+  width: 668,
+  height: 516,
+  minWidth: 608,
+  maxWidth: 808,
+  minHeight: 356,
+  maxHeight: 636,
 });
 
 function validDecisionPayload(payload, currentId) {
@@ -425,8 +429,9 @@ class IslandController {
 module.exports = {
   IslandController,
   COMPACT,
+  COMPACT_CONTENT,
   EXPANDED,
-  TRANSPARENT_GUTTER,
+  SHADOW_GUTTER,
   BOUNDS_ANIMATION_MS,
   calculateBounds,
   easeOutCubic,
