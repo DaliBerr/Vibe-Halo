@@ -68,6 +68,12 @@ test("installs exact ZCode process hooks, backs up once, and preserves third-par
   assert.equal(permissionHook.type, "process");
   assert.equal(permissionHook.command, "cmd.exe");
   assert.equal(permissionHook.args[3].includes("VIBE_HALO_HOOK=vibe-halo-hook.js"), true);
+  const encoded = permissionHook.args[3].match(/-EncodedCommand\s+(\S+)/)[1];
+  const powershell = Buffer.from(encoded, "base64").toString("utf16le");
+  assert.match(powershell, /Start-Process/);
+  assert.match(powershell, /-NoNewWindow/);
+  assert.match(powershell, /-Wait/);
+  assert.match(powershell, /-PassThru/);
   assert.equal(permissionHook.timeoutMs, 135000);
   assert.equal(config.hooks.events.Stop.some(entry => entry.hooks?.[0]?.command === "third-party"), true);
   assert.equal(containsMarker(config), true);
@@ -116,6 +122,30 @@ test("migrates malformed managed ZCode shell commands and reports them unhealthy
   assert.equal(JSON.stringify(repaired).includes("cmd.exe /d /s /c"), false);
   assert.equal(isHealthyZcodeIntegration(repaired), true);
   assert.equal(repaired.hooks.events.PermissionRequest.some(entry => containsMarker(entry) && entry.matcher === undefined), true);
+});
+
+test("repairs ZCode process hooks that detach the packaged GUI executable", () => {
+  const { home, manager } = fixture();
+  const configPath = path.join(home, ".zcode", "cli", "config.json");
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, "{}\n");
+  assert.equal(manager.install("zcode").ok, true);
+
+  const config = readJson(configPath);
+  const managed = config.hooks.events.PermissionRequest.find(containsMarker).hooks[0];
+  const oldPowerShell = "$env:ELECTRON_RUN_AS_NODE='1'; & 'C:\\Program Files\\Vibe Halo\\Vibe Halo.exe' 'C:\\Program Files\\Vibe Halo\\vibe-halo-hook.js' --agent 'zcode' --event 'PermissionRequest'";
+  const oldEncoded = Buffer.from(oldPowerShell, "utf16le").toString("base64");
+  managed.args[3] = `set VIBE_HALO_HOOK=vibe-halo-hook.js&&powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${oldEncoded}`;
+  fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+
+  assert.equal(manager.status("zcode").healthy, false);
+  assert.equal(manager.status("zcode").reason, "invalid-zcode-process-hook");
+  assert.equal(manager.install("zcode").ok, true);
+  const repaired = readJson(configPath);
+  assert.equal(isHealthyZcodeIntegration(repaired), true);
+  const repairedCommand = repaired.hooks.events.PermissionRequest.find(containsMarker).hooks[0].args[3];
+  const repairedEncoded = repairedCommand.match(/-EncodedCommand\s+(\S+)/)[1];
+  assert.match(Buffer.from(repairedEncoded, "base64").toString("utf16le"), /Start-Process.+-NoNewWindow.+-Wait.+-PassThru/);
 });
 
 test("repairs ZCode's invalid star matcher so approval hooks match every tool", () => {

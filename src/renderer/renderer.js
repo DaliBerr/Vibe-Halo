@@ -48,7 +48,7 @@ function renderMetadata(items) {
   }
 }
 
-function renderQuestions(questions, interactive = false) {
+function renderQuestions(questions, interactive = false, item = null) {
   clearElement(questionList);
   const values = Array.isArray(questions) ? questions : [];
   questionList.hidden = values.length === 0;
@@ -77,6 +77,11 @@ function renderQuestions(questions, interactive = false) {
           input.name = `question-${question.id}`;
           input.value = option.id;
           input.dataset.questionId = question.id;
+          input.addEventListener("change", () => {
+            if (!input.checked || !state?.current || state.current.id !== item?.id) return;
+            const decision = window.vibeQuestionSubmit?.zcodeSingleChoiceDecision(item, values, question, option);
+            if (decision) window.islandAPI.decide(decision.approvalId, decision.optionId, decision.answers);
+          });
           row.appendChild(input);
         }
         const copy = document.createElement("div");
@@ -251,7 +256,7 @@ function render(next) {
     copyButton.textContent = presentation.copyLabel || "复制内容";
   } else if (isElicitation) {
     renderMetadata([]);
-    renderQuestions(item.questions, true);
+    renderQuestions(item.questions, true, item);
     rawDetails.hidden = true;
     primaryLabel.hidden = true;
     primaryCode.hidden = true;

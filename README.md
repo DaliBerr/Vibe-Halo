@@ -17,7 +17,7 @@ Codex 0.129.0 及之后版本会要求用户审核新安装或发生变化的 co
 ## 工作方式
 
 - Codex、ZCode、Qwen Code、Copilot CLI、Claude Code、CodeBuddy、Hermes 和 OpenCode 支持灵动岛审批。
-- Claude/CodeBuddy Elicitation 与 Hermes clarify 支持精确协议回答；Codex `request_user_input` 等无稳定回答协议的场景仍只提醒。
+- ZCode `AskUserQuestion`、Claude/CodeBuddy Elicitation 与 Hermes clarify 支持精确协议回答；Codex `request_user_input` 等无稳定回答协议的场景仍只提醒。
 - Kimi Code、Qoder 和 QoderWork 只显示客户端原生审批提醒；Gemini、Antigravity、Cursor Agent、Kiro、CodeWhale、Pi、OpenClaw 和 Reasonix 提供完成/状态通知。
 - 所有客户端的审批进入同一个带稳定 ID 的 FIFO；去重键包含客户端 ID，相同工具调用只显示一次并把结果返回所有等待连接。
 - 只有当前 adapter 明确暴露的选项才会产生决定；关闭、断线、超时、非法选项和编码失败都返回无决定。
