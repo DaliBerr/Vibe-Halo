@@ -75,7 +75,10 @@ function installZcodeHooks(root) {
   return readJson(configPath).hooks.events;
 }
 
-function waitFor(predicate, timeoutMs = 5000) {
+// Process-hook startup can be delayed when Windows CI is concurrently
+// rebuilding and packaging Electron. Keep this comfortably below the hook's
+// protocol timeout while avoiding a machine-load-dependent false failure.
+function waitFor(predicate, timeoutMs = 20_000) {
   const started = Date.now();
   return new Promise((resolve, reject) => {
     const check = () => {
