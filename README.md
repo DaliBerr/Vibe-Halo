@@ -4,7 +4,9 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-**A Windows dynamic island for approvals, interactive questions, and completion notifications from AI coding clients.**
+**A Windows approval popup and Dynamic Island for Codex, ZCode, Claude Code, OpenCode, and other AI coding agents.**
+
+Handle supported permission requests and interactive questions, and receive completion notifications without constantly switching back to agent terminals.
 
 ![Version](https://img.shields.io/badge/version-0.3.0-6d7cff)
 ![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078d4)
@@ -21,18 +23,33 @@
 
 </div>
 
+> [!NOTE]
+> **Runtime validation:** Codex and ZCode have completed real client round-trip testing in the maintainer's environment. The other adapters have automated contract coverage but may still contain client-specific compatibility bugs; keep their native approval UI available while evaluating them.
+
 > [!IMPORTANT]
 > Vibe Halo is a derivative development of [Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk), maintained independently and not an official upstream edition. It retains and adapts parts of the upstream hook, plugin, approval transport, and lifecycle design, while removing the desktop pet, themes, animated session state, remote approval, and mobile features. See [NOTICE.md](NOTICE.md) for upstream copyright and attribution.
 
 Vibe Halo appears at the top of the active display when you need to intervene. Supported approval requests can be allowed or denied in place, questions with a stable answer protocol can be completed inside the island, and finished tasks produce short notifications. If no explicit decision is made—or if the app, transport, or protocol fails—the request is returned to the native client flow instead of being automatically allowed or denied.
 
+## Quick start
+
+1. Download `Vibe-Halo-Setup-<version>-x64.exe` from [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases).
+2. Launch Vibe Halo and open `客户端集成` (Client integrations) from the tray to inspect detected clients and integration health.
+3. If you use Codex, enter `/hooks` in Codex and review the installed Vibe Halo command hooks before triggering an approval.
+
+> [!WARNING]
+> Packages labeled **Unsigned Preview** are testing-only. Windows SmartScreen may show an unknown-publisher warning, and automatic updates remain disabled until a signed stable release is available.
+
+See [Installation and setup](#installation-and-setup) for source builds, integration details, and the complete verification flow.
+
 ## Table of contents
 
+- [Quick start](#quick-start)
 - [Why Vibe Halo](#why-vibe-halo)
 - [Key features](#key-features)
 - [Client support](#client-support)
 - [How it works](#how-it-works)
-- [Quick start](#quick-start)
+- [Installation and setup](#installation-and-setup)
 - [Daily use](#daily-use)
 - [Security and privacy](#security-and-privacy)
 - [Architecture](#architecture)
@@ -40,6 +57,7 @@ Vibe Halo appears at the top of the active display when you need to intervene. S
 - [Testing](#testing)
 - [Building and releasing](#building-and-releasing)
 - [Environment variables](#environment-variables)
+- [FAQ](#faq)
 - [Troubleshooting](#troubleshooting)
 - [Known boundaries](#known-boundaries)
 - [Contributing](#contributing)
@@ -133,7 +151,7 @@ flowchart LR
 5. After the user acts, the main process validates the current request ID, option, and answers again before the adapter encodes a native response.
 6. If any stage cannot complete safely, the adapter returns its no-decision output and the client resumes its native flow.
 
-## Quick start
+## Installation and setup
 
 ### Use a release build
 
@@ -407,6 +425,20 @@ Normal installations require no manual environment configuration. These variable
 | `VIBE_HALO_RELEASE_DATE` | Supply a reproducible release date for update metadata |
 
 Signing variables belong only in protected CI. The SignPath API token is a GitHub Actions secret—not an application environment variable—and must never appear in source, logs, or release assets.
+
+## FAQ
+
+### Is Vibe Halo a Windows alternative to Vibe Island?
+
+Vibe Halo provides a similar top-center approval and notification workflow for Windows, but it is an independent open-source project rather than an official Windows edition of Vibe Island. It appears only when an AI coding agent needs a supported permission decision, asks a supported interactive question, or completes a task.
+
+### Can I approve Codex permissions without returning to the terminal?
+
+Yes. Supported Codex `PermissionRequest` events can be allowed or denied directly from the approval popup. If Vibe Halo cannot safely return a decision—or if you close or time out the request—it returns no decision so Codex can resume its native approval flow. Codex `request_user_input` remains reminder-only and must still be answered in Codex.
+
+### Does Vibe Halo support Claude Code and OpenCode?
+
+Vibe Halo includes adapters, installers, and automated contract tests for Claude Code and OpenCode. However, only Codex and ZCode have completed full real-client round-trip verification in the maintainer's environment. Treat the Claude Code, OpenCode, and other non-validated integrations as preview support and keep their native approval interfaces available.
 
 ## Troubleshooting
 
