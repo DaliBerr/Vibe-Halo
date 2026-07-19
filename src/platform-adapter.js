@@ -34,6 +34,15 @@ function selectLinuxWindowBackend(env = process.env) {
   return env.DISPLAY ? "xwayland" : "wayland-degraded";
 }
 
+function linuxOzoneRelaunchArgs(argv = process.argv, env = process.env) {
+  if (env.VIBE_HALO_OZONE_BOOTSTRAPPED === "1") return null;
+  if (argv.some((value) => String(value).startsWith("--ozone-platform="))) return null;
+  const backend = selectLinuxWindowBackend(env);
+  if (backend === "x11") return null;
+  const ozonePlatform = backend === "xwayland" ? "x11" : "wayland";
+  return [`--ozone-platform=${ozonePlatform}`, ...argv.slice(1)];
+}
+
 function packageKind(platform, env = process.env, packaged = false) {
   if (!packaged) return "source";
   if (platform === "win32") return "nsis";
@@ -259,6 +268,7 @@ module.exports = {
   buildDesktopEntry,
   buildPosixRunner,
   createPlatformAdapter,
+  linuxOzoneRelaunchArgs,
   desktopExecQuote,
   normalizePlatform,
   packageKind,

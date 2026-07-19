@@ -12,6 +12,7 @@ const {
   buildDesktopEntry,
   buildPosixRunner,
   createPlatformAdapter,
+  linuxOzoneRelaunchArgs,
   packageKind,
   posixQuote,
   selectLinuxWindowBackend,
@@ -56,6 +57,28 @@ test("selects the requested Electron ozone backend before app readiness", () => 
     commandLine: { appendSwitch(name, value) { switches.push([name, value]); } },
   });
   assert.deepEqual(switches, [["ozone-platform", "x11"], ["ozone-platform", "wayland"]]);
+});
+
+test("relaunches Linux before Electron chooses an incompatible Ozone backend", () => {
+  const argv = ["/opt/Vibe Halo/vibe-halo", "--smoke-test"];
+  assert.deepEqual(
+    linuxOzoneRelaunchArgs(argv, { XDG_SESSION_TYPE: "wayland", DISPLAY: ":99" }),
+    ["--ozone-platform=x11", "--smoke-test"],
+  );
+  assert.deepEqual(
+    linuxOzoneRelaunchArgs(argv, { XDG_SESSION_TYPE: "wayland", VIBE_HALO_NATIVE_WAYLAND: "1" }),
+    ["--ozone-platform=wayland", "--smoke-test"],
+  );
+  assert.equal(linuxOzoneRelaunchArgs(argv, { XDG_SESSION_TYPE: "x11" }), null);
+  assert.equal(linuxOzoneRelaunchArgs(
+    [argv[0], "--ozone-platform=x11", "--smoke-test"],
+    { XDG_SESSION_TYPE: "wayland", DISPLAY: ":99" },
+  ), null);
+  assert.equal(linuxOzoneRelaunchArgs(argv, {
+    XDG_SESSION_TYPE: "wayland",
+    DISPLAY: ":99",
+    VIBE_HALO_OZONE_BOOTSTRAPPED: "1",
+  }), null);
 });
 
 test("quotes POSIX commands and desktop entries without exposing shell syntax", () => {

@@ -2,6 +2,20 @@
 
 const fs = require("fs");
 const path = require("path");
+const childProcess = require("child_process");
+const { createPlatformAdapter, linuxOzoneRelaunchArgs } = require("./platform-adapter");
+
+if (process.platform === "linux") {
+  const relaunchArgs = linuxOzoneRelaunchArgs(process.argv, process.env);
+  if (relaunchArgs) {
+    const result = childProcess.spawnSync(process.execPath, relaunchArgs, {
+      env: { ...process.env, VIBE_HALO_OZONE_BOOTSTRAPPED: "1" },
+      stdio: "inherit",
+    });
+    process.exit(Number.isInteger(result.status) ? result.status : 1);
+  }
+}
+
 const {
   app,
   BrowserWindow,
@@ -31,7 +45,6 @@ const { IslandServer } = require("./server");
 const { SettingsStore } = require("./settings-store");
 const { ShutdownCoordinator } = require("./shutdown-coordinator");
 const { UpdateManager } = require("./update-manager");
-const { createPlatformAdapter } = require("./platform-adapter");
 const { autoUpdater } = require("electron-updater");
 const appMetadata = require("../package.json");
 
