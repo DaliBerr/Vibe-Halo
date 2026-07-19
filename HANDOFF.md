@@ -1,12 +1,12 @@
 # Vibe Halo Project Handoff
 
 Updated: 2026-07-19
-Current version: `0.5.0`
+Current version: `0.5.1`
 Source directory: `C:\Tools\Clawd-island`
 
 ## Current Scope
 
-Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for AI coding clients. Version 0.5.0 adds a platform runtime layer, stable POSIX Hook launcher, macOS accessory lifecycle, Linux X11/XWayland selection, and three-platform preview packaging while retaining the centered mini-island, one window, one global approval FIFO, loopback-only transport, strict renderer isolation, and fail-open behavior.
+Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for AI coding clients. Version 0.5.1 adopts the new transparent Halo terminal icon across application packages and the tray, adds matching README branding, and retains the 0.5.0 platform runtime, stable POSIX Hook launcher, macOS accessory lifecycle, Linux X11/XWayland selection, centered mini-island, one window, one global approval FIFO, loopback-only transport, strict renderer isolation, and fail-open behavior.
 
 - Dynamic-island approvals: Codex, ZCode, Qwen Code, Copilot CLI, Claude Code, CodeBuddy, Hermes, and OpenCode.
 - Exact interactive answers: ZCode `AskUserQuestion`, Claude/CodeBuddy Elicitation, and Hermes clarify.
@@ -41,9 +41,9 @@ The application does not contain desktop pets, remote approvals, a theme system,
 
 ## Verification Status
 
-- Automated suite: 122 tests on Windows before cross-platform CI (121 passed, one POSIX-only process test skipped), covering 19 adapters, platform contracts, codecs, forms, global FIFO, server authentication/bounds, Windows/POSIX Hook paths, offline fallback, X11 source-window matching, installers, backups, idempotence, explicit disables, safe uninstall, IPC, sizing, stores, localization, settings migration, and legacy regressions. The POSIX process-runner test executes on macOS/Linux CI.
+- Automated suite: 126 tests on Windows before cross-platform CI (125 passed, one POSIX-only process test skipped), covering 19 adapters, platform contracts, codecs, forms, global FIFO, server authentication/bounds, Windows/POSIX Hook paths, offline fallback, X11 source-window matching, installers, backups, idempotence, explicit disables, safe uninstall, IPC, sizing, stores, localization, icon assets, settings migration, and legacy regressions. The POSIX process-runner test executes on macOS/Linux CI.
 - Automatic-update suite: signed-build gating, scheduler state, download/install transitions, sanitized errors, ordered fail-open shutdown, external signing staging/injection, and signed-byte metadata regeneration.
-- Windows: Codex/ZCode retain existing real-client validation. The 0.5.0 unpacked app launched in an isolated profile; an expanded approval action traversed Renderer IPC and cleared the queue. `Vibe-Halo-Setup-0.5.0-x64.exe` is unsigned, update-disabled, 102,778,900 bytes, and has SHA-256 `4271AFC8D4042D51ED21C444CCBF94D85DB213393891683D0D7D48FE60F1A304`.
+- Windows: Codex/ZCode retain existing real-client validation. The 0.5.1 unpacked app passed package verification. `Vibe-Halo-Setup-0.5.1-x64.exe` is unsigned, update-disabled, 102,837,420 bytes, and has SHA-256 `A3A36BE8B3017D175020EA4C1B62C8C9ADB5B7A1C20B187FB68C4A4D28FEF27E`.
 - macOS/Linux: first release is limited to CI contract, package, stable-runner, and isolated startup smoke tests. No real-client round-trip claim may be made until tested on physical installations.
 - Codex: trusted Hook health detected; command Hook single-allow path returned the exact Codex protocol.
 - ZCode 3.3.0: native process hooks use `cmd.exe` plus explicit arguments and a waiting, no-new-window PowerShell launcher. This is required because a direct PowerShell invocation detaches the packaged GUI-subsystem Electron process and returns empty stdout to ZCode before the Hook decision is ready. Health checks repair that legacy launcher, invalid wildcard matchers, and malformed 0.2.0 shell-command entries. Real approval, completion, structured `AskUserQuestion`, exact `updatedInput.answers` round-trips, immediate single-choice submission, and the final allow response are verified against the running app.
@@ -67,7 +67,7 @@ npm run build
 - Linux prefers X11/XWayland; `VIBE_HALO_NATIVE_WAYLAND=1` forces a diagnosed degraded native-Wayland mode.
 - macOS runs as an accessory application without Dock presence or Accessibility/Screen Recording permissions.
 - The stable POSIX launcher lives at `~/.vibe-halo/bin/vibe-halo-hook-runner`; remove all integrations before deleting the app on macOS/Linux.
-- `preview-0.5.0` is a GitHub Pre-release built by `.github/workflows/cross-platform.yml`; it includes all platform packages and `SHA256SUMS.txt` but no stable update metadata. macOS packages are ad-hoc signed only, without Developer ID signing or notarization, and macOS/Linux auto-update stays disabled.
+- `preview-0.5.1` is a GitHub Pre-release built by `.github/workflows/cross-platform.yml`; it includes all platform packages and `SHA256SUMS.txt` but no stable update metadata. macOS packages are ad-hoc signed only, without Developer ID signing or notarization, and macOS/Linux auto-update stays disabled.
 - Windows local artifacts remain unsigned and update-disabled. The separate stable `v*` workflow still signs the app EXE and NSIS elevation helper, then the generated uninstaller and final installer in order, and regenerates `latest.yml` and the blockmap.
 - Version 0.2.3 requires one final manual bootstrap install of a signed release. The SignPath Foundation application has been submitted and is awaiting approval, so no public auto-update release may be created until approval and publisher verification are complete.
 - Keep `LICENSE`, `NOTICE.md`, and upstream attribution in every release.
