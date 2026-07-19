@@ -10,6 +10,23 @@ function clean(value, max) {
     : "";
 }
 
+function cleanKey(value) {
+  const key = clean(value, 120);
+  return /^[a-z][a-zA-Z0-9.-]{0,119}$/.test(key) ? key : "";
+}
+
+function cleanParams(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const output = {};
+  for (const [rawKey, rawValue] of Object.entries(value).slice(0, 8)) {
+    const key = clean(rawKey, 40);
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(key)) continue;
+    if (typeof rawValue === "string") output[key] = clean(rawValue, 160);
+    else if (Number.isFinite(rawValue)) output[key] = rawValue;
+  }
+  return output;
+}
+
 function publicItem(item) {
   if (!item) return null;
   const { requestKey: _requestKey, timer: _timer, ...safe } = item;
@@ -18,17 +35,21 @@ function publicItem(item) {
 
 function cleanQuestions(value) {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 10).map((question, index) => ({
-    header: clean(question?.header, 80),
-    id: clean(question?.id, 120) || `question_${index + 1}`,
-    question: clean(question?.question, 600) || "Codex 正在等待你的输入。",
-    options: Array.isArray(question?.options)
-      ? question.options.slice(0, 20).map(option => ({
-        label: clean(option?.label, 120),
-        description: clean(option?.description, 300),
-      })).filter(option => option.label)
-      : [],
-  }));
+  return value.slice(0, 10).map((question, index) => {
+    const questionText = clean(question?.question, 600);
+    return {
+      header: clean(question?.header, 80),
+      id: clean(question?.id, 120) || `question_${index + 1}`,
+      question: questionText,
+      questionKey: cleanKey(question?.questionKey) || (questionText ? "" : "fallback.codexWaitingInput"),
+      options: Array.isArray(question?.options)
+        ? question.options.slice(0, 20).map(option => ({
+          label: clean(option?.label, 120),
+          description: clean(option?.description, 300),
+        })).filter(option => option.label)
+        : [],
+    };
+  });
 }
 
 class InputRequestStore extends EventEmitter {
@@ -55,15 +76,22 @@ class InputRequestStore extends EventEmitter {
     const existing = this.byRequestKey.get(requestKey);
     if (existing) return { entry: existing, duplicate: true };
 
+    const agentName = clean(input.agentName, 120) || "Codex";
+    const title = clean(input.title, 240);
+    const content = clean(input.content, 6000);
     const item = {
       id: crypto.randomUUID(),
       type: "input-request",
       agentId: clean(input.agentId, 80) || "codex",
-      agentName: clean(input.agentName, 120) || "Codex",
+      agentName,
       requestKey,
       sessionId: clean(input.sessionId, 240) || "codex:unknown",
-      title: clean(input.title, 240) || "Codex 等待你的选择",
-      content: clean(input.content, 6000) || "请回到 Codex 原生界面完成选择。",
+      title,
+      titleKey: cleanKey(input.titleKey) || (title ? "" : "fallback.codexWaitingChoice"),
+      titleParams: cleanParams(input.titleParams),
+      content,
+      contentKey: cleanKey(input.contentKey) || (content ? "" : "fallback.returnToCodex"),
+      contentParams: cleanParams(input.contentParams),
       questions: cleanQuestions(input.questions),
       cwd: clean(input.cwd, 2000),
       questionCount: Number.isInteger(input.questionCount)

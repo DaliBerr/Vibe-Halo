@@ -9,7 +9,10 @@ const DEFAULTS = Object.freeze({
   integrationInstalled: true,
   openAtLogin: true,
   initialized: false,
+  language: "system",
 });
+
+const LANGUAGE_VALUES = Object.freeze(["system", "en-US", "zh-CN"]);
 
 function cleanIntegrationState(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -41,7 +44,8 @@ class SettingsStore {
     try {
       const raw = JSON.parse(fs.readFileSync(this.filePath, "utf8"));
       for (const key of Object.keys(DEFAULTS)) {
-        if (typeof raw[key] === "boolean") this.value[key] = raw[key];
+        if (typeof DEFAULTS[key] === "boolean" && typeof raw[key] === "boolean") this.value[key] = raw[key];
+        else if (key === "language" && LANGUAGE_VALUES.includes(raw[key])) this.value[key] = raw[key];
       }
       this.integrationStates = cleanIntegrationState(raw.integrations);
       if (!this.integrationStates.codex && raw.integrationInstalled === false) {
@@ -59,7 +63,9 @@ class SettingsStore {
   }
 
   set(key, value) {
-    if (!Object.prototype.hasOwnProperty.call(DEFAULTS, key) || typeof value !== "boolean") return false;
+    if (!Object.prototype.hasOwnProperty.call(DEFAULTS, key)) return false;
+    if (typeof DEFAULTS[key] === "boolean" && typeof value !== "boolean") return false;
+    if (key === "language" && !LANGUAGE_VALUES.includes(value)) return false;
     this.value[key] = value;
     this.save();
     return true;
@@ -96,4 +102,4 @@ class SettingsStore {
   }
 }
 
-module.exports = { DEFAULTS, SettingsStore, cleanIntegrationState };
+module.exports = { DEFAULTS, LANGUAGE_VALUES, SettingsStore, cleanIntegrationState };

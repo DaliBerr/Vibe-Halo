@@ -15,6 +15,7 @@ const primaryProse = document.getElementById("primary-prose");
 const questionList = document.getElementById("question-list");
 const metadata = document.getElementById("metadata");
 const rawDetails = document.getElementById("raw-details");
+const rawSummary = document.getElementById("raw-summary");
 const rawContent = document.getElementById("raw-content");
 const collapseButton = document.getElementById("collapse");
 const closeButton = document.getElementById("close");
@@ -32,6 +33,50 @@ let lastItemId = null;
 let measurementFrame = null;
 let lastMeasurement = "";
 
+const defaultStrings = Object.freeze({
+  collapseIsland: "Collapse island",
+  collapse: "Collapse",
+  close: "Close",
+  rawDetails: "View full parameters",
+  copyContent: "Copy content",
+  copied: "Copied",
+  moreActions: "More actions",
+  more: "More",
+  parameter: "Parameter",
+  option: "Option",
+  otherAnswerOptional: "Other answer (optional)",
+  enterAnswer: "Enter an answer",
+  content: "Content",
+  waitingInput: "{agentName} is waiting for your input.",
+  waitingAnswerCompact: "Waiting for an answer",
+  approvalRequestCompact: "{toolName} approval request",
+  waitingChoiceCompact: "{agentName} is waiting for your choice",
+  completedCompact: "{agentName} completed",
+  waitingYourAnswer: "{agentName} is waiting for your answer",
+  returnToClient: "Return to {agentName} to finish the choice in its native interface.",
+  taskCompleted: "Task completed",
+});
+
+function ui(key) {
+  return state?.strings?.[key] || defaultStrings[key] || key;
+}
+
+function formatUi(key, params = {}) {
+  return ui(key).replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name) => (
+    Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match
+  ));
+}
+
+function applyStaticStrings() {
+  document.documentElement.lang = state?.locale === "zh-CN" ? "zh-CN" : "en-US";
+  collapseButton.setAttribute("aria-label", ui("collapseIsland"));
+  collapseButton.title = ui("collapse");
+  closeButton.setAttribute("aria-label", ui("close"));
+  rawSummary.textContent = ui("rawDetails");
+  overflowToggle.setAttribute("aria-label", ui("moreActions"));
+  overflowToggle.textContent = ui("more");
+}
+
 function clearElement(element) {
   while (element.firstChild) element.removeChild(element.firstChild);
 }
@@ -42,7 +87,7 @@ function renderMetadata(items) {
   metadata.hidden = values.length === 0;
   for (const item of values) {
     const term = document.createElement("dt");
-    term.textContent = item.label || "参数";
+    term.textContent = item.label || ui("parameter");
     const detail = document.createElement("dd");
     detail.textContent = item.value || "";
     metadata.append(term, detail);
@@ -64,7 +109,7 @@ function renderQuestions(questions, interactive = false, item = null) {
     }
     const text = document.createElement("div");
     text.className = "question-text";
-    text.textContent = question.question || "Codex 正在等待你的输入。";
+    text.textContent = question.question || formatUi("waitingInput", { agentName: item?.agentName || "Codex" });
     card.appendChild(text);
     if (Array.isArray(question.options) && question.options.length) {
       const options = document.createElement("div");
@@ -88,7 +133,7 @@ function renderQuestions(questions, interactive = false, item = null) {
         const copy = document.createElement("div");
         const label = document.createElement("div");
         label.className = "option-label";
-        label.textContent = option.label || "选项";
+        label.textContent = option.label || ui("option");
         copy.appendChild(label);
         if (option.description) {
           const detail = document.createElement("div");
@@ -106,7 +151,7 @@ function renderQuestions(questions, interactive = false, item = null) {
       textarea.className = "answer-text";
       textarea.dataset.questionId = question.id;
       textarea.maxLength = 2000;
-      textarea.placeholder = question.options?.length ? "其他答案（可选）" : "输入回答";
+      textarea.placeholder = question.options?.length ? ui("otherAnswerOptional") : ui("enterAnswer");
       card.appendChild(textarea);
     }
     questionList.appendChild(card);
@@ -158,7 +203,7 @@ function renderActions(item, actionable) {
 }
 
 function setPrimaryCode(label, text) {
-  primaryLabel.textContent = label || "内容";
+  primaryLabel.textContent = label || ui("content");
   primaryLabel.hidden = false;
   primaryCode.textContent = text || "";
   primaryCode.hidden = false;
@@ -215,6 +260,7 @@ function scheduleMeasurement() {
 function render(next) {
   if (!next || !next.current || next.mode === "hidden") return;
   state = next;
+  applyStaticStrings();
   document.documentElement.dataset.theme = next.theme === "light" ? "light" : "dark";
   const item = next.current;
   const isApproval = item.type === "approval";
@@ -228,15 +274,19 @@ function render(next) {
   expanded.hidden = !isExpanded;
   const agentName = item.agentName || "Codex";
   compactTitle.textContent = isActionable
-    ? `${agentName} · ${isElicitation ? "等待回答" : `${item.toolName} 请求审批`}`
-    : (isInputRequest ? `${agentName} 等待你的选择` : `${agentName} 已完成`);
+    ? `${agentName} · ${isElicitation ? ui("waitingAnswerCompact") : formatUi("approvalRequestCompact", { toolName: item.toolName })}`
+    : (isInputRequest
+      ? formatUi("waitingChoiceCompact", { agentName })
+      : formatUi("completedCompact", { agentName }));
   count.hidden = (!isActionable && !isInputRequest) || next.pendingCount <= 1;
   count.textContent = String(next.pendingCount);
   title.textContent = isActionable
-    ? (isElicitation ? `${agentName} 等待你的回答` : `${agentName} · ${item.toolName}`)
-    : (item.title || (isInputRequest ? `${agentName} 等待你的选择` : `${agentName} 已完成`));
+    ? (isElicitation ? formatUi("waitingYourAnswer", { agentName }) : `${agentName} · ${item.toolName}`)
+    : (item.title || (isInputRequest
+      ? formatUi("waitingChoiceCompact", { agentName })
+      : formatUi("completedCompact", { agentName })));
   subtitle.textContent = item.cwd || item.sessionId || agentName;
-  const explanation = isInputRequest ? `请回到 ${agentName} 原生界面完成选择。` : (isActionable ? item.description : "");
+  const explanation = isInputRequest ? formatUi("returnToClient", { agentName }) : (isActionable ? item.description : "");
   description.hidden = !explanation;
   description.textContent = explanation;
 
@@ -254,7 +304,7 @@ function render(next) {
     rawDetails.hidden = !presentation.hasRaw;
     rawContent.textContent = presentation.raw || "{}";
     copyText = presentation.copyText || "";
-    copyButton.textContent = presentation.copyLabel || "复制内容";
+    copyButton.textContent = presentation.copyLabel || ui("copyContent");
   } else if (isElicitation) {
     renderMetadata([]);
     renderQuestions(item.questions, true, item);
@@ -265,24 +315,24 @@ function render(next) {
     copyText = "";
   } else if (isInputRequest) {
     renderMetadata([]);
-    renderQuestions(item.questions);
+    renderQuestions(item.questions, false, item);
     rawDetails.hidden = true;
     if (Array.isArray(item.questions) && item.questions.length) {
       primaryLabel.hidden = true;
       primaryCode.hidden = true;
       primaryProse.hidden = true;
     } else {
-      setPrimaryProse(item.content || "请回到 Codex 原生界面完成选择。");
+      setPrimaryProse(item.content || formatUi("returnToClient", { agentName }));
     }
     copyText = item.content || "";
-    copyButton.textContent = "复制内容";
+    copyButton.textContent = ui("copyContent");
   } else {
     renderMetadata([]);
     renderQuestions([]);
     rawDetails.hidden = true;
-    setPrimaryProse(item.output || "任务已完成");
+    setPrimaryProse(item.output || ui("taskCompleted"));
     copyText = item.output || "";
-    copyButton.textContent = "复制内容";
+    copyButton.textContent = ui("copyContent");
   }
 
   copyButton.hidden = !copyText;
@@ -304,7 +354,7 @@ collapseButton.addEventListener("click", () => {
 });
 copyButton.addEventListener("click", () => {
   window.islandAPI.copy(copyText);
-  copyButton.textContent = "已复制";
+  copyButton.textContent = ui("copied");
 });
 overflowToggle.addEventListener("click", () => { overflowMenu.hidden = !overflowMenu.hidden; });
 rawDetails.addEventListener("toggle", scheduleMeasurement);

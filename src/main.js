@@ -21,6 +21,7 @@ const { ApprovalStore } = require("./approval-store");
 const { CodexInputMonitor } = require("./codex-input-monitor");
 const { CompletionStore } = require("./completion-store");
 const { HookManager } = require("./hook-manager");
+const { createLocalizer, translateReason } = require("./i18n");
 const { IntegrationManager } = require("./integration-manager");
 const { IslandController } = require("./island-controller");
 const { InputRequestStore } = require("./input-request-store");
@@ -94,6 +95,8 @@ function startApplication() {
   let logger = null;
   let updateManager = null;
   let shutdownCoordinator = null;
+  let localization = createLocalizer({ preference: "system", systemLocale: "en-US" });
+  const t = (key, params) => localization.t(key, params);
   const approvals = new ApprovalStore();
   const completions = new CompletionStore();
   const inputRequests = new InputRequestStore();
@@ -156,12 +159,12 @@ function startApplication() {
     if (approvals.size > 0 || inputRequests.size > 0) {
       const result = await dialog.showMessageBox({
         type: "warning",
-        buttons: ["稍后", "交回客户端并更新"],
+        buttons: [t("dialog.later"), t("dialog.returnAndUpdate")],
         defaultId: 0,
         cancelId: 0,
         title: APP_NAME,
-        message: "当前仍有客户端请求等待处理。",
-        detail: "继续更新会将待处理审批或问题安全交回客户端原生流程，然后重启 Vibe Halo。",
+        message: t("dialog.pendingRequests"),
+        detail: t("dialog.pendingRequestsDetail"),
       });
       if (result.response !== 1) return;
     }
@@ -199,8 +202,17 @@ function startApplication() {
     const integrations = listAgents().map(descriptor => {
       const state = settings.getIntegration(descriptor.id);
       const status = integrationManager.status(descriptor.id);
-      const verification = state.verification === "live" ? "本机实测" : (state.verification === "contract" ? "契约测试通过、未在本机实测" : "未验证");
-      return `${descriptor.name}：${state.disabledByUser ? "用户停用" : (status.disabled ? "客户端已禁用 Hook" : (status.healthy ? "健康" : (status.detected ? "需修复" : "未检测")))}；${verification}`;
+      const verification = state.verification === "live"
+        ? t("diagnostics.liveVerified")
+        : (state.verification === "contract" ? t("diagnostics.contractOnly") : t("diagnostics.unverified"));
+      const integrationStatus = state.disabledByUser
+        ? t("diagnostics.userDisabled")
+        : (status.disabled
+          ? t("diagnostics.clientHooksDisabled")
+          : (status.healthy
+            ? t("diagnostics.healthy")
+            : (status.detected ? t("diagnostics.needsRepair") : t("diagnostics.notDetected"))));
+      return t("diagnostics.integrationLine", { agentName: descriptor.name, status: integrationStatus, verification });
     });
     const update = updateManager?.snapshot() || {
       enabled: false,
@@ -209,25 +221,51 @@ function startApplication() {
       percent: null,
       error: "",
     };
+    const updateStatusKeys = {
+      idle: "diagnostics.updateIdle",
+      checking: "diagnostics.updateChecking",
+      available: "diagnostics.updateAvailable",
+      downloading: "diagnostics.updateDownloading",
+      downloaded: "diagnostics.updateDownloaded",
+      installing: "diagnostics.updateInstalling",
+      error: "diagnostics.updateError",
+    };
+    const updateValues = [
+      update.enabled ? t(updateStatusKeys[update.status] || "diagnostics.updateIdle") : t("diagnostics.buildDisabled"),
+      update.availableVersion ? t("diagnostics.versionValue", { version: update.availableVersion }) : "",
+      update.percent != null ? t("diagnostics.progressValue", { percent: update.percent }) : "",
+      update.error ? t("diagnostics.errorValue", { error: update.error }) : "",
+    ].filter(Boolean).join(", ");
     return [
-      `应用：${APP_NAME} ${app.getVersion()}`,
-      `自动更新：${update.enabled ? update.status : "此构建未启用"}${update.availableVersion ? `，版本=${update.availableVersion}` : ""}${update.percent != null ? `，进度=${update.percent}%` : ""}${update.error ? `，错误=${update.error}` : ""}`,
-      `本地服务：${local.listening ? `127.0.0.1:${local.port}` : "未运行"}`,
-      `审批：${settings.get("approvalEnabled") ? "启用" : "停用"}`,
-      `等待输入提醒：${settings.get("inputReminderEnabled") ? "启用" : "停用"}`,
-      "客户端集成：",
+      t("diagnostics.application", { appName: APP_NAME, version: app.getVersion() }),
+      t("diagnostics.autoUpdate", { value: updateValues }),
+      t("diagnostics.localService", { value: local.listening ? `127.0.0.1:${local.port}` : t("diagnostics.notRunning") }),
+      t("diagnostics.approvals", { value: settings.get("approvalEnabled") ? t("diagnostics.enabled") : t("diagnostics.disabled") }),
+      t("diagnostics.inputReminders", { value: settings.get("inputReminderEnabled") ? t("diagnostics.enabled") : t("diagnostics.disabled") }),
+      t("diagnostics.language", {
+        locale: localization.locale,
+        preference: localization.preference === "system"
+          ? t("tray.followWindows")
+          : (localization.preference === "zh-CN" ? "简体中文" : "English"),
+      }),
+      t("diagnostics.clientIntegrations"),
       ...integrations.map(value => `  ${value}`),
-      `待审批：${approvals.size}`,
-      `等待输入：${inputRequests.size}`,
-      `Codex 目录：${hook.codexHomeExists ? "已找到" : "未找到"}`,
-      `Hooks 功能：${hook.feature}`,
-      `Hook 事件：${Object.entries(hook.events).map(([key, value]) => `${key}=${value ? "ok" : "missing"}`).join(", ")}`,
-      `Hook 信任：${Object.entries(hook.trust.events).map(([key, value]) => `${key}=${value}`).join(", ")}`,
-      `运行时：${local.runtimePath}`,
-      `会话监控：${input.running ? "运行中" : "未运行"}, 目录=${input.sessionsFound ? "已找到" : "未找到"}, 文件=${input.trackedFiles}, 待响应=${input.pendingCount}`,
-      `会话目录：${input.sessionsDir}`,
-      `会话监控错误：${input.lastError || "无"}`,
-      `日志：${logger.filePath}`,
+      t("diagnostics.pendingApprovals", { count: approvals.size }),
+      t("diagnostics.pendingInput", { count: inputRequests.size }),
+      t("diagnostics.codexDirectory", { value: hook.codexHomeExists ? t("diagnostics.found") : t("diagnostics.notFound") }),
+      t("diagnostics.hooksFeature", { value: hook.feature }),
+      t("diagnostics.hookEvents", { value: Object.entries(hook.events).map(([key, value]) => `${key}=${value ? "ok" : "missing"}`).join(", ") }),
+      t("diagnostics.hookTrust", { value: Object.entries(hook.trust.events).map(([key, value]) => `${key}=${value}`).join(", ") }),
+      t("diagnostics.runtime", { path: local.runtimePath }),
+      t("diagnostics.sessionMonitor", {
+        state: input.running ? t("diagnostics.running") : t("diagnostics.notRunning"),
+        directory: input.sessionsFound ? t("diagnostics.found") : t("diagnostics.notFound"),
+        files: input.trackedFiles,
+        pending: input.pendingCount,
+      }),
+      t("diagnostics.sessionDirectory", { path: input.sessionsDir }),
+      t("diagnostics.sessionMonitorError", { error: input.lastError || t("diagnostics.none") }),
+      t("diagnostics.logs", { path: logger.filePath }),
     ].join("\n");
   }
 
@@ -236,6 +274,14 @@ function startApplication() {
     const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
     const image = nativeImage.createFromDataURL(dataUrl);
     return image.isEmpty() ? nativeImage.createEmpty() : image.resize({ width: 16, height: 16 });
+  }
+
+  function setLanguage(preference) {
+    if (!settings?.set("language", preference)) return false;
+    localization.setPreference(preference);
+    if (island) island.refresh("language");
+    else rebuildTray();
+    return true;
   }
 
   function rebuildTray() {
@@ -247,49 +293,62 @@ function startApplication() {
     const healthyCount = descriptors.filter(descriptor => statuses.get(descriptor.id).healthy).length;
     const detectedCount = descriptors.filter(descriptor => statuses.get(descriptor.id).detected).length;
     const statusLabel = !local.listening
-      ? "服务未运行"
+      ? t("tray.serviceNotRunning")
       : hook.feature === "false"
-        ? "Codex Hooks 已禁用"
+        ? t("tray.codexHooksDisabled")
         : hook.trust.pendingCount > 0
-          ? "Codex Hook 待审核"
-        : `客户端集成 ${healthyCount}/${detectedCount} 健康`;
+          ? t("tray.codexHookPending")
+          : t("tray.integrationsHealthy", { healthy: healthyCount, detected: detectedCount });
     const integrationItems = descriptors.map(descriptor => {
       const state = settings.getIntegration(descriptor.id);
       const status = statuses.get(descriptor.id);
-      const suffix = state.disabledByUser ? "（已停用）" : status.disabled ? "（客户端禁用）" : status.healthy ? "（健康）" : status.detected ? "（需修复）" : "（未检测）";
+      const suffix = state.disabledByUser
+        ? t("tray.integrationDisabledByUser")
+        : status.disabled
+          ? t("tray.integrationDisabledByClient")
+          : status.healthy
+            ? t("tray.integrationHealthy")
+            : status.detected
+              ? t("tray.integrationNeedsRepair")
+              : t("tray.integrationNotDetected");
       return {
-        label: `${descriptor.name} ${suffix}`,
+        label: `${descriptor.name} (${suffix})`,
         type: "checkbox",
         checked: !state.disabledByUser,
         enabled: status.detected || state.disabledByUser,
         click: item => {
           const result = item.checked ? integrationManager.enable(descriptor.id) : integrationManager.disable(descriptor.id);
           if (!result?.ok && item.checked) {
-            dialog.showMessageBox({ type: "warning", title: APP_NAME, message: `${descriptor.name} 集成未能启用。`, detail: result?.reason || "未知错误" });
+            dialog.showMessageBox({
+              type: "warning",
+              title: APP_NAME,
+              message: t("dialog.integrationEnableFailed", { agentName: descriptor.name }),
+              detail: translateReason(localization, result?.reason),
+            });
           }
           rebuildTray();
         },
       };
     });
     const update = updateManager?.snapshot() || { enabled: false, status: "disabled" };
-    const updateItems = [{ label: `版本 ${app.getVersion()}`, enabled: false }];
+    const updateItems = [{ label: t("tray.version", { version: app.getVersion() }), enabled: false }];
     if (update.enabled) {
       if (update.status === "checking") {
-        updateItems.push({ label: "正在检查更新…", enabled: false });
+        updateItems.push({ label: t("tray.checkingUpdates"), enabled: false });
       } else if (update.status === "available") {
-        updateItems.push({ label: `正在准备下载 ${update.availableVersion || "新版本"}…`, enabled: false });
+        updateItems.push({ label: t("tray.preparingDownload", { version: update.availableVersion || t("fallback.newVersion") }), enabled: false });
       } else if (update.status === "downloading") {
-        updateItems.push({ label: `正在下载 ${update.availableVersion || "新版本"} ${update.percent ?? 0}%`, enabled: false });
+        updateItems.push({ label: t("tray.downloading", { version: update.availableVersion || t("fallback.newVersion"), percent: update.percent ?? 0 }), enabled: false });
       } else if (update.status === "downloaded") {
         updateItems.push({
-          label: `重启并更新到 ${update.availableVersion || "新版本"}`,
+          label: t("tray.restartAndUpdate", { version: update.availableVersion || t("fallback.newVersion") }),
           click: () => installDownloadedUpdate(),
         });
       } else if (update.status === "installing") {
-        updateItems.push({ label: "正在重启并更新…", enabled: false });
+        updateItems.push({ label: t("tray.restartingAndUpdating"), enabled: false });
       } else {
         updateItems.push({
-          label: update.status === "error" ? "重新检查更新" : "检查更新",
+          label: update.status === "error" ? t("tray.checkAgain") : t("tray.checkUpdates"),
           click: () => updateManager.check({ manual: true }),
         });
       }
@@ -300,13 +359,13 @@ function startApplication() {
       ...updateItems,
       { type: "separator" },
       {
-        label: "启用审批",
+        label: t("tray.enableApprovals"),
         type: "checkbox",
         checked: settings.get("approvalEnabled"),
         click: item => { settings.set("approvalEnabled", item.checked); rebuildTray(); },
       },
       {
-        label: "等待输入提醒",
+        label: t("tray.inputReminders"),
         type: "checkbox",
         checked: settings.get("inputReminderEnabled"),
         click: item => {
@@ -317,31 +376,31 @@ function startApplication() {
         },
       },
       {
-        label: "开机启动",
+        label: t("tray.launchAtLogin"),
         type: "checkbox",
         checked: settings.get("openAtLogin"),
         click: item => { setLogin(item.checked); rebuildTray(); },
       },
       {
-        label: "客户端集成",
+        label: t("tray.clientIntegrations"),
         submenu: [
           ...integrationItems,
           { type: "separator" },
           {
-            label: "重新扫描",
+            label: t("tray.rescan"),
             click: () => { integrationManager.scan({ install: true }); rebuildTray(); },
           },
           {
-            label: "修复全部",
+            label: t("tray.repairAll"),
             click: () => { integrationManager.repairAll(); rebuildTray(); },
           },
           {
-            label: "卸载全部…",
+            label: t("tray.uninstallAll"),
             click: async () => {
               const result = await dialog.showMessageBox({
-                type: "warning", buttons: ["取消", "卸载全部"], defaultId: 0, cancelId: 0,
-                title: APP_NAME, message: "移除所有 Vibe Halo 客户端集成？",
-                detail: "第三方配置和首次备份会保留；所有客户端将回到原生流程。",
+                type: "warning", buttons: [t("dialog.cancel"), t("dialog.uninstallAll")], defaultId: 0, cancelId: 0,
+                title: APP_NAME, message: t("dialog.removeAllIntegrations"),
+                detail: t("dialog.removeAllIntegrationsDetail"),
               });
               if (result.response === 1) {
                 integrationManager.uninstallAll();
@@ -352,18 +411,41 @@ function startApplication() {
           },
         ],
       },
+      {
+        label: t("tray.language"),
+        submenu: [
+          {
+            label: t("tray.followWindows"),
+            type: "radio",
+            checked: settings.get("language") === "system",
+            click: () => setLanguage("system"),
+          },
+          {
+            label: "English",
+            type: "radio",
+            checked: settings.get("language") === "en-US",
+            click: () => setLanguage("en-US"),
+          },
+          {
+            label: "简体中文",
+            type: "radio",
+            checked: settings.get("language") === "zh-CN",
+            click: () => setLanguage("zh-CN"),
+          },
+        ],
+      },
     ];
     if (hook.feature === "false") {
       items.push({
-        label: "启用 Codex Hooks…",
+        label: t("tray.enableCodexHooks"),
         click: async () => {
           const result = await dialog.showMessageBox({
             type: "question",
-            buttons: ["取消", "启用"],
+            buttons: [t("dialog.cancel"), t("dialog.enable")],
             defaultId: 1,
             cancelId: 0,
             title: APP_NAME,
-            message: "Codex config.toml 明确禁用了 Hooks。是否将 hooks 设置为 true？",
+            message: t("dialog.enableCodexHooksQuestion"),
           });
           if (result.response === 1) {
             hookManager.enableFeature();
@@ -376,16 +458,16 @@ function startApplication() {
     }
     if (hook.trust.pendingCount > 0) {
       items.push({
-        label: "审核 Codex Hook…",
+        label: t("tray.reviewCodexHook"),
         click: async () => {
           const result = await dialog.showMessageBox({
             type: "warning",
-            buttons: ["关闭", "复制 /hooks"],
+            buttons: [t("renderer.close"), t("dialog.copyHooks")],
             defaultId: 1,
             cancelId: 0,
             title: APP_NAME,
-            message: "Codex 尚未信任 Vibe Halo Hook",
-            detail: "请在 Codex 的输入框中执行 /hooks，找到用户级 ~/.codex/hooks.json，并审核、信任 Vibe Halo 的 PermissionRequest、Stop 和 UserPromptSubmit 条目。Codex 官方目前没有可供本地安装器调用的安全信任 API。",
+            message: t("dialog.codexHookUntrusted"),
+            detail: t("dialog.codexHookUntrustedDetail"),
           });
           if (result.response === 1) clipboard.writeText("/hooks");
         },
@@ -393,7 +475,7 @@ function startApplication() {
     }
     items.push(
       {
-        label: "修复 Codex Hook",
+        label: t("tray.repairCodexHook"),
         click: async () => {
           settings.setIntegration("codex", { disabledByUser: false });
           const result = integrationManager.enable("codex");
@@ -401,23 +483,23 @@ function startApplication() {
           await dialog.showMessageBox({
             type: result.ok ? "info" : "error",
             title: APP_NAME,
-            message: result.ok ? "Codex Hook 配置已检查并修复。" : "无法修复 Codex Hook。",
-            detail: result.reason || (hookManager.status().trust.pendingCount > 0
-              ? "配置已写入，但仍需在 Codex 输入 /hooks，审核并信任 Vibe Halo 条目。"
-              : `Hooks 功能状态：${result.feature}`),
+            message: result.ok ? t("dialog.codexHookRepaired") : t("dialog.codexHookRepairFailed"),
+            detail: result.reason ? translateReason(localization, result.reason) : (hookManager.status().trust.pendingCount > 0
+              ? t("dialog.codexHookReviewStillRequired")
+              : t("dialog.hooksFeatureState", { state: result.feature })),
           });
         },
       },
       {
-        label: "诊断信息",
+        label: t("tray.diagnostics"),
         click: async () => {
           const detail = diagnosticText();
           const result = await dialog.showMessageBox({
             type: "info",
-            buttons: ["关闭", "复制", "打开日志目录"],
+            buttons: [t("renderer.close"), t("dialog.copy"), t("dialog.openLogDirectory")],
             defaultId: 0,
-            title: `${APP_NAME} 诊断`,
-            message: "运行状态",
+            title: t("dialog.diagnosticsTitle", { appName: APP_NAME }),
+            message: t("dialog.runtimeStatus"),
             detail,
           });
           if (result.response === 1) clipboard.writeText(detail);
@@ -425,7 +507,7 @@ function startApplication() {
         },
       },
       { type: "separator" },
-      { label: "退出", click: () => requestQuit() },
+      { label: t("tray.quit"), click: () => requestQuit() },
     );
     tray.setContextMenu(Menu.buildFromTemplate(items));
     tray.setToolTip(`${APP_NAME} — ${statusLabel}`);
@@ -448,8 +530,10 @@ function startApplication() {
       const requestId = typeof data.requestId === "string" ? data.requestId : (typeof data.request_id === "string" ? data.request_id : data.toolUseId || Date.now());
       inputRequests.enqueue({
         agentId, agentName, requestKey: `${agentId}:${sessionId}:permission:${requestId}`, sessionId,
-        title: `${agentName} 等待原生审批`,
-        content: `请在 ${agentName} 客户端中完成 ${data.toolName || data.tool_name || "工具"} 审批。`,
+        titleKey: "fallback.passiveApprovalTitle",
+        titleParams: { agentName },
+        contentKey: "fallback.passiveApprovalContent",
+        contentParams: { agentName, toolName: data.toolName || data.tool_name || t("fallback.tool") },
         cwd: data.cwd, sourcePid: data.sourcePid, pidChain: data.pidChain,
       });
       return;
@@ -464,8 +548,11 @@ function startApplication() {
       agentName,
       title: typeof data.session_title === "string" && data.session_title.trim()
         ? data.session_title.trim()
-        : (cwd ? path.basename(cwd) : `${agentName} 已完成`),
-      output: typeof data.assistant_last_output === "string" ? data.assistant_last_output : "任务已完成",
+        : (cwd ? path.basename(cwd) : ""),
+      titleKey: cwd ? "" : "fallback.completionTitle",
+      titleParams: { agentName },
+      output: typeof data.assistant_last_output === "string" ? data.assistant_last_output : "",
+      outputKey: typeof data.assistant_last_output === "string" ? "" : "fallback.taskCompleted",
       cwd,
       sourcePid: Number.isInteger(data.source_pid) ? data.source_pid : null,
       pidChain: Array.isArray(data.pid_chain) ? data.pid_chain : [],
@@ -474,7 +561,7 @@ function startApplication() {
 
   app.on("second-instance", () => {
     if (tray && process.platform === "win32") {
-      try { tray.displayBalloon({ title: APP_NAME, content: "Vibe Halo 已在后台运行。" }); } catch {}
+      try { tray.displayBalloon({ title: APP_NAME, content: t("notification.background") }); } catch {}
     }
   });
 
@@ -483,6 +570,7 @@ function startApplication() {
   app.whenReady().then(async () => {
     logger = createLogger(path.join(app.getPath("userData"), "logs"));
     settings = new SettingsStore(path.join(app.getPath("userData"), "settings.json"));
+    localization = createLocalizer({ preference: settings.get("language"), systemLocale: app.getLocale() });
     integrationManager = createIntegrationManager(logger, settings);
     hookManager = integrationManager.codexManager;
     if (!settings.get("initialized")) {
@@ -507,6 +595,7 @@ function startApplication() {
       nativeTheme,
       approvalStore: approvals,
       screen,
+      localization,
       onChanged: () => rebuildTray(),
     });
     island.create();
@@ -545,17 +634,17 @@ function startApplication() {
       if (reason === "downloaded" && tray && process.platform === "win32") {
         try {
           tray.displayBalloon({
-            title: `${APP_NAME} 更新已就绪`,
-            content: `${snapshot.availableVersion || "新版本"} 已下载，可从托盘重启更新。`,
+            title: t("notification.updateReadyTitle", { appName: APP_NAME }),
+            content: t("notification.updateReadyContent", { version: snapshot.availableVersion || t("fallback.newVersion") }),
           });
         } catch {}
       }
     });
     updateManager.on("manual-result", result => {
       if (result.kind === "up-to-date") {
-        dialog.showMessageBox({ type: "info", title: APP_NAME, message: `当前已是最新版本 ${app.getVersion()}。` });
+        dialog.showMessageBox({ type: "info", title: APP_NAME, message: t("dialog.updateCurrent", { version: app.getVersion() }) });
       } else if (result.kind === "error") {
-        dialog.showMessageBox({ type: "warning", title: APP_NAME, message: "暂时无法检查更新。", detail: "Vibe Halo 会继续正常运行，你可以稍后从托盘重试。" });
+        dialog.showMessageBox({ type: "warning", title: APP_NAME, message: t("dialog.updateCheckFailed"), detail: t("dialog.updateCheckFailedDetail") });
       }
     });
 
@@ -574,19 +663,19 @@ function startApplication() {
         agentName: "Codex",
         kind: "approval",
         options: [
-          { id: "allow", label: "允许一次", tone: "primary" },
-          { id: "deny", label: "拒绝", tone: "danger" },
-          { id: "native", label: "在客户端处理", tone: "secondary", overflow: true },
+          { id: "allow", labelKey: "action.allowOnce", tone: "primary" },
+          { id: "deny", labelKey: "action.deny", tone: "danger" },
+          { id: "native", labelKey: "action.handleInClient", tone: "secondary", overflow: true },
         ],
         sessionId: "codex:demo",
         toolUseId: "demo-tool",
         toolName: "PowerShell",
-        description: "运行完整测试套件并读取结果。这个说明故意较长，用于确认高 DPI 和多行文字下操作按钮仍保持可见。",
+        description: t("demo.description"),
         toolInput: {
           command: "npm test -- --test-reporter=spec --test-concurrency=1",
           cwd: "C:\\Projects\\demo-with-a-longer-workspace-name",
           timeout_ms: 120000,
-          description: "运行完整测试套件并读取结果。这个说明故意较长，用于确认高 DPI 和多行文字下操作按钮仍保持可见。",
+          description: t("demo.description"),
           environment: { CI: "1", FORCE_COLOR: "0" },
         },
         cwd: "C:\\Projects\\demo",
@@ -614,7 +703,7 @@ function startApplication() {
     }
   }).catch(error => {
     try { logger?.error("Startup failed", { message: error.message }); } catch {}
-    dialog.showErrorBox(APP_NAME, `启动失败：${error.message}`);
+    dialog.showErrorBox(APP_NAME, t("dialog.startupFailed", { message: error.message }));
     requestQuit();
   });
 

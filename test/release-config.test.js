@@ -30,6 +30,9 @@ test("ordinary packages stay update-disabled while signed release packages are p
   assert.deepEqual(local.publish, [{
     provider: "github", owner: "DaliBerr", repo: "Vibe-Halo", channel: "latest", releaseType: "release",
   }]);
+  assert.equal(local.nsis.multiLanguageInstaller, true);
+  assert.deepEqual(local.nsis.installerLanguages, ["en_US", "zh_CN"]);
+  assert.equal(local.nsis.displayLanguageSelector, false);
 
   const release = loadBuildConfig({
     VIBE_HALO_PUBLISHER_NAME: "CN=SignPath Foundation, O=SignPath Foundation",

@@ -11,10 +11,12 @@ const css = fs.readFileSync(path.join(rendererRoot, "style.css"), "utf8");
 const javascript = fs.readFileSync(path.join(rendererRoot, "renderer.js"), "utf8");
 
 test("expanded island exposes a centered non-destructive collapse control", () => {
-  assert.match(html, /id="collapse"[^>]+aria-label="收起灵动岛"/);
+  assert.match(html, /id="collapse"[^>]+aria-label="Collapse island"/);
   assert.match(css, /\.collapse-button\s*\{[^}]*position:\s*absolute[^}]*left:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
   assert.match(css, /\.collapse-button\s*\{[^}]*border-radius:\s*999px[^}]*background:\s*#08090b[^}]*box-shadow:/s);
   assert.match(javascript, /collapseButton\.addEventListener\("click"[\s\S]+islandAPI\.view\(state\.current\.id, "collapse"\)/);
+  assert.match(javascript, /document\.documentElement\.lang = state\?\.locale === "zh-CN"/);
+  assert.match(javascript, /collapseButton\.setAttribute\("aria-label", ui\("collapseIsland"\)\)/);
 });
 
 test("compact expand indicator uses a fixed SVG box instead of a font glyph", () => {

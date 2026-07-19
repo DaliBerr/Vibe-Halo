@@ -23,6 +23,7 @@ module.exports = {
     "LICENSE",
     "NOTICE.md",
     "README.md",
+    "README.zh-CN.md",
   ],
   extraMetadata: {
     autoUpdateEnabled: Boolean(publisherName),
@@ -44,6 +45,9 @@ module.exports = {
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
+    multiLanguageInstaller: true,
+    installerLanguages: ["en_US", "zh_CN"],
+    displayLanguageSelector: false,
     include: "build/installer.nsh",
   },
 };

@@ -1,9 +1,9 @@
 "use strict";
 
 const APPROVAL_OPTIONS = Object.freeze([
-  Object.freeze({ id: "allow", label: "允许一次", tone: "primary" }),
-  Object.freeze({ id: "deny", label: "拒绝", tone: "danger" }),
-  Object.freeze({ id: "native", label: "在客户端处理", tone: "secondary", overflow: true }),
+  Object.freeze({ id: "allow", labelKey: "action.allowOnce", tone: "primary" }),
+  Object.freeze({ id: "deny", labelKey: "action.deny", tone: "danger" }),
+  Object.freeze({ id: "native", labelKey: "action.handleInClient", tone: "secondary", overflow: true }),
 ]);
 
 const PASSIVE_OPTIONS = Object.freeze([]);
@@ -180,7 +180,10 @@ function normalizeQuestions(value) {
     return {
       id: cleanText(question?.id, 120) || `question_${index + 1}`,
       header: cleanText(question?.header, 120),
-      question: cleanText(question?.question ?? question?.prompt ?? question?.text, 1000) || "Agent 正在等待你的输入。",
+      question: cleanText(question?.question ?? question?.prompt ?? question?.text, 1000),
+      questionKey: cleanText(question?.question ?? question?.prompt ?? question?.text, 1000)
+        ? ""
+        : "fallback.agentWaitingInput",
       multiSelect: question?.multiSelect === true || question?.multi_select === true,
       allowText: question?.allowText !== false && question?.allow_text !== false,
       options,
@@ -188,20 +191,26 @@ function normalizeQuestions(value) {
   });
 }
 
-function permissionSuggestionLabel(suggestion, index) {
+function permissionSuggestionDisplay(suggestion, index) {
   if (suggestion.type === "addRules") {
     const toolName = cleanText(suggestion.rules?.[0]?.toolName || suggestion.toolName, 80);
-    return toolName ? `始终允许 ${toolName}` : "采用长期允许规则";
+    return toolName
+      ? { labelKey: "action.allowToolAlways", labelParams: { toolName } }
+      : { labelKey: "action.useLongTermRule" };
   }
   if (suggestion.type === "setMode") {
     const mode = cleanText(suggestion.mode, 80);
-    return mode ? `切换权限模式：${mode}` : "切换权限模式";
+    return mode
+      ? { labelKey: "action.switchPermissionMode", labelParams: { mode } }
+      : { labelKey: "action.switchPermissionModeGeneric" };
   }
   if (suggestion.type === "addDirectories") {
     const count = Array.isArray(suggestion.directories) ? suggestion.directories.length : 0;
-    return count ? `允许访问 ${count} 个目录` : "允许目录访问";
+    return count
+      ? { labelKey: "action.allowDirectories", labelParams: { count } }
+      : { labelKey: "action.allowDirectoryAccess" };
   }
-  return `采用权限建议 ${index + 1}`;
+  return { labelKey: "action.permissionSuggestion", labelParams: { index: index + 1 } };
 }
 
 function normalizePermissionSuggestions(value) {
@@ -214,12 +223,12 @@ function normalizePermissionSuggestions(value) {
 function permissionOptions(agentId, data = {}, permissionSuggestions = []) {
   if (agentId === "opencode") {
     const options = [
-      { id: "once", label: "允许一次", tone: "primary" },
+      { id: "once", labelKey: "action.allowOnce", tone: "primary" },
       ...(data.always === true || data.allow_always === true || data.capabilities?.always === true
-        ? [{ id: "always", label: "始终允许", tone: "primary", overflow: true }]
+        ? [{ id: "always", labelKey: "action.alwaysAllow", tone: "primary", overflow: true }]
         : []),
-      { id: "reject", label: "拒绝", tone: "danger" },
-      { id: "native", label: "在客户端处理", tone: "secondary", overflow: true },
+      { id: "reject", labelKey: "action.deny", tone: "danger" },
+      { id: "native", labelKey: "action.handleInClient", tone: "secondary", overflow: true },
     ];
     return options;
   }
@@ -227,7 +236,7 @@ function permissionOptions(agentId, data = {}, permissionSuggestions = []) {
   if (["claude-code", "codebuddy"].includes(agentId)) {
     options.splice(2, 0, ...permissionSuggestions.map((suggestion, index) => ({
       id: `suggestion:${index}`,
-      label: permissionSuggestionLabel(suggestion, index),
+      ...permissionSuggestionDisplay(suggestion, index),
       tone: "secondary",
       overflow: true,
     })));
@@ -269,7 +278,10 @@ function normalizeRequest(agentId, data) {
     pidChain: Array.isArray(data.pid_chain || data.pidChain)
       ? (data.pid_chain || data.pidChain).map(positiveInteger).filter(Boolean).slice(0, 32)
       : [],
-    options: approval ? permissionOptions(descriptorValue.id, data, permissionSuggestions) : (elicitation ? [{ id: "submit", label: "提交", tone: "primary" }, { id: "native", label: "在客户端处理", tone: "secondary" }] : PASSIVE_OPTIONS),
+    options: approval ? permissionOptions(descriptorValue.id, data, permissionSuggestions) : (elicitation ? [
+      { id: "submit", labelKey: "action.submit", tone: "primary" },
+      { id: "native", labelKey: "action.handleInClient", tone: "secondary" },
+    ] : PASSIVE_OPTIONS),
     questions,
     passive,
     nativeMeta: {

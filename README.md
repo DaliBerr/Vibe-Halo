@@ -8,7 +8,7 @@
 
 Handle supported permission requests and interactive questions, and receive completion notifications without constantly switching back to agent terminals.
 
-![Version](https://img.shields.io/badge/version-0.3.0-6d7cff)
+![Version](https://img.shields.io/badge/version-0.4.0-6d7cff)
 ![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078d4)
 ![Electron](https://img.shields.io/badge/Electron-41-47848f)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
@@ -34,7 +34,7 @@ Vibe Halo appears at the top of the active display when you need to intervene. S
 ## Quick start
 
 1. Download `Vibe-Halo-Setup-<version>-x64.exe` from [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases).
-2. Launch Vibe Halo and open `客户端集成` (Client integrations) from the tray to inspect detected clients and integration health.
+2. Launch Vibe Halo and open **Client integrations** from the tray to inspect detected clients and integration health.
 3. If you use Codex, enter `/hooks` in Codex and review the installed Vibe Halo command hooks before triggering an approval.
 
 > [!WARNING]
@@ -167,12 +167,14 @@ After installation:
 
 1. Launch Vibe Halo. It stays in the system tray and shows no main window until an event arrives.
 2. The app scans installed or initialized supported clients and incrementally adds its own hook/plugin entries.
-3. Open the tray's `客户端集成` (Client integrations) submenu to inspect detection and health.
+3. Open the tray's **Client integrations** submenu to inspect detection and health.
 4. For Codex, enter `/hooks` in Codex and review the Vibe Halo `PermissionRequest`, `Stop`, and `UserPromptSubmit` entries under the user-level `~/.codex/hooks.json`.
 5. Trigger one approval or completion from the client and confirm that the island appears and that the result returns correctly.
 
 > [!WARNING]
 > Codex 0.129.0 and later require the user to trust new or changed command hooks. Vibe Halo can write and repair the configuration, but it does not bypass the official trust review.
+
+The installer contains English and Simplified Chinese resources and automatically follows the Windows display language. After launch, Vibe Halo follows Windows by default; use **Language** in the tray to switch immediately without restarting the app.
 
 ### Run from source
 
@@ -214,22 +216,23 @@ Use `npm install` and commit the updated `package-lock.json` when intentionally 
 
 ### Tray menu
 
-The application UI is currently Simplified Chinese. These are the relevant tray items:
+The tray exposes the following controls in English mode:
 
 | Menu item | Purpose |
 | --- | --- |
-| `启用审批` (Enable approvals) | Global island-approval switch; when disabled, approvals return to the client while completion notifications continue |
-| `等待输入提醒` (Input reminders) | Controls read-only input reminders and native-approval reminders |
-| `开机启动` (Launch at login) | Controls Windows login startup |
-| `客户端集成` (Client integrations) | Shows status and provides per-client disable/enable, rescan, repair, and uninstall-all actions |
-| `审核 Codex Hook…` (Review Codex hook) | Explains how to complete the official Codex `/hooks` trust review |
-| `修复 Codex Hook` (Repair Codex hook) | Incrementally repairs Vibe Halo-managed Codex configuration |
-| `诊断信息` (Diagnostics) | Shows service, queue, integration verification, update status, and log location |
-| `检查更新` (Check for updates) | Appears only in trusted, signed release builds |
+| **Enable approvals** | Global island-approval switch; when disabled, approvals return to the client while completion notifications continue |
+| **Input reminders** | Controls read-only input reminders and native-approval reminders |
+| **Launch at login** | Controls Windows login startup |
+| **Client integrations** | Shows status and provides per-client disable/enable, rescan, repair, and uninstall-all actions |
+| **Review Codex Hook…** | Explains how to complete the official Codex `/hooks` trust review |
+| **Repair Codex Hook** | Incrementally repairs Vibe Halo-managed Codex configuration |
+| **Diagnostics** | Shows service, queue, integration verification, update status, active locale, and log location |
+| **Language** | Chooses Follow Windows, English, or Simplified Chinese; the island and queued items update immediately |
+| **Check for updates** | Appears only in trusted, signed release builds |
 
 ### Remove integrations
 
-Use `客户端集成 → 卸载全部…` (Client integrations → Uninstall all) to remove every Vibe Halo-managed integration, or run this from a source checkout:
+Use **Client integrations → Uninstall all…** to remove every Vibe Halo-managed integration, or run this from a source checkout:
 
 ```powershell
 npm start -- --uninstall-hooks
@@ -445,8 +448,8 @@ Vibe Halo includes adapters, installers, and automated contract tests for Claude
 ### The island does not appear
 
 1. Confirm that the tray reports a running service or healthy client integrations.
-2. Confirm that `启用审批` (Enable approvals) or `等待输入提醒` (Input reminders) is enabled.
-3. Open `客户端集成` (Client integrations) and run “Rescan” or “Repair all.”
+2. Confirm that **Enable approvals** or **Input reminders** is enabled.
+3. Open **Client integrations** and run **Rescan** or **Repair all**.
 4. Open diagnostics and check whether the client is healthy, needs repair, or was not detected.
 5. Use the diagnostics dialog to open the log directory and inspect `main.log`.
 
@@ -455,7 +458,7 @@ Vibe Halo includes adapters, installers, and automated contract tests for Claude
 1. Enter `/hooks` in Codex.
 2. Locate the user-level `~/.codex/hooks.json` entry.
 3. Review and trust the Vibe Halo `PermissionRequest`, `Stop`, and `UserPromptSubmit` commands.
-4. Run `修复 Codex Hook` (Repair Codex hook) from the tray and inspect diagnostics again.
+4. Run **Repair Codex Hook** from the tray and inspect diagnostics again.
 
 ### A client is detected but cannot be installed
 
@@ -475,7 +478,7 @@ Source runs, local packages, and unsigned builds deliberately disable automatic 
 ## Known boundaries
 
 - The release target is Windows x64; there are no macOS, Linux, or ARM64 packages.
-- The application UI is currently Simplified Chinese.
+- The application UI and installer support English and Simplified Chinese; Traditional Chinese currently falls back to English unless Simplified Chinese is selected manually.
 - Vibe Halo does not include the upstream desktop pet, animated themes, session dashboard, terminal focus, remote SSH, PWA, or mobile features.
 - Remote approval is not supported, and the service never listens on a LAN interface.
 - Not every client exposes a stable approval or answer protocol. Unsupported capabilities remain reminders or are handed back to the native client.

@@ -1,5 +1,7 @@
 "use strict";
 
+const { translate } = require("./i18n");
+
 const MAX_PRIMARY_LENGTH = 10_000;
 const MAX_RAW_LENGTH = 10_000;
 
@@ -31,7 +33,8 @@ function metadataItem(label, value) {
   return text ? { label, value: text } : null;
 }
 
-function formatApprovalInput(toolInput, description = "") {
+function formatApprovalInput(toolInput, description = "", translator = null) {
+  const t = typeof translator === "function" ? translator : (key, params) => translate("en-US", key, params);
   const input = toolInput && typeof toolInput === "object" && !Array.isArray(toolInput) ? toolInput : {};
   const command = firstText(input, ["command", "cmd", "script"]);
   const patch = firstText(input, ["patch", "diff"]);
@@ -43,31 +46,31 @@ function formatApprovalInput(toolInput, description = "") {
   const selected = command || patch || query || prompt || url || filePath || generic;
 
   let kind = "structured";
-  let label = "工具参数";
-  let copyLabel = "复制内容";
-  if (command && selected === command) { kind = "command"; label = "命令"; copyLabel = "复制命令"; }
-  else if (patch && selected === patch) { kind = "patch"; label = "补丁"; copyLabel = "复制补丁"; }
-  else if (query && selected === query) { kind = "query"; label = "查询"; }
-  else if (prompt && selected === prompt) { kind = "prompt"; label = "提示"; }
-  else if (url && selected === url) { kind = "url"; label = "网址"; }
-  else if (filePath && selected === filePath) { kind = "path"; label = "路径"; }
-  else if (generic && selected === generic) { kind = "text"; label = "输入"; }
+  let label = t("presentation.toolParameters");
+  let copyLabel = t("renderer.copyContent");
+  if (command && selected === command) { kind = "command"; label = t("presentation.command"); copyLabel = t("renderer.copyCommand"); }
+  else if (patch && selected === patch) { kind = "patch"; label = t("presentation.patch"); copyLabel = t("renderer.copyPatch"); }
+  else if (query && selected === query) { kind = "query"; label = t("presentation.query"); }
+  else if (prompt && selected === prompt) { kind = "prompt"; label = t("presentation.prompt"); }
+  else if (url && selected === url) { kind = "url"; label = t("presentation.url"); }
+  else if (filePath && selected === filePath) { kind = "path"; label = t("presentation.path"); }
+  else if (generic && selected === generic) { kind = "text"; label = t("presentation.input"); }
 
   const raw = safeJson(input);
   const primary = selected?.value
-    || "此工具包含结构化参数，请展开“查看完整参数”进行审阅。";
+    || t("presentation.structuredFallback");
   const metadata = [];
   const chosenKey = selected?.key;
-  const cwd = metadataItem("工作目录", input.cwd || input.workdir);
+  const cwd = metadataItem(t("presentation.workingDirectory"), input.cwd || input.workdir);
   if (cwd && chosenKey !== "cwd" && chosenKey !== "workdir") metadata.push(cwd);
-  const pathValue = metadataItem("路径", input.file_path || input.path);
+  const pathValue = metadataItem(t("presentation.path"), input.file_path || input.path);
   if (pathValue && chosenKey !== "file_path" && chosenKey !== "path") metadata.push(pathValue);
-  const urlValue = metadataItem("网址", input.url || input.uri);
+  const urlValue = metadataItem(t("presentation.url"), input.url || input.uri);
   if (urlValue && chosenKey !== "url" && chosenKey !== "uri") metadata.push(urlValue);
-  if (Number.isFinite(input.timeout_ms)) metadata.push({ label: "超时", value: `${Math.max(0, Math.floor(input.timeout_ms))} ms` });
+  if (Number.isFinite(input.timeout_ms)) metadata.push({ label: t("presentation.timeout"), value: `${Math.max(0, Math.floor(input.timeout_ms))} ms` });
   const extraDescription = cleanLine(input.description || input.justification, 1000);
   if (extraDescription && extraDescription !== cleanLine(description, 1000)) {
-    metadata.push({ label: "说明", value: extraDescription });
+    metadata.push({ label: t("presentation.description"), value: extraDescription });
   }
 
   return {

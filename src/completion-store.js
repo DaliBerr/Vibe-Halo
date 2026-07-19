@@ -10,6 +10,23 @@ function clean(value, max) {
     : "";
 }
 
+function cleanKey(value) {
+  const key = clean(value, 120);
+  return /^[a-z][a-zA-Z0-9.-]{0,119}$/.test(key) ? key : "";
+}
+
+function cleanParams(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const output = {};
+  for (const [rawKey, rawValue] of Object.entries(value).slice(0, 8)) {
+    const key = clean(rawKey, 40);
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(key)) continue;
+    if (typeof rawValue === "string") output[key] = clean(rawValue, 160);
+    else if (Number.isFinite(rawValue)) output[key] = rawValue;
+  }
+  return output;
+}
+
 class CompletionStore extends EventEmitter {
   constructor(options = {}) {
     super();
@@ -21,14 +38,21 @@ class CompletionStore extends EventEmitter {
 
   show(input) {
     this.clear("replaced");
+    const agentName = clean(input.agentName, 120) || "Codex";
+    const title = clean(input.title, 240);
+    const output = clean(input.output, 6000);
     const item = {
       id: crypto.randomUUID(),
       type: "completion",
       agentId: clean(input.agentId, 80) || "codex",
-      agentName: clean(input.agentName, 120) || "Codex",
+      agentName,
       sessionId: clean(input.sessionId, 240),
-      title: clean(input.title, 240) || "Codex 已完成",
-      output: clean(input.output, 6000),
+      title,
+      titleKey: cleanKey(input.titleKey) || (title ? "" : "fallback.completionTitle"),
+      titleParams: cleanParams(input.titleParams || { agentName }),
+      output,
+      outputKey: cleanKey(input.outputKey) || (output ? "" : "fallback.taskCompleted"),
+      outputParams: cleanParams(input.outputParams),
       cwd: clean(input.cwd, 2000),
       sourcePid: Number.isInteger(input.sourcePid) ? input.sourcePid : null,
       pidChain: Array.isArray(input.pidChain) ? input.pidChain.filter(Number.isInteger).slice(0, 32) : [],

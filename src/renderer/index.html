@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en-US">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -21,7 +21,7 @@
     </section>
 
     <section id="expanded" class="expanded-view" hidden>
-      <button id="collapse" class="collapse-button" type="button" aria-label="收起灵动岛" title="收起">
+      <button id="collapse" class="collapse-button" type="button" aria-label="Collapse island" title="Collapse">
         <svg class="chevron-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
           <path d="m3.5 10.25 4.5-4.5 4.5 4.5"></path>
         </svg>
@@ -34,7 +34,7 @@
             <div id="subtitle" class="subtitle"></div>
           </div>
         </div>
-        <button id="close" class="icon-button" type="button" aria-label="关闭">×</button>
+        <button id="close" class="icon-button" type="button" aria-label="Close">×</button>
       </header>
 
       <div id="description" class="description" hidden></div>
@@ -48,16 +48,16 @@
         <div id="question-list" class="question-list" hidden></div>
         <dl id="metadata" class="metadata" hidden></dl>
         <details id="raw-details" class="raw-details" hidden>
-          <summary>查看完整参数</summary>
+          <summary id="raw-summary">View full parameters</summary>
           <pre id="raw-content" class="raw-content"></pre>
         </details>
       </section>
 
       <footer>
-        <button id="copy" class="secondary" type="button">复制内容</button>
+        <button id="copy" class="secondary" type="button">Copy content</button>
         <span class="spacer"></span>
         <div id="overflow-actions" class="overflow-actions" hidden>
-          <button id="overflow-toggle" class="secondary" type="button" aria-label="更多操作">更多</button>
+          <button id="overflow-toggle" class="secondary" type="button" aria-label="More actions">More</button>
           <div id="overflow-menu" class="overflow-menu" hidden></div>
         </div>
         <div id="actions" class="actions"></div>

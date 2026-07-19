@@ -48,17 +48,18 @@ function normalizeQuestions(argumentsValue) {
     return {
       header: safeText(value.header, 80),
       id: safeText(value.id, 120) || `question_${index + 1}`,
-      question: safeText(value.question, 600) || "Codex 正在等待你的输入。",
+      question: safeText(value.question, 600),
+      questionKey: safeText(value.question, 600) ? "" : "fallback.codexWaitingInput",
       options,
     };
   });
 }
 
 function formatQuestions(questions) {
-  if (!questions.length) return "请回到 Codex 原生界面完成选择。";
+  if (!questions.length) return "";
   const lines = [];
   questions.forEach((question, index) => {
-    lines.push(`${index + 1}. ${question.question}`);
+    if (question.question) lines.push(`${index + 1}. ${question.question}`);
     for (const option of question.options) {
       lines.push(`   • ${option.label}${option.description ? ` — ${option.description}` : ""}`);
     }
@@ -269,14 +270,17 @@ class CodexInputMonitor {
       const createdAt = Number.isFinite(Date.parse(record.timestamp)) ? Date.parse(record.timestamp) : now;
       if (createdAt < now - this.recoveryMaxAgeMs || this.pending.has(requestKey)) return;
       const questions = normalizeQuestions(payload.arguments);
+      const content = formatQuestions(questions);
       this.pending.set(requestKey, {
         requestKey,
         callId,
         filePath,
         sessionId: tracked.sessionId,
         cwd: tracked.cwd,
-        title: questions[0]?.header || "Codex 等待你的选择",
-        content: formatQuestions(questions),
+        title: questions[0]?.header || "",
+        titleKey: questions[0]?.header ? "" : "fallback.codexWaitingChoice",
+        content,
+        contentKey: content ? "" : "fallback.returnToCodex",
         questions,
         questionCount: questions.length,
         createdAt,

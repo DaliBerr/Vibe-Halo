@@ -18,6 +18,23 @@ function safeText(value, max) {
   return typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max) : "";
 }
 
+function safeMessageKey(value) {
+  const key = safeText(value, 120);
+  return /^[a-z][a-zA-Z0-9.-]{0,119}$/.test(key) ? key : "";
+}
+
+function safeMessageParams(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const output = {};
+  for (const [rawKey, rawValue] of Object.entries(value).slice(0, 8)) {
+    const key = safeText(rawKey, 40);
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(key)) continue;
+    if (typeof rawValue === "string") output[key] = safeText(rawValue, 160);
+    else if (Number.isFinite(rawValue)) output[key] = rawValue;
+  }
+  return output;
+}
+
 function publicEntry(entry) {
   if (!entry) return null;
   return {
@@ -99,19 +116,22 @@ class ApprovalStore extends EventEmitter {
       sourcePid: Number.isInteger(request.sourcePid) ? request.sourcePid : null,
       pidChain: Array.isArray(request.pidChain) ? request.pidChain.filter(Number.isInteger).slice(0, 32) : [],
       options: (Array.isArray(request.options) && request.options.length ? request.options : [
-        { id: "allow", label: "允许一次", tone: "primary" },
-        { id: "deny", label: "拒绝", tone: "danger" },
-        { id: "native", label: "在客户端处理", tone: "secondary" },
+        { id: "allow", labelKey: "action.allowOnce", tone: "primary" },
+        { id: "deny", labelKey: "action.deny", tone: "danger" },
+        { id: "native", labelKey: "action.handleInClient", tone: "secondary" },
       ]).slice(0, 12).map(option => ({
         id: safeText(option?.id, 80),
         label: safeText(option?.label, 160),
+        labelKey: safeMessageKey(option?.labelKey),
+        labelParams: safeMessageParams(option?.labelParams),
         tone: ["primary", "danger", "secondary"].includes(option?.tone) ? option.tone : "secondary",
         overflow: option?.overflow === true,
-      })).filter(option => option.id && option.label),
+      })).filter(option => option.id && (option.label || option.labelKey)),
       questions: Array.isArray(request.questions) ? request.questions.slice(0, 10).map(question => ({
         id: safeText(question?.id, 120),
         header: safeText(question?.header, 120),
         question: safeText(question?.question, 1000),
+        questionKey: safeMessageKey(question?.questionKey),
         multiSelect: question?.multiSelect === true,
         allowText: question?.allowText !== false,
         options: Array.isArray(question?.options) ? question.options.slice(0, 20).map(option => ({
@@ -119,7 +139,7 @@ class ApprovalStore extends EventEmitter {
           label: safeText(option?.label, 240),
           description: safeText(option?.description, 600),
         })).filter(option => option.id && option.label) : [],
-      })).filter(question => question.id && question.question) : [],
+      })).filter(question => question.id && (question.question || question.questionKey)) : [],
       createdAt: this.now(),
       waiters: new Set([waiter]),
       timer: null,

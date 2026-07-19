@@ -2,6 +2,7 @@
 
 const path = require("path");
 const { formatApprovalInput } = require("./approval-presenter");
+const { createLocalizer } = require("./i18n");
 const { locateDisplay } = require("./window-locator");
 
 const SHADOW_GUTTER = Object.freeze({ top: 8, right: 24, bottom: 28, left: 24 });
@@ -126,6 +127,7 @@ class IslandController {
     this.approvals = options.approvalStore;
     this.inputRequests = options.inputRequestStore;
     this.completions = options.completionStore;
+    this.localization = options.localization || createLocalizer({ preference: "system", systemLocale: "en-US" });
     this.logger = options.logger || { info() {}, warn() {}, error() {} };
     this.preloadPath = options.preloadPath || path.join(__dirname, "preload.js");
     this.htmlPath = options.htmlPath || path.join(__dirname, "renderer", "index.html");
@@ -265,17 +267,23 @@ class IslandController {
   }
 
   state() {
+    const t = (key, params) => this.localization.t(key, params);
+    const view = {
+      theme: this.nativeTheme.shouldUseDarkColors ? "dark" : "light",
+      locale: this.localization.locale,
+      strings: this.localization.rendererStrings(),
+    };
     const approval = this.approvals.snapshot();
     if (approval.current) {
       const { toolInput, ...current } = approval.current;
       return {
         mode: this.expandedApprovalId === approval.current.id ? "approval-expanded" : "approval-compact",
         current: {
-          ...current,
-          presentation: formatApprovalInput(toolInput, approval.current.description),
+          ...this.localizeEntry(current),
+          presentation: formatApprovalInput(toolInput, approval.current.description, t),
         },
         pendingCount: approval.pendingCount,
-        theme: this.nativeTheme.shouldUseDarkColors ? "dark" : "light",
+        ...view,
       };
     }
     const completion = this.completions.snapshot();
@@ -283,20 +291,47 @@ class IslandController {
     if (inputRequest.current) {
       return {
         mode: inputRequest.current.expanded ? "input-request-expanded" : "input-request-compact",
-        current: inputRequest.current,
+        current: this.localizeEntry(inputRequest.current),
         pendingCount: inputRequest.pendingCount,
-        theme: this.nativeTheme.shouldUseDarkColors ? "dark" : "light",
+        ...view,
       };
     }
     if (completion) {
       return {
         mode: completion.expanded ? "completion-expanded" : "completion-compact",
-        current: completion,
+        current: this.localizeEntry(completion),
         pendingCount: 0,
-        theme: this.nativeTheme.shouldUseDarkColors ? "dark" : "light",
+        ...view,
       };
     }
-    return { mode: "hidden", current: null, pendingCount: 0, theme: this.nativeTheme.shouldUseDarkColors ? "dark" : "light" };
+    return { mode: "hidden", current: null, pendingCount: 0, ...view };
+  }
+
+  localizeEntry(entry) {
+    if (!entry) return entry;
+    const localize = (value, key, params) => value || (key ? this.localization.t(key, params) : "");
+    const {
+      titleKey, titleParams, contentKey, contentParams, outputKey, outputParams,
+      ...safe
+    } = entry;
+    if (Object.prototype.hasOwnProperty.call(entry, "title")) safe.title = localize(entry.title, titleKey, titleParams);
+    if (Object.prototype.hasOwnProperty.call(entry, "content")) safe.content = localize(entry.content, contentKey, contentParams);
+    if (Object.prototype.hasOwnProperty.call(entry, "output")) safe.output = localize(entry.output, outputKey, outputParams);
+    if (Array.isArray(entry.options)) {
+      safe.options = entry.options.map(option => {
+        const { labelKey, labelParams, ...display } = option;
+        display.label = localize(option.label, labelKey, labelParams);
+        return display;
+      });
+    }
+    if (Array.isArray(entry.questions)) {
+      safe.questions = entry.questions.map(question => {
+        const { questionKey, ...display } = question;
+        display.question = localize(question.question, questionKey);
+        return display;
+      });
+    }
+    return safe;
   }
 
   refresh(reason = "changed") {
