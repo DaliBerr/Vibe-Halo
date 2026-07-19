@@ -21,6 +21,8 @@ for (const required of [
   "/NOTICE.md",
   "/README.md",
   "/README.zh-CN.md",
+  "/assets/icons/16x16.png",
+  "/assets/icons/32x32.png",
   "/src/platform-adapter.js",
   "/hooks/vibe-halo-hook.js",
 ]) {

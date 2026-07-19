@@ -298,11 +298,15 @@ function startApplication() {
   }
 
   function trayImage() {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect x="2" y="5" width="28" height="22" rx="11" fill="#111318"/><circle cx="10" cy="16" r="3" fill="#72e5a5"/><path d="M17 12h7M17 16h7M17 20h5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>`;
-    const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
-    const image = nativeImage.createFromDataURL(dataUrl);
-    const resized = image.isEmpty() ? nativeImage.createEmpty() : image.resize({ width: 16, height: 16 });
-    return platformAdapter.configureTrayImage(resized);
+    const iconDir = path.join(__dirname, "..", "assets", "icons");
+    const image = nativeImage.createFromPath(path.join(iconDir, "16x16.png"));
+    if (!image.isEmpty()) {
+      try {
+        const retina = nativeImage.createFromPath(path.join(iconDir, "32x32.png"));
+        if (!retina.isEmpty()) image.addRepresentation({ scaleFactor: 2, dataURL: retina.toDataURL() });
+      } catch {}
+    }
+    return platformAdapter.configureTrayImage(image.isEmpty() ? nativeImage.createEmpty() : image);
   }
 
   function showSystemNotification(title, body) {

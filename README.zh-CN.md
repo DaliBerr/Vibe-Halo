@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="docs/assets/vibe-halo-icon-black.png" width="160" alt="Vibe Halo 图标">
+
 [English](README.md) · **简体中文**
 
 **面向 Windows、macOS 与常见 Linux 的 Codex、ZCode、Claude Code、OpenCode 权限审批弹窗与灵动岛通知工具。**

@@ -18,6 +18,8 @@ module.exports = {
   asarUnpack: ["hooks/**/*"],
   files: [
     "src/**/*",
+    "assets/icons/16x16.png",
+    "assets/icons/32x32.png",
     "hooks/**/*",
     "LICENSE",
     "NOTICE.md",

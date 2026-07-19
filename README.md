@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="docs/assets/vibe-halo-icon-black.png" width="160" alt="Vibe Halo icon">
+
 **English** · [简体中文](README.zh-CN.md)
 
 **A cross-platform approval popup and Dynamic Island for Codex, ZCode, Claude Code, OpenCode, and other AI coding agents.**
