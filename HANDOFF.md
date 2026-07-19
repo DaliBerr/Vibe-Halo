@@ -67,7 +67,7 @@ npm run build
 - Linux prefers X11/XWayland; `VIBE_HALO_NATIVE_WAYLAND=1` forces a diagnosed degraded native-Wayland mode.
 - macOS runs as an accessory application without Dock presence or Accessibility/Screen Recording permissions.
 - The stable POSIX launcher lives at `~/.vibe-halo/bin/vibe-halo-hook-runner`; remove all integrations before deleting the app on macOS/Linux.
-- `preview-0.5.0` is an unsigned GitHub Pre-release built by `.github/workflows/cross-platform.yml`; it includes all platform packages and `SHA256SUMS.txt` but no stable update metadata. macOS/Linux auto-update stays disabled.
+- `preview-0.5.0` is a GitHub Pre-release built by `.github/workflows/cross-platform.yml`; it includes all platform packages and `SHA256SUMS.txt` but no stable update metadata. macOS packages are ad-hoc signed only, without Developer ID signing or notarization, and macOS/Linux auto-update stays disabled.
 - Windows local artifacts remain unsigned and update-disabled. The separate stable `v*` workflow still signs the app EXE and NSIS elevation helper, then the generated uninstaller and final installer in order, and regenerates `latest.yml` and the blockmap.
 - Version 0.2.3 requires one final manual bootstrap install of a signed release. The SignPath Foundation application has been submitted and is awaiting approval, so no public auto-update release may be created until approval and publisher verification are complete.
 - Keep `LICENSE`, `NOTICE.md`, and upstream attribution in every release.

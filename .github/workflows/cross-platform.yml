@@ -54,7 +54,10 @@ jobs:
           $env:VIBE_HALO_RUNTIME_DIR = Join-Path $root "runtime"
           $env:VIBE_HALO_TEST = "1"
           $env:VIBE_HALO_SCREENSHOT = Join-Path $root "island.png"
-          & "dist/win-unpacked/Vibe Halo.exe" --smoke-test --demo-approval --demo-expanded
+          $process = Start-Process -FilePath "dist/win-unpacked/Vibe Halo.exe" `
+            -ArgumentList "--smoke-test", "--demo-approval", "--demo-expanded" `
+            -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Windows smoke exited with $($process.ExitCode)" }
           if (-not (Test-Path $env:VIBE_HALO_SCREENSHOT)) { throw "Windows smoke screenshot missing" }
       - run: npm run build:win
       - uses: actions/upload-artifact@v7
@@ -94,13 +97,12 @@ jobs:
           root="$RUNNER_TEMP/vibe-smoke"
           executable="$(find dist -path '*/Vibe Halo.app/Contents/MacOS/Vibe Halo' -type f -print -quit)"
           test -n "$executable"
-          HOME="$root/home" \
-          XDG_CONFIG_HOME="$root/config" \
+          CODEX_HOME="$root/codex" \
           VIBE_HALO_USER_DATA="$root/userdata" \
           VIBE_HALO_RUNTIME_DIR="$root/runtime" \
           VIBE_HALO_TEST=1 \
           VIBE_HALO_SCREENSHOT="$root/island.png" \
-          "$executable" --smoke-test --demo-approval --demo-expanded
+          "$executable" --disable-gpu --smoke-test --demo-approval --demo-expanded
           test -s "$root/island.png"
           test -x "$root/runtime/bin/vibe-halo-hook-runner"
           test -f "$root/runtime/hooks/vibe-halo-hook.js"
@@ -140,7 +142,7 @@ jobs:
             VIBE_HALO_RUNTIME_DIR="$root/runtime" \
             VIBE_HALO_TEST=1 \
             VIBE_HALO_SCREENSHOT="$root/island.png" \
-            "$executable" --smoke-test --demo-approval --demo-expanded
+            "$executable" --no-sandbox --smoke-test --demo-approval --demo-expanded
           test -s "$root/island.png"
           test -x "$root/runtime/bin/vibe-halo-hook-runner"
           test -f "$root/runtime/hooks/vibe-halo-hook.js"
@@ -186,8 +188,11 @@ jobs:
               "$@"
             test -s "$root/$profile/island.png"
           }
-          run_smoke compact "$executable" --smoke-test --demo-approval
-          run_smoke expanded "$executable" --smoke-test --demo-approval --demo-expanded
+          # The unpacked Electron directory cannot carry the root-owned 4755
+          # chrome-sandbox required by Chromium. Shipped deb packages restore
+          # those permissions; --no-sandbox is limited to this CI smoke test.
+          run_smoke compact "$executable" --no-sandbox --smoke-test --demo-approval
+          run_smoke expanded "$executable" --no-sandbox --smoke-test --demo-approval --demo-expanded
           xvfb-run -a env \
             XDG_SESSION_TYPE=wayland \
             HOME="$root/click/home" \
@@ -196,7 +201,7 @@ jobs:
             VIBE_HALO_RUNTIME_DIR="$root/click/runtime" \
             VIBE_HALO_TEST=1 \
             VIBE_HALO_SMOKE_ACTION_FILE="$root/click/action.txt" \
-            "$executable" --smoke-test --demo-approval --demo-expanded
+            "$executable" --no-sandbox --smoke-test --demo-approval --demo-expanded
           test "$(cat "$root/click/action.txt")" = "resolved"
 
   preview-release:
@@ -218,24 +223,25 @@ jobs:
           test "$GITHUB_REF_NAME" = "preview-$version"
           cd release-assets
           sha256sum Vibe-Halo-* > SHA256SUMS.txt
-      - name: Publish unsigned preview
+      - name: Publish cross-platform preview
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
-          Unsigned cross-platform preview of Vibe Halo 0.5.0.
+          Cross-platform preview of Vibe Halo 0.5.0.
 
           - Windows x64: NSIS installer
           - macOS 12+: separate Apple Silicon and Intel DMG/ZIP packages
           - Linux x64: AppImage and deb packages for common Ubuntu/Debian desktops
           - macOS and Linux integrations are contract-tested and CI-smoke-tested, not yet real-client verified
-          - Automatic updates remain disabled in all unsigned preview packages
+          - Automatic updates remain disabled in all preview packages
+          - macOS packages use ad-hoc signing only; they are not Developer ID signed or notarized
 
           macOS Gatekeeper may require right-clicking the app and choosing **Open**.
           EOF
           gh release create "$GITHUB_REF_NAME" release-assets/* \
             --verify-tag \
             --prerelease \
-            --title "Vibe Halo 0.5.0 — Unsigned Cross-platform Preview" \
+            --title "Vibe Halo 0.5.0 — Cross-platform Preview" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

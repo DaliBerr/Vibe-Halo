@@ -38,7 +38,7 @@ Vibe Halo appears at the top of the active display when you need to intervene. S
 3. If you use Codex, enter `/hooks` in Codex and review the installed Vibe Halo command hooks before triggering an approval.
 
 > [!WARNING]
-> Packages labeled **Unsigned Preview** are testing-only. Windows SmartScreen may show an unknown-publisher warning. On macOS, use Finder's context menu and choose **Open** to approve the unnotarized app. Automatic updates are disabled in all preview packages.
+> Packages labeled **Preview** are testing-only. Windows SmartScreen may show an unknown-publisher warning. macOS packages are ad-hoc signed, not Developer ID signed or notarized; use Finder's context menu and choose **Open** when prompted. Automatic updates are disabled in all preview packages.
 
 See [Installation and setup](#installation-and-setup) for source builds, integration details, and the complete verification flow.
 
@@ -163,7 +163,7 @@ Download the current package from [GitHub Releases](https://github.com/DaliBerr/
 | macOS | macOS 12+, Apple Silicon or Intel | `Vibe-Halo-<version>-arm64.dmg` / `.zip`, `Vibe-Halo-<version>-x64.dmg` / `.zip` |
 | Linux | Ubuntu 22.04/24.04 or Debian 12 x64 | `Vibe-Halo-<version>-x64.AppImage`, `Vibe-Halo-<version>-x64.deb` |
 
-Other Linux distributions may work with the AppImage, but are not part of the first release guarantee. Preview packages are intentionally unsigned; verify the published SHA-256 list and download only from this repository.
+Other Linux distributions may work with the AppImage, but are not part of the first release guarantee. Preview packages are not publisher-signed; verify the published SHA-256 list and download only from this repository.
 
 After installation:
 
@@ -180,7 +180,7 @@ The Windows installer and the application contain English and Simplified Chinese
 
 #### macOS first launch
 
-The preview is not signed with an Apple Developer ID and is not notarized. Drag the app from the DMG to **Applications**, then Control-click or right-click Vibe Halo in Finder, choose **Open**, and confirm once. Vibe Halo runs as an accessory app without a Dock icon and does not request Accessibility or Screen Recording permission.
+The preview has only an ad-hoc signature required for reliable Apple Silicon launch. It is not signed with an Apple Developer ID and is not notarized. Drag the app from the DMG to **Applications**, then Control-click or right-click Vibe Halo in Finder, choose **Open**, and confirm once. Vibe Halo runs as an accessory app without a Dock icon and does not request Accessibility or Screen Recording permission.
 
 #### Linux window backend
 

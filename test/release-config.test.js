@@ -38,12 +38,14 @@ test("ordinary packages stay update-disabled while signed release packages are p
     { target: "zip", arch: ["arm64", "x64"] },
   ]);
   assert.equal(local.mac.minimumSystemVersion, "12.0");
-  assert.equal(local.mac.identity, null);
+  assert.equal(local.mac.identity, "-");
   assert.equal(local.mac.extendInfo.LSUIElement, true);
   assert.deepEqual(local.linux.target, [
     { target: "AppImage", arch: ["x64"] },
     { target: "deb", arch: ["x64"] },
   ]);
+  assert.equal(local.linux.artifactName, "Vibe-Halo-${version}-x64.${ext}");
+  assert.equal(local.linux.syncDesktopName, true);
 
   const release = loadBuildConfig({
     VIBE_HALO_PUBLISHER_NAME: "CN=SignPath Foundation, O=SignPath Foundation",
