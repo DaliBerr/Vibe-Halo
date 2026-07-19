@@ -92,7 +92,10 @@ function createNativeLocator(options = {}) {
 
 function locateWindowBounds(pidChain, options = {}) {
   const pids = [...new Set((Array.isArray(pidChain) ? pidChain : []).map(Number).filter(pid => Number.isInteger(pid) && pid > 0))].slice(0, 32);
-  if (process.platform !== "win32" || !pids.length) return Promise.resolve(null);
+  const platform = options.platform || process.platform;
+  if (!pids.length) return Promise.resolve(null);
+  if (platform === "linux") return locateLinuxWindowBounds(pids, options);
+  if (platform !== "win32") return Promise.resolve(null);
   if (nativeLocator === undefined) nativeLocator = createNativeLocator(options);
   if (nativeLocator) {
     try {
@@ -137,6 +140,34 @@ function locateWindowBounds(pidChain, options = {}) {
   });
 }
 
+function runFile(command, args, options = {}) {
+  const runner = options.execFile || execFile;
+  return new Promise(resolve => {
+    runner(command, args, {
+      encoding: "utf8",
+      timeout: options.timeoutMs || 400,
+      windowsHide: true,
+      maxBuffer: 32 * 1024,
+    }, (error, stdout) => resolve(error ? "" : String(stdout || "")));
+  });
+}
+
+async function locateLinuxWindowBounds(pidChain, options = {}) {
+  if (!(options.env || process.env).DISPLAY) return null;
+  const root = await runFile("xprop", ["-root", "_NET_ACTIVE_WINDOW"], options);
+  const id = root.match(/0x[0-9a-f]+/i)?.[0];
+  if (!id || /^0x0+$/i.test(id)) return null;
+  const pidText = await runFile("xprop", ["-id", id, "_NET_WM_PID"], options);
+  const windowPid = Number(pidText.match(/=\s*(\d+)/)?.[1]);
+  if (!Number.isInteger(windowPid) || !pidChain.includes(windowPid)) return null;
+  const info = await runFile("xwininfo", ["-id", id], options);
+  const x = Number(info.match(/Absolute upper-left X:\s*(-?\d+)/i)?.[1]);
+  const y = Number(info.match(/Absolute upper-left Y:\s*(-?\d+)/i)?.[1]);
+  const width = Number(info.match(/Width:\s*(\d+)/i)?.[1]);
+  const height = Number(info.match(/Height:\s*(\d+)/i)?.[1]);
+  return normalizeBounds({ x, y, width, height });
+}
+
 async function locateDisplay(screenApi, entry, options = {}) {
   const chain = [entry?.sourcePid, ...(entry?.pidChain || [])];
   const windowBounds = await (options.locateWindowBounds || locateWindowBounds)(chain, options);
@@ -144,4 +175,14 @@ async function locateDisplay(screenApi, entry, options = {}) {
   return chooseDisplay(displays, windowBounds, screenApi.getCursorScreenPoint(), screenApi.getPrimaryDisplay());
 }
 
-module.exports = { chooseDisplay, createNativeLocator, intersectionArea, locateDisplay, locateWindowBounds, normalizeBounds, pointInside };
+module.exports = {
+  chooseDisplay,
+  createNativeLocator,
+  intersectionArea,
+  locateDisplay,
+  locateLinuxWindowBounds,
+  locateWindowBounds,
+  normalizeBounds,
+  pointInside,
+  runFile,
+};

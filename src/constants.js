@@ -23,6 +23,7 @@ const CODEX_INPUT_POLL_INTERVAL_MS = 1_000;
 const CODEX_INPUT_RESCAN_INTERVAL_MS = 5_000;
 const CODEX_INPUT_RECOVERY_MAX_AGE_MS = 30 * 60_000;
 const OWN_HOOK_MARKER = "vibe-halo-hook.js";
+const OWN_RUNNER_MARKER = "vibe-halo-hook-runner";
 const PREVIOUS_HOOK_MARKER = "clawd-island-hook.js";
 const LEGACY_HOOK_MARKER = "codex-hook.js";
 const MANAGED_EVENTS = Object.freeze(["PermissionRequest", "Stop", "UserPromptSubmit"]);
@@ -56,6 +57,7 @@ module.exports = {
   CODEX_INPUT_RESCAN_INTERVAL_MS,
   CODEX_INPUT_RECOVERY_MAX_AGE_MS,
   OWN_HOOK_MARKER,
+  OWN_RUNNER_MARKER,
   PREVIOUS_HOOK_MARKER,
   LEGACY_HOOK_MARKER,
   MANAGED_EVENTS,

@@ -4,3 +4,5 @@ coverage/
 .smoke/
 *.log
 .DS_Store
+build/generated-icons/
+build/icon.png

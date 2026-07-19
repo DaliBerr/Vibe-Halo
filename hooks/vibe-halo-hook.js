@@ -136,7 +136,27 @@ function classifyRole(payload, meta) {
 
 function collectPidChain() {
   const fallback = { sourcePid: process.ppid || null, pidChain: process.ppid ? [process.ppid] : [] };
-  if (process.platform !== "win32" || !process.ppid) return fallback;
+  if (!process.ppid) return fallback;
+  if (process.platform !== "win32") {
+    const chain = [];
+    let current = Number(process.ppid);
+    for (let depth = 0; depth < 20 && Number.isInteger(current) && current > 1; depth++) {
+      chain.push(current);
+      try {
+        const result = spawnSync("ps", ["-o", "ppid=", "-p", String(current)], {
+          encoding: "utf8",
+          timeout: 500,
+          windowsHide: true,
+        });
+        const parent = Number(String(result.stdout || "").trim());
+        if (result.status !== 0 || !Number.isInteger(parent) || parent <= 1 || parent === current) break;
+        current = parent;
+      } catch {
+        break;
+      }
+    }
+    return { sourcePid: chain[0] || fallback.sourcePid, pidChain: chain.length ? chain : fallback.pidChain };
+  }
   const script = [
     "Add-Type @'",
     "using System;",

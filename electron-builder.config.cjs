@@ -14,7 +14,6 @@ const signtoolOptions = {
 module.exports = {
   appId: "com.vibe.halo",
   productName: "Vibe Halo",
-  artifactName: "Vibe-Halo-Setup-${version}-${arch}.${ext}",
   asar: true,
   asarUnpack: ["hooks/**/*"],
   files: [
@@ -38,8 +37,38 @@ module.exports = {
   }],
   win: {
     target: [{ target: "nsis", arch: ["x64"] }],
+    artifactName: "Vibe-Halo-Setup-${version}-${arch}.${ext}",
+    icon: "build/icon.png",
     verifyUpdateCodeSignature: true,
     signtoolOptions,
+  },
+  mac: {
+    target: [
+      { target: "dmg", arch: ["arm64", "x64"] },
+      { target: "zip", arch: ["arm64", "x64"] },
+    ],
+    artifactName: "Vibe-Halo-${version}-${arch}.${ext}",
+    category: "public.app-category.utilities",
+    icon: "build/icon.png",
+    minimumSystemVersion: "12.0",
+    identity: null,
+    hardenedRuntime: false,
+    notarize: false,
+    extendInfo: { LSUIElement: true },
+  },
+  linux: {
+    target: [
+      { target: "AppImage", arch: ["x64"] },
+      { target: "deb", arch: ["x64"] },
+    ],
+    artifactName: "Vibe-Halo-${version}-${arch}.${ext}",
+    category: "Utility",
+    synopsis: "Approval and notification island for AI coding agents",
+    description: "Vibe Halo presents supported AI coding agent approvals, questions, and completion notifications in a top-center island.",
+    maintainer: "DaliBerr <DaliBerr@users.noreply.github.com>",
+    vendor: "Vibe Halo contributors",
+    executableName: "vibe-halo",
+    icon: "build/generated-icons",
   },
   nsis: {
     oneClick: false,

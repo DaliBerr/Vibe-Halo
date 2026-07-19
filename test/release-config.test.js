@@ -33,6 +33,17 @@ test("ordinary packages stay update-disabled while signed release packages are p
   assert.equal(local.nsis.multiLanguageInstaller, true);
   assert.deepEqual(local.nsis.installerLanguages, ["en_US", "zh_CN"]);
   assert.equal(local.nsis.displayLanguageSelector, false);
+  assert.deepEqual(local.mac.target, [
+    { target: "dmg", arch: ["arm64", "x64"] },
+    { target: "zip", arch: ["arm64", "x64"] },
+  ]);
+  assert.equal(local.mac.minimumSystemVersion, "12.0");
+  assert.equal(local.mac.identity, null);
+  assert.equal(local.mac.extendInfo.LSUIElement, true);
+  assert.deepEqual(local.linux.target, [
+    { target: "AppImage", arch: ["x64"] },
+    { target: "deb", arch: ["x64"] },
+  ]);
 
   const release = loadBuildConfig({
     VIBE_HALO_PUBLISHER_NAME: "CN=SignPath Foundation, O=SignPath Foundation",
@@ -42,6 +53,21 @@ test("ordinary packages stay update-disabled while signed release packages are p
   assert.equal(release.win.signtoolOptions.publisherName, "CN=SignPath Foundation, O=SignPath Foundation");
   assert.match(release.win.signtoolOptions.sign, /stage-windows-signing\.js$/);
   assert.deepEqual(release.win.signtoolOptions.signingHashAlgorithms, ["sha256"]);
+});
+
+test("cross-platform preview workflow tests and packages every promised architecture", () => {
+  const workflow = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "cross-platform.yml"), "utf8");
+  for (const runner of ["windows-2025", "macos-15", "macos-15-intel", "ubuntu-22.04", "ubuntu-24.04"]) {
+    assert.match(workflow, new RegExp(runner.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  assert.match(workflow, /build:win/);
+  assert.match(workflow, /build:mac:\$\{\{ matrix\.arch \}\}/);
+  assert.match(workflow, /arch: arm64/);
+  assert.match(workflow, /arch: x64/);
+  assert.match(workflow, /build:linux:x64/);
+  assert.match(workflow, /SHA256SUMS\.txt/);
+  assert.match(workflow, /--prerelease/);
+  assert.doesNotMatch(workflow, /latest(?:-mac)?\.(?:yml|yaml)/);
 });
 
 test("release workflow signs all PE layers before publishing update metadata", () => {

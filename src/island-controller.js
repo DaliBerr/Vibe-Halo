@@ -128,6 +128,7 @@ class IslandController {
     this.inputRequests = options.inputRequestStore;
     this.completions = options.completionStore;
     this.localization = options.localization || createLocalizer({ preference: "system", systemLocale: "en-US" });
+    this.platformAdapter = options.platformAdapter || null;
     this.logger = options.logger || { info() {}, warn() {}, error() {} };
     this.preloadPath = options.preloadPath || path.join(__dirname, "preload.js");
     this.htmlPath = options.htmlPath || path.join(__dirname, "renderer", "index.html");
@@ -170,6 +171,7 @@ class IslandController {
       },
     });
     this.window = win;
+    this.platformAdapter?.configureWindow?.(win);
     try { win.setAlwaysOnTop(true, "pop-up-menu"); } catch {}
     win.setMenuBarVisibility(false);
     win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

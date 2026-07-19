@@ -1,6 +1,16 @@
 # Vibe Halo signed releases
 
-Vibe Halo uses GitHub Releases, `electron-updater`, x64 NSIS, and SignPath Foundation. Unsigned and local builds deliberately contain `autoUpdateEnabled: false`; only a release build with the certificate's exact publisher name enables update checks.
+Vibe Halo uses GitHub Releases and electron-builder for Windows, macOS, and Linux previews. The stable update channel remains Windows-only and uses `electron-updater`, x64 NSIS, and SignPath Foundation. Unsigned and local builds deliberately contain `autoUpdateEnabled: false`; only a Windows release build with the certificate's exact publisher name enables update checks.
+
+## Three-platform preview procedure
+
+1. Keep `package.json`, `package-lock.json`, both READMEs, and `HANDOFF.md` on the same version.
+2. Push the release branch and wait for `.github/workflows/cross-platform.yml` to pass on Windows 2025, macOS 15 arm64/Intel, Ubuntu 22.04, and Ubuntu 24.04.
+3. Merge the exact verified commit to `main`, create `preview-<version>`, and push it.
+4. The workflow builds Windows x64 NSIS, macOS arm64/x64 DMG and ZIP, and Linux x64 AppImage/deb. It publishes an unsigned GitHub Pre-release with `SHA256SUMS.txt`.
+5. Do not upload `latest.yml`, `latest-mac.yml`, Linux update metadata, or mark the preview as latest. macOS/Linux automatic updates remain disabled until a signed and notarized production path exists.
+
+macOS preview packages are intentionally unsigned and unnotarized. Linux support is guaranteed only for Ubuntu 22.04/24.04 and Debian 12 x64 in the initial release; other AppImage-compatible distributions are best effort.
 
 ## SignPath Foundation application
 

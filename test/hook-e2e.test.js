@@ -8,6 +8,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { ApprovalStore } = require("../src/approval-store");
 const { IntegrationManager, readJson } = require("../src/integration-manager");
+const { createPlatformAdapter } = require("../src/platform-adapter");
 const { IslandServer } = require("../src/server");
 
 const HOOK_SCRIPT = path.resolve(__dirname, "..", "hooks", "vibe-halo-hook.js");
@@ -132,7 +133,9 @@ test("generic command hook handles ZCode and Copilot wire formats", async () => 
   assert.deepEqual(JSON.parse(await copilotOutput), { behavior: "allow" });
 });
 
-test("installed ZCode process hooks run without a shell and deliver every managed event", async () => {
+test("installed ZCode process hooks run without a shell and deliver every managed event", {
+  skip: process.platform !== "win32",
+}, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-halo-zcode-process-"));
   roots.push(root);
   const approvals = new ApprovalStore({ timeoutMs: 10_000 });
@@ -219,6 +222,54 @@ test("installed ZCode process hooks run without a shell and deliver every manage
     tool_name: "Shell",
     tool_input: { command: "dir" },
   }), "{}");
+});
+
+test("installed POSIX runner uses a stable path and returns a decision without a shell", {
+  skip: process.platform === "win32",
+}, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-halo-posix-runner-"));
+  roots.push(root);
+  const home = path.join(root, "home");
+  const runtimeDir = path.join(root, "runtime");
+  const configPath = path.join(home, ".zcode", "cli", "config.json");
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, "{}\n");
+  const platformAdapter = createPlatformAdapter({
+    platform: process.platform,
+    homeDir: home,
+    runtimeRoot: runtimeDir,
+    executablePath: process.execPath,
+    packaged: true,
+  });
+  platformAdapter.prepareHookRuntime(HOOK_SCRIPT);
+  const manager = new IntegrationManager({
+    platform: process.platform,
+    platformAdapter,
+    homeDir: home,
+    backupRoot: path.join(root, "backups"),
+    executablePath: process.execPath,
+    hookScriptPath: platformAdapter.managedHookPath,
+  });
+  assert.equal(manager.install("zcode").ok, true);
+  const hook = readJson(configPath).hooks.events.PermissionRequest[0].hooks[0];
+  assert.equal(hook.command, platformAdapter.runnerPath);
+  assert.deepEqual(hook.args, ["--agent", "zcode", "--event", "PermissionRequest"]);
+
+  const approvals = new ApprovalStore({ timeoutMs: 10_000 });
+  const server = new IslandServer({ approvalStore: approvals, runtimePath: path.join(runtimeDir, "runtime.json") });
+  await server.start();
+  servers.push(server);
+  const outputPromise = runProcessHook(hook, runtimeDir, {
+    session_id: "posix-e2e",
+    request_id: "permission-posix",
+    tool_name: "Shell",
+    tool_input: { command: "printf safe" },
+  });
+  await waitFor(() => approvals.size === 1);
+  approvals.resolve(approvals.current.id, "allow");
+  assert.deepEqual(JSON.parse(await outputPromise), {
+    hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "allow" } },
+  });
 });
 
 test("clients with empty-stdout fallback remain native when Vibe Halo is offline", async () => {

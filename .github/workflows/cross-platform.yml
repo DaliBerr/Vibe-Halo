@@ -1,0 +1,241 @@
+name: Cross-platform preview
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+    tags:
+      - "preview-*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cross-platform-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [windows-2025, macos-15, macos-15-intel, ubuntu-24.04]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm test
+
+  windows-package:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build:dir
+      - run: npm run verify:package -- dist/win-unpacked/resources 0.5.0
+      - name: Smoke packaged Windows app
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP "vibe-smoke"
+          $env:USERPROFILE = Join-Path $root "home"
+          $env:APPDATA = Join-Path $root "appdata"
+          $env:LOCALAPPDATA = Join-Path $root "localappdata"
+          $env:VIBE_HALO_USER_DATA = Join-Path $root "userdata"
+          $env:VIBE_HALO_RUNTIME_DIR = Join-Path $root "runtime"
+          $env:VIBE_HALO_TEST = "1"
+          $env:VIBE_HALO_SCREENSHOT = Join-Path $root "island.png"
+          & "dist/win-unpacked/Vibe Halo.exe" --smoke-test --demo-approval --demo-expanded
+          if (-not (Test-Path $env:VIBE_HALO_SCREENSHOT)) { throw "Windows smoke screenshot missing" }
+      - run: npm run build:win
+      - uses: actions/upload-artifact@v7
+        with:
+          name: preview-windows-x64
+          path: dist/Vibe-Halo-Setup-*-x64.exe
+          if-no-files-found: error
+
+  mac-package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build:dir
+      - name: Verify packaged macOS contents
+        shell: bash
+        run: |
+          resources="$(find dist -path '*/Vibe Halo.app/Contents/Resources' -type d -print -quit)"
+          test -n "$resources"
+          npm run verify:package -- "$resources" 0.5.0
+      - name: Smoke packaged macOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/vibe-smoke"
+          executable="$(find dist -path '*/Vibe Halo.app/Contents/MacOS/Vibe Halo' -type f -print -quit)"
+          test -n "$executable"
+          HOME="$root/home" \
+          XDG_CONFIG_HOME="$root/config" \
+          VIBE_HALO_USER_DATA="$root/userdata" \
+          VIBE_HALO_RUNTIME_DIR="$root/runtime" \
+          VIBE_HALO_TEST=1 \
+          VIBE_HALO_SCREENSHOT="$root/island.png" \
+          "$executable" --smoke-test --demo-approval --demo-expanded
+          test -s "$root/island.png"
+          test -x "$root/runtime/bin/vibe-halo-hook-runner"
+          test -f "$root/runtime/hooks/vibe-halo-hook.js"
+          test "$(stat -f '%Lp' "$root/runtime/bin/vibe-halo-hook-runner")" = "700"
+          test "$(stat -f '%Lp' "$root/runtime/hooks/vibe-halo-hook.js")" = "600"
+      - run: npm run build:mac:${{ matrix.arch }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: preview-macos-${{ matrix.arch }}
+          path: |
+            dist/Vibe-Halo-*-${{ matrix.arch }}.dmg
+            dist/Vibe-Halo-*-${{ matrix.arch }}.zip
+          if-no-files-found: error
+
+  linux-package:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y xvfb x11-utils
+      - run: npm run build:dir
+      - run: npm run verify:package -- dist/linux-unpacked/resources 0.5.0
+      - name: Smoke packaged Linux app under X11
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/vibe-smoke"
+          executable="dist/linux-unpacked/vibe-halo"
+          xvfb-run -a env \
+            HOME="$root/home" \
+            XDG_CONFIG_HOME="$root/config" \
+            VIBE_HALO_USER_DATA="$root/userdata" \
+            VIBE_HALO_RUNTIME_DIR="$root/runtime" \
+            VIBE_HALO_TEST=1 \
+            VIBE_HALO_SCREENSHOT="$root/island.png" \
+            "$executable" --smoke-test --demo-approval --demo-expanded
+          test -s "$root/island.png"
+          test -x "$root/runtime/bin/vibe-halo-hook-runner"
+          test -f "$root/runtime/hooks/vibe-halo-hook.js"
+          test "$(stat -c '%a' "$root/runtime/bin/vibe-halo-hook-runner")" = "700"
+          test "$(stat -c '%a' "$root/runtime/hooks/vibe-halo-hook.js")" = "600"
+      - run: npm run build:linux:x64
+      - uses: actions/upload-artifact@v7
+        with:
+          name: preview-linux-x64
+          path: |
+            dist/Vibe-Halo-*-x64.AppImage
+            dist/Vibe-Halo-*-x64.deb
+          if-no-files-found: error
+
+  linux-ui-smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y xvfb x11-utils
+      - run: npm run build:dir
+      - name: Exercise compact/expanded screenshots and approval-click flow through XWayland selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/vibe-ui-smoke"
+          executable="dist/linux-unpacked/vibe-halo"
+          run_smoke() {
+            local profile="$1"
+            shift
+            xvfb-run -a env \
+              XDG_SESSION_TYPE=wayland \
+              HOME="$root/$profile/home" \
+              XDG_CONFIG_HOME="$root/$profile/config" \
+              VIBE_HALO_USER_DATA="$root/$profile/userdata" \
+              VIBE_HALO_RUNTIME_DIR="$root/$profile/runtime" \
+              VIBE_HALO_TEST=1 \
+              VIBE_HALO_SCREENSHOT="$root/$profile/island.png" \
+              "$@"
+            test -s "$root/$profile/island.png"
+          }
+          run_smoke compact "$executable" --smoke-test --demo-approval
+          run_smoke expanded "$executable" --smoke-test --demo-approval --demo-expanded
+          xvfb-run -a env \
+            XDG_SESSION_TYPE=wayland \
+            HOME="$root/click/home" \
+            XDG_CONFIG_HOME="$root/click/config" \
+            VIBE_HALO_USER_DATA="$root/click/userdata" \
+            VIBE_HALO_RUNTIME_DIR="$root/click/runtime" \
+            VIBE_HALO_TEST=1 \
+            VIBE_HALO_SMOKE_ACTION_FILE="$root/click/action.txt" \
+            "$executable" --smoke-test --demo-approval --demo-expanded
+          test "$(cat "$root/click/action.txt")" = "resolved"
+
+  preview-release:
+    if: startsWith(github.ref, 'refs/tags/preview-')
+    needs: [test, windows-package, mac-package, linux-package, linux-ui-smoke]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: preview-*
+          path: release-assets
+          merge-multiple: true
+      - name: Validate preview tag and create checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          test "$GITHUB_REF_NAME" = "preview-$version"
+          cd release-assets
+          sha256sum Vibe-Halo-* > SHA256SUMS.txt
+      - name: Publish unsigned preview
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
+          Unsigned cross-platform preview of Vibe Halo 0.5.0.
+
+          - Windows x64: NSIS installer
+          - macOS 12+: separate Apple Silicon and Intel DMG/ZIP packages
+          - Linux x64: AppImage and deb packages for common Ubuntu/Debian desktops
+          - macOS and Linux integrations are contract-tested and CI-smoke-tested, not yet real-client verified
+          - Automatic updates remain disabled in all unsigned preview packages
+
+          macOS Gatekeeper may require right-clicking the app and choosing **Open**.
+          EOF
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --verify-tag \
+            --prerelease \
+            --title "Vibe Halo 0.5.0 — Unsigned Cross-platform Preview" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"

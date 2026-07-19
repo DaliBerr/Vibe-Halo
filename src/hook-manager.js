@@ -12,8 +12,10 @@ const {
   MANAGED_EVENTS,
   MIGRATION_PATH,
   OWN_HOOK_MARKER,
+  OWN_RUNNER_MARKER,
   PREVIOUS_HOOK_MARKER,
 } = require("./constants");
+const { createPlatformAdapter } = require("./platform-adapter");
 
 function defaultPaths() {
   const codexDir = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
@@ -40,6 +42,10 @@ function atomicWrite(filePath, text) {
 
 function commandContains(hook, marker) {
   return !!hook && [hook.command, hook.commandWindows].some(value => typeof value === "string" && value.includes(marker));
+}
+
+function ownCommandContains(hook) {
+  return commandContains(hook, OWN_HOOK_MARKER) || commandContains(hook, OWN_RUNNER_MARKER);
 }
 
 function removeMarkerEntries(settings, marker, events) {
@@ -80,7 +86,17 @@ function psSingleQuote(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-function buildHookCommand(executablePath, hookScriptPath, args = []) {
+function buildHookCommand(executablePath, hookScriptPath, args = [], options = {}) {
+  const platform = options.platform || process.platform;
+  if (platform !== "win32") {
+    const platformAdapter = options.platformAdapter || createPlatformAdapter({
+      platform,
+      executablePath,
+      homeDir: options.homeDir,
+      runtimeRoot: options.runtimeRoot,
+    });
+    return platformAdapter.hookCommand("codex", options.event || "PermissionRequest") || "";
+  }
   // Electron executables are Windows GUI-subsystem programs. PowerShell's
   // call operator returns immediately for them, dropping the blocking hook's
   // stdin/stdout contract. cmd.exe /c acts as the console parent, waits for
@@ -90,8 +106,8 @@ function buildHookCommand(executablePath, hookScriptPath, args = []) {
   return `$env:ELECTRON_RUN_AS_NODE='1'; cmd.exe /d /s /c ${psSingleQuote(childCommand)}`;
 }
 
-function desiredHook(event, executablePath, hookScriptPath) {
-  const command = buildHookCommand(executablePath, hookScriptPath);
+function desiredHook(event, executablePath, hookScriptPath, options = {}) {
+  const command = buildHookCommand(executablePath, hookScriptPath, [], { ...options, event });
   return {
     hooks: [{
       type: "command",
@@ -167,7 +183,7 @@ function hookTrustStatus(settings, configText, hooksPath) {
     entries.forEach((entry, groupIndex) => {
       const handlers = Array.isArray(entry?.hooks) ? entry.hooks : [];
       handlers.forEach((handler, handlerIndex) => {
-        if (commandContains(handler, OWN_HOOK_MARKER)) ownHandlers.push({ groupIndex, handlerIndex });
+        if (ownCommandContains(handler)) ownHandlers.push({ groupIndex, handlerIndex });
       });
     });
     if (!ownHandlers.length) {
@@ -239,6 +255,13 @@ class HookManager {
     Object.assign(this, paths);
     this.executablePath = options.executablePath || process.execPath;
     this.hookScriptPath = options.hookScriptPath;
+    this.platform = options.platform || options.platformAdapter?.platform || process.platform;
+    this.platformAdapter = options.platformAdapter || createPlatformAdapter({
+      platform: this.platform,
+      executablePath: this.executablePath,
+      homeDir: options.homeDir,
+      runtimeRoot: options.runtimeRoot,
+    });
     this.logger = options.logger || { info() {}, warn() {}, error() {} };
   }
 
@@ -272,10 +295,14 @@ class HookManager {
 
     removeMarkerEntries(settings, PREVIOUS_HOOK_MARKER, LEGACY_EVENTS);
     removeMarkerEntries(settings, OWN_HOOK_MARKER, LEGACY_EVENTS);
+    removeMarkerEntries(settings, OWN_RUNNER_MARKER, LEGACY_EVENTS);
     if (!settings.hooks || typeof settings.hooks !== "object") settings.hooks = {};
     for (const event of MANAGED_EVENTS) {
       if (!Array.isArray(settings.hooks[event])) settings.hooks[event] = [];
-      settings.hooks[event].push(desiredHook(event, this.executablePath, this.hookScriptPath));
+      settings.hooks[event].push(desiredHook(event, this.executablePath, this.hookScriptPath, {
+        platform: this.platform,
+        platformAdapter: this.platformAdapter,
+      }));
     }
     const nextText = `${JSON.stringify(settings, null, 2)}\n`;
     if (nextText !== originalText) atomicWrite(this.hooksPath, nextText);
@@ -288,6 +315,7 @@ class HookManager {
     const settings = readJson(this.hooksPath, {});
     if (!settings || typeof settings !== "object" || Array.isArray(settings)) return { ok: false, reason: "hooks-json-invalid" };
     const removedOwn = removeMarkerEntries(settings, OWN_HOOK_MARKER, LEGACY_EVENTS).count
+      + removeMarkerEntries(settings, OWN_RUNNER_MARKER, LEGACY_EVENTS).count
       + removeMarkerEntries(settings, PREVIOUS_HOOK_MARKER, LEGACY_EVENTS).count;
     const migration = readJson(this.migrationPath, null);
     let restored = 0;
@@ -328,7 +356,7 @@ class HookManager {
     for (const event of MANAGED_EVENTS) {
       const entries = settings?.hooks?.[event];
       eventStatus[event] = Array.isArray(entries)
-        && entries.some(entry => (entry?.hooks || []).some(hook => commandContains(hook, OWN_HOOK_MARKER)));
+        && entries.some(entry => (entry?.hooks || []).some(hook => ownCommandContains(hook)));
     }
     const trust = hookTrustStatus(settings, configText, this.hooksPath);
     return {
@@ -354,5 +382,6 @@ module.exports = {
   hookTrustStatus,
   legacyTargetExists,
   parseHookTrustStates,
+  ownCommandContains,
   removeMarkerEntries,
 };

@@ -6,6 +6,7 @@ const os = require("os");
 const path = require("path");
 const { agent, listAgents } = require("./agent-registry");
 const { HookManager } = require("./hook-manager");
+const { createPlatformAdapter } = require("./platform-adapter");
 
 const MARKER = "vibe-halo-hook.js";
 const GROUP_ID = "vibe-halo";
@@ -122,7 +123,17 @@ function removeManaged(value) {
   return output;
 }
 
-function commandFor(executablePath, scriptPath, agentId, event) {
+function commandFor(executablePath, scriptPath, agentId, event, options = {}) {
+  const platform = options.platform || process.platform;
+  if (platform !== "win32") {
+    const platformAdapter = options.platformAdapter || createPlatformAdapter({
+      platform,
+      executablePath,
+      homeDir: options.homeDir,
+      runtimeRoot: options.runtimeRoot,
+    });
+    return platformAdapter.hookCommand(agentId, event) || "";
+  }
   const command = processCommandFor(executablePath, scriptPath, agentId, event);
   return `cmd.exe /d /s /c "${command}"`;
 }
@@ -140,7 +151,17 @@ function processCommandFor(executablePath, scriptPath, agentId, event) {
   return `set VIBE_HALO_HOOK=${MARKER}&&powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encoded}`;
 }
 
-function zcodeProcessHook(executablePath, scriptPath, event) {
+function zcodeProcessHook(executablePath, scriptPath, event, options = {}) {
+  const platform = options.platform || process.platform;
+  if (platform !== "win32") {
+    const platformAdapter = options.platformAdapter || createPlatformAdapter({
+      platform,
+      executablePath,
+      homeDir: options.homeDir,
+      runtimeRoot: options.runtimeRoot,
+    });
+    return platformAdapter.processHook("zcode", event, event === "PermissionRequest" ? 135000 : 10000);
+  }
   return {
     type: "process",
     command: "cmd.exe",
@@ -149,8 +170,22 @@ function zcodeProcessHook(executablePath, scriptPath, event) {
   };
 }
 
-function isHealthyZcodeProcessHook(value, event) {
+function isHealthyZcodeProcessHook(value, event, options = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const platform = options.platform || process.platform;
+  if (platform !== "win32") {
+    const expectedCommand = options.runnerPath || options.platformAdapter?.runnerPath;
+    return value.type === "process"
+      && typeof value.command === "string"
+      && (!expectedCommand || value.command === expectedCommand)
+      && Array.isArray(value.args)
+      && value.args.length === 4
+      && value.args[0] === "--agent"
+      && value.args[1] === "zcode"
+      && value.args[2] === "--event"
+      && value.args[3] === event
+      && value.timeoutMs === (event === "PermissionRequest" ? 135000 : 10000);
+  }
   if (value.type !== "process" || String(value.command).toLowerCase() !== "cmd.exe") return false;
   if (!Array.isArray(value.args) || value.args.length !== 4) return false;
   if (value.args[0] !== "/d" || value.args[1] !== "/s" || value.args[2] !== "/c") return false;
@@ -162,7 +197,7 @@ function isHealthyZcodeProcessHook(value, event) {
   return value.timeoutMs === (event === "PermissionRequest" ? 135000 : 10000);
 }
 
-function isHealthyZcodeIntegration(config) {
+function isHealthyZcodeIntegration(config, options = {}) {
   if (!config || config.hooks?.enabled !== true) return false;
   const eventMap = config.hooks?.events;
   if (!eventMap || typeof eventMap !== "object" || Array.isArray(eventMap)) return false;
@@ -171,7 +206,7 @@ function isHealthyZcodeIntegration(config) {
     return Array.isArray(entries) && entries.some(entry => (
       !entry?.matcher
       && Array.isArray(entry?.hooks)
-      && entry.hooks.some(hook => containsMarker(hook) && isHealthyZcodeProcessHook(hook, event))
+      && entry.hooks.some(hook => containsMarker(hook) && isHealthyZcodeProcessHook(hook, event, options))
     ));
   });
 }
@@ -193,7 +228,7 @@ function explicitDisabled(agentId, config) {
   return config.hooksConfig?.disabled === true || config.hooks?.enabled === false;
 }
 
-function addJsonHooks(agentId, config, executablePath, scriptPath) {
+function addJsonHooks(agentId, config, executablePath, scriptPath, options = {}) {
   const events = EVENTS[agentId] || [];
   if (agentId === "zcode") {
     const existing = config.hooks && typeof config.hooks === "object" && !Array.isArray(config.hooks) ? config.hooks : {};
@@ -201,7 +236,7 @@ function addJsonHooks(agentId, config, executablePath, scriptPath) {
     for (const event of events) {
       const other = Array.isArray(eventMap[event]) ? eventMap[event].filter(item => !containsMarker(item)) : [];
       other.push({
-        hooks: [zcodeProcessHook(executablePath, scriptPath, event)],
+        hooks: [zcodeProcessHook(executablePath, scriptPath, event, options)],
       });
       eventMap[event] = other;
     }
@@ -212,7 +247,7 @@ function addJsonHooks(agentId, config, executablePath, scriptPath) {
     if (!config.hooks || typeof config.hooks !== "object" || Array.isArray(config.hooks)) config.hooks = {};
     for (const event of events) {
       const entries = Array.isArray(config.hooks[event]) ? config.hooks[event].filter(item => !containsMarker(item)) : [];
-      const command = commandFor(executablePath, scriptPath, agentId, event);
+      const command = commandFor(executablePath, scriptPath, agentId, event, options);
       entries.push({ type: "command", bash: command, powershell: command, timeoutSec: event === "permissionRequest" ? 135 : 10 });
       config.hooks[event] = entries;
     }
@@ -220,15 +255,15 @@ function addJsonHooks(agentId, config, executablePath, scriptPath) {
   }
   if (agentId === "antigravity") {
     config[GROUP_ID] = {
-      PreInvocation: [{ type: "command", command: commandFor(executablePath, scriptPath, agentId, "PreInvocation"), timeout: 10 }],
-      Stop: [{ type: "command", command: commandFor(executablePath, scriptPath, agentId, "Stop"), timeout: 10 }],
+      PreInvocation: [{ type: "command", command: commandFor(executablePath, scriptPath, agentId, "PreInvocation", options), timeout: 10 }],
+      Stop: [{ type: "command", command: commandFor(executablePath, scriptPath, agentId, "Stop", options), timeout: 10 }],
     };
     return config;
   }
   if (!config.hooks || typeof config.hooks !== "object" || Array.isArray(config.hooks)) config.hooks = {};
   for (const event of events) {
     const entries = Array.isArray(config.hooks[event]) ? config.hooks[event].filter(item => !containsMarker(item)) : [];
-    const command = commandFor(executablePath, scriptPath, agentId, event);
+    const command = commandFor(executablePath, scriptPath, agentId, event, options);
     if (agentId === "cursor-agent" || agentId === "kiro") entries.push({ command });
     else if (agentId === "reasonix") entries.push({ match: "*", command });
     else entries.push(nestedEntry(command, event, agentId));
@@ -237,17 +272,17 @@ function addJsonHooks(agentId, config, executablePath, scriptPath) {
   return config;
 }
 
-function managedTomlBlock(agentId, executablePath, scriptPath) {
+function managedTomlBlock(agentId, executablePath, scriptPath, options = {}) {
   const events = agentId === "kimi-code"
     ? ["UserPromptSubmit", "Stop", "PermissionRequest"]
     : ["message_submit", "session_end"];
   const lines = [`# >>> Vibe Halo integration (${agentId}) >>>`];
   for (const event of events) {
-    const command = commandFor(executablePath, scriptPath, agentId, event).replace(/'/g, "''");
+    const command = JSON.stringify(commandFor(executablePath, scriptPath, agentId, event, options));
     if (agentId === "kimi-code") {
-      lines.push("[[hooks]]", `event = '${event}'`, "matcher = '*'", `command = '${command}'`, `timeout = ${event === "PermissionRequest" ? 135 : 10}`, "");
+      lines.push("[[hooks]]", `event = '${event}'`, "matcher = '*'", `command = ${command}`, `timeout = ${event === "PermissionRequest" ? 135 : 10}`, "");
     } else {
-      lines.push("[[hooks.hooks]]", `# managed by Vibe Halo`, `event = '${event}'`, `command = '''${command}'''`, "background = true", "timeout_secs = 5", "");
+      lines.push("[[hooks.hooks]]", `# managed by Vibe Halo`, `event = '${event}'`, `command = ${command}`, "background = true", "timeout_secs = 5", "");
     }
   }
   lines.push(`# <<< Vibe Halo integration (${agentId}) <<<`);
@@ -279,8 +314,16 @@ function pathExists(value) {
 
 class IntegrationManager {
   constructor(options = {}) {
+    this.platform = options.platform || options.platformAdapter?.platform || process.platform;
     this.homeDir = options.homeDir || os.homedir();
-    this.appData = options.appData || process.env.APPDATA || path.join(this.homeDir, "AppData", "Roaming");
+    this.platformAdapter = options.platformAdapter || createPlatformAdapter({
+      platform: this.platform,
+      homeDir: this.homeDir,
+      appData: options.appData,
+      executablePath: options.executablePath,
+      runtimeRoot: options.runtimeRoot,
+    });
+    this.appData = options.appData || this.platformAdapter.appData;
     this.executablePath = options.executablePath || process.execPath;
     this.hookScriptPath = options.hookScriptPath;
     this.assetRoot = options.assetRoot || path.join(__dirname, "..", "hooks", "integrations");
@@ -291,8 +334,19 @@ class IntegrationManager {
     this.codexManager = options.codexManager || new HookManager({
       executablePath: this.executablePath,
       hookScriptPath: this.hookScriptPath,
+      platform: this.platform,
+      platformAdapter: this.platformAdapter,
       logger: this.logger,
     });
+  }
+
+  commandOptions() {
+    return {
+      platform: this.platform,
+      platformAdapter: this.platformAdapter,
+      homeDir: this.homeDir,
+      runnerPath: this.platformAdapter.runnerPath,
+    };
   }
 
   paths(agentId) {
@@ -315,27 +369,23 @@ class IntegrationManager {
       hermes: [path.join(home, ".hermes", "plugins")],
       qoder: [path.join(home, ".qoder", "settings.json")],
       qoderwork: [path.join(home, ".qoderwork", "settings.json")],
-      reasonix: [path.join(this.appData, "reasonix", "settings.json")],
+      reasonix: [this.platform === "win32"
+        ? path.join(this.appData, "reasonix", "settings.json")
+        : path.join(home, ".reasonix", "settings.json")],
     };
     return map[agentId] || [];
   }
 
   configHomePath(descriptorValue) {
     if (!descriptorValue?.configHome) return null;
-    if (descriptorValue.id === "reasonix") return path.join(this.appData, "reasonix");
+    if (descriptorValue.id === "reasonix") return this.platform === "win32"
+      ? path.join(this.appData, "reasonix")
+      : path.join(this.homeDir, ".reasonix");
     return path.join(this.homeDir, ...String(descriptorValue.configHome).split(/[\\/]+/).filter(Boolean));
   }
 
   executableDetected(descriptorValue) {
-    for (const name of descriptorValue.executableNames) {
-      try {
-        const result = childProcess.spawnSync("where.exe", [name], { encoding: "utf8", windowsHide: true, timeout: 1000 });
-        if (result.status === 0 && result.stdout.trim()) return true;
-      } catch {}
-    }
-    if (descriptorValue.id === "zcode" && pathExists(path.join(process.env.ProgramFiles || "C:\\Program Files", "ZCode", "ZCode.exe"))) return true;
-    if (descriptorValue.id === "cursor-agent" && pathExists(path.join(process.env.LOCALAPPDATA || "", "Programs", "cursor", "Cursor.exe"))) return true;
-    return false;
+    return this.platformAdapter.executableDetected(descriptorValue);
   }
 
   detect(agentId, options = {}) {
@@ -343,6 +393,11 @@ class IntegrationManager {
     if (!options.force && cached && Date.now() - cached.at < 30_000) return { ...cached.value };
     const descriptorValue = agent(agentId);
     if (!descriptorValue) return { detected: false, reason: "unknown-agent" };
+    if (descriptorValue.platforms?.[this.platform] !== true) {
+      const value = { detected: false, executable: false, reason: "not-available-on-platform" };
+      this.detectionCache.set(agentId, { at: Date.now(), value });
+      return { ...value };
+    }
     if (agentId === "codex") {
       const value = { detected: this.codexManager.ensureCodexDir(), reason: "codex-home" };
       this.detectionCache.set(agentId, { at: Date.now(), value });
@@ -362,7 +417,7 @@ class IntegrationManager {
     if (explicitDisabled(agentId, config)) return { ok: false, disabled: true, reason: "hooks-explicitly-disabled", path: filePath };
     backupOnce(agentId, filePath, this.backupRoot);
     const cleaned = removeManaged(config);
-    const next = addJsonHooks(agentId, cleaned, this.executablePath, this.hookScriptPath);
+    const next = addJsonHooks(agentId, cleaned, this.executablePath, this.hookScriptPath, this.commandOptions());
     const output = `${JSON.stringify(next, null, 2)}\n`;
     const original = fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
     if (output !== original) atomicWrite(filePath, output);
@@ -386,7 +441,7 @@ class IntegrationManager {
     backupOnce(agentId, filePath, this.backupRoot);
     let base = original;
     if (agentId === "codewhale" && !/^\s*\[hooks\]\s*$/m.test(base)) base = `${base.trimEnd()}${base.trim() ? "\n\n" : ""}[hooks]\nenabled = true\n`;
-    const next = replaceTomlBlock(base, agentId, managedTomlBlock(agentId, this.executablePath, this.hookScriptPath));
+    const next = replaceTomlBlock(base, agentId, managedTomlBlock(agentId, this.executablePath, this.hookScriptPath, this.commandOptions()));
     if (next !== original) atomicWrite(filePath, next);
     return { ok: true, changed: next !== original, path: filePath };
   }
@@ -445,6 +500,7 @@ class IntegrationManager {
   install(agentId) {
     const descriptorValue = agent(agentId);
     if (!descriptorValue) return { ok: false, reason: "unknown-agent" };
+    if (descriptorValue.platforms?.[this.platform] !== true) return { ok: false, reason: "not-available-on-platform" };
     if (!this.hookScriptPath || !pathExists(this.hookScriptPath)) return { ok: false, reason: "hook-script-missing" };
     if (agentId === "codex") return this.codexManager.install();
     if (["opencode", "pi", "openclaw", "hermes"].includes(agentId)) return this.installAsset(agentId);
@@ -495,7 +551,7 @@ class IntegrationManager {
       const config = readJson(target);
       const disabled = explicitDisabled(agentId, config);
       const installed = containsMarker(config);
-      const healthy = installed && !disabled && (agentId !== "zcode" || isHealthyZcodeIntegration(config));
+      const healthy = installed && !disabled && (agentId !== "zcode" || isHealthyZcodeIntegration(config, this.commandOptions()));
       const reason = disabled
         ? "hooks-explicitly-disabled"
         : (!installed ? "missing" : (healthy ? "healthy" : "invalid-zcode-process-hook"));
@@ -596,7 +652,9 @@ class IntegrationManager {
   }
 
   uninstallAll() {
-    return listAgents().map(descriptorValue => ({ agentId: descriptorValue.id, result: this.uninstall(descriptorValue.id) }));
+    const results = listAgents().map(descriptorValue => ({ agentId: descriptorValue.id, result: this.uninstall(descriptorValue.id) }));
+    this.platformAdapter.removeHookRuntime();
+    return results;
   }
 }
 

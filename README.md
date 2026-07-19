@@ -4,12 +4,12 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-**A Windows approval popup and Dynamic Island for Codex, ZCode, Claude Code, OpenCode, and other AI coding agents.**
+**A cross-platform approval popup and Dynamic Island for Codex, ZCode, Claude Code, OpenCode, and other AI coding agents.**
 
 Handle supported permission requests and interactive questions, and receive completion notifications without constantly switching back to agent terminals.
 
-![Version](https://img.shields.io/badge/version-0.4.0-6d7cff)
-![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078d4)
+![Version](https://img.shields.io/badge/version-0.5.0-6d7cff)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)
 ![Electron](https://img.shields.io/badge/Electron-41-47848f)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
@@ -24,21 +24,21 @@ Handle supported permission requests and interactive questions, and receive comp
 </div>
 
 > [!NOTE]
-> **Runtime validation:** Codex and ZCode have completed real client round-trip testing in the maintainer's environment. The other adapters have automated contract coverage but may still contain client-specific compatibility bugs; keep their native approval UI available while evaluating them.
+> **Runtime validation:** Codex and ZCode on Windows have completed real client round-trip testing in the maintainer's environment. macOS and Linux currently have CI, protocol, packaging, and startup smoke coverage only. All other client/platform combinations may still contain compatibility bugs; keep their native approval UI available while evaluating them.
 
 > [!IMPORTANT]
-> Vibe Halo is a derivative development of [Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk), maintained independently and not an official upstream edition. It retains and adapts parts of the upstream hook, plugin, approval transport, and lifecycle design, while removing the desktop pet, themes, animated session state, remote approval, and mobile features. See [NOTICE.md](NOTICE.md) for upstream copyright and attribution.
+> Vibe Halo is a derivative development of [Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk), maintained independently and not an official upstream edition. It retains and adapts parts of the upstream hook, plugin, approval transport, process-discovery, and lifecycle design, while removing the desktop pet, themes, animated session state, remote approval, and mobile features. See [NOTICE.md](NOTICE.md) for upstream copyright and attribution.
 
 Vibe Halo appears at the top of the active display when you need to intervene. Supported approval requests can be allowed or denied in place, questions with a stable answer protocol can be completed inside the island, and finished tasks produce short notifications. If no explicit decision is made—or if the app, transport, or protocol fails—the request is returned to the native client flow instead of being automatically allowed or denied.
 
 ## Quick start
 
-1. Download `Vibe-Halo-Setup-<version>-x64.exe` from [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases).
+1. Download the package for your platform from [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases): Windows x64 NSIS, macOS 12+ arm64/x64 DMG or ZIP, or Linux x64 AppImage/deb.
 2. Launch Vibe Halo and open **Client integrations** from the tray to inspect detected clients and integration health.
 3. If you use Codex, enter `/hooks` in Codex and review the installed Vibe Halo command hooks before triggering an approval.
 
 > [!WARNING]
-> Packages labeled **Unsigned Preview** are testing-only. Windows SmartScreen may show an unknown-publisher warning, and automatic updates remain disabled until a signed stable release is available.
+> Packages labeled **Unsigned Preview** are testing-only. Windows SmartScreen may show an unknown-publisher warning. On macOS, use Finder's context menu and choose **Open** to approve the unnotarized app. Automatic updates are disabled in all preview packages.
 
 See [Installation and setup](#installation-and-setup) for source builds, integration details, and the complete verification flow.
 
@@ -103,7 +103,7 @@ AI coding clients often wait in the background for a permission decision, a foll
 
 ### Updates
 
-- Automatic updates are enabled only in official Windows builds whose publisher signature matches the trusted configuration.
+- Automatic updates are enabled only in official Windows builds whose publisher signature matches the trusted configuration. macOS and Linux updates remain disabled until a signed and notarized distribution path exists.
 - Signed builds check and download stable releases from GitHub Releases in the background.
 - Installation always requires an explicit “Restart and update” action from the tray; a normal quit does not install an update.
 - Before updating, the local server is stopped and pending approvals/questions are returned to their native client flows.
@@ -155,13 +155,15 @@ flowchart LR
 
 ### Use a release build
 
-Download the current installer from [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases):
+Download the current package from [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases):
 
-```text
-Vibe-Halo-Setup-<version>-x64.exe
-```
+| Platform | Supported baseline | Artifacts |
+| --- | --- | --- |
+| Windows | Windows 10/11 x64 | `Vibe-Halo-Setup-<version>-x64.exe` |
+| macOS | macOS 12+, Apple Silicon or Intel | `Vibe-Halo-<version>-arm64.dmg` / `.zip`, `Vibe-Halo-<version>-x64.dmg` / `.zip` |
+| Linux | Ubuntu 22.04/24.04 or Debian 12 x64 | `Vibe-Halo-<version>-x64.AppImage`, `Vibe-Halo-<version>-x64.deb` |
 
-If the Releases page does not yet contain a signed installer, the public signing pipeline is not ready. Do not treat an unsigned installer from an unknown source as an official release.
+Other Linux distributions may work with the AppImage, but are not part of the first release guarantee. Preview packages are intentionally unsigned; verify the published SHA-256 list and download only from this repository.
 
 After installation:
 
@@ -174,7 +176,15 @@ After installation:
 > [!WARNING]
 > Codex 0.129.0 and later require the user to trust new or changed command hooks. Vibe Halo can write and repair the configuration, but it does not bypass the official trust review.
 
-The installer contains English and Simplified Chinese resources and automatically follows the Windows display language. After launch, Vibe Halo follows Windows by default; use **Language** in the tray to switch immediately without restarting the app.
+The Windows installer and the application contain English and Simplified Chinese resources. Vibe Halo follows the operating-system UI locale by default; use **Language** in the tray to switch immediately without restarting the app.
+
+#### macOS first launch
+
+The preview is not signed with an Apple Developer ID and is not notarized. Drag the app from the DMG to **Applications**, then Control-click or right-click Vibe Halo in Finder, choose **Open**, and confirm once. Vibe Halo runs as an accessory app without a Dock icon and does not request Accessibility or Screen Recording permission.
+
+#### Linux window backend
+
+Vibe Halo prefers X11. In a Wayland session it uses XWayland when `DISPLAY` is available so the island can still be positioned and animated. If XWayland is unavailable, it starts in native-Wayland degraded mode and diagnostics report that precise window positioning, resizing, or focus may be limited. Set `VIBE_HALO_NATIVE_WAYLAND=1` only when you intentionally want to force that degraded native mode.
 
 ### Run from source
 
@@ -182,7 +192,7 @@ Running from source is intended for contributing, integration debugging, and unr
 
 #### Prerequisites
 
-- Windows x64; the primary manual acceptance environment is Windows 11.
+- Windows x64, macOS 12+ arm64/x64, or Linux x64. Windows remains the primary real-client acceptance environment.
 - [Node.js 24](https://nodejs.org/) and npm, matching release CI.
 - Git.
 - At least one supported client for real integration testing; automated tests do not require one.
@@ -222,23 +232,23 @@ The tray exposes the following controls in English mode:
 | --- | --- |
 | **Enable approvals** | Global island-approval switch; when disabled, approvals return to the client while completion notifications continue |
 | **Input reminders** | Controls read-only input reminders and native-approval reminders |
-| **Launch at login** | Controls Windows login startup |
+| **Launch at login** | Controls operating-system login startup |
 | **Client integrations** | Shows status and provides per-client disable/enable, rescan, repair, and uninstall-all actions |
 | **Review Codex Hook…** | Explains how to complete the official Codex `/hooks` trust review |
 | **Repair Codex Hook** | Incrementally repairs Vibe Halo-managed Codex configuration |
 | **Diagnostics** | Shows service, queue, integration verification, update status, active locale, and log location |
-| **Language** | Chooses Follow Windows, English, or Simplified Chinese; the island and queued items update immediately |
+| **Language** | Chooses Follow system, English, or Simplified Chinese; the island and queued items update immediately |
 | **Check for updates** | Appears only in trusted, signed release builds |
 
 ### Remove integrations
 
 Use **Client integrations → Uninstall all…** to remove every Vibe Halo-managed integration, or run this from a source checkout:
 
-```powershell
+```shell
 npm start -- --uninstall-hooks
 ```
 
-The NSIS uninstaller invokes the same cleanup path. Cleanup removes only Vibe Halo-owned hook/plugin records; third-party configuration, first-state backups, and application user data are retained.
+The Windows NSIS uninstaller invokes the same cleanup path. On macOS, dragging the app to Trash cannot run integration cleanup, so run **Uninstall all…** before removing the app. On Linux, do the same before removing the AppImage or package. Stale launchers always fail open, but explicit cleanup avoids leaving dead Hook entries. Cleanup removes only Vibe Halo-owned hook/plugin records; third-party configuration, first-state backups, and application user data are retained.
 
 ## Security and privacy
 
@@ -277,8 +287,9 @@ Settings, logs, and integration backups live under Electron's `userData` directo
 | Desktop runtime | Electron 41, CommonJS, Node.js |
 | UI | Native HTML, CSS, and JavaScript in one transparent `BrowserWindow` |
 | Local transport | Node HTTP, loopback-only, per-process token |
-| Windows integration | `koffi`, system tray, x64 NSIS |
-| Automatic updates | `electron-updater`, GitHub Releases, Authenticode verification |
+| Platform integration | `PlatformAdapter`, `koffi` on Windows, POSIX launchers, system tray |
+| Packaging | x64 NSIS; arm64/x64 DMG and ZIP; x64 AppImage and deb |
+| Automatic updates | Windows-only signed stable channel; disabled for macOS/Linux previews |
 | Tests | Node's built-in test runner |
 | Release | GitHub Actions, electron-builder, SignPath Foundation |
 
@@ -290,6 +301,7 @@ The project has no database, web backend, frontend framework, Docker deployment,
 .
 ├── src/
 │   ├── main.js                  # Electron lifecycle, tray, and service wiring
+│   ├── platform-adapter.js      # OS paths, stable hooks, login items, notifications, window backend
 │   ├── agent-registry.js        # 19 adapters, normalization, options, response codecs
 │   ├── integration-manager.js   # Detection, backup, install, health, repair, removal
 │   ├── server.js                # Token-authenticated 127.0.0.1 HTTP gateway
@@ -309,7 +321,7 @@ The project has no database, web backend, frontend framework, Docker deployment,
 ├── docs/
 │   ├── assets/vibe-halo-demo.gif # README demonstration
 │   └── RELEASING.md              # SignPath and signed-release guide
-├── electron-builder.config.cjs   # Windows x64 NSIS packaging configuration
+├── electron-builder.config.cjs   # Windows, macOS, and Linux packaging configuration
 ├── README.zh-CN.md               # Simplified Chinese documentation
 ├── LICENSE                       # AGPL-3.0-only
 └── NOTICE.md                     # Upstream attribution and derivative notice
@@ -325,8 +337,11 @@ The project has no database, web backend, frontend framework, Docker deployment,
 | `npm install` | Install dependencies and permit lockfile updates; use only for dependency changes |
 | `npm test` | Run the full Node test suite |
 | `npm start` | Start Electron from source and scan local client integrations |
-| `npm run build:dir` | Produce unpacked `dist/win-unpacked` output |
-| `npm run build` | Produce a local x64 NSIS installer without publishing or enabling updates |
+| `npm run build:dir` | Produce unpacked output for the current host platform |
+| `npm run build` | Produce unsigned packages for the current host platform |
+| `npm run build:win` | Produce the Windows x64 NSIS package |
+| `npm run build:mac:arm64` / `npm run build:mac:x64` | Produce macOS DMG and ZIP packages on macOS |
+| `npm run build:linux:x64` | Produce Linux x64 AppImage and deb packages on Linux |
 | `npm run build:prepackaged` | Build NSIS from a prepackaged directory; mainly used by the signing workflow |
 | `npm run release:metadata` | Regenerate blockmap, hashes, and `latest.yml` for the final signed installer |
 
@@ -371,30 +386,36 @@ The automated suite covers:
 - Loopback authentication, request-size bounds, invalid option IDs, bridge tokens, and replay protection.
 - JSON, JSONC, TOML, and plugin backup, idempotence, third-party preservation, and safe uninstall behavior.
 - Settings migration, automatic detection, user-disable overrides, diagnostics, and update state.
-- Renderer IPC, dynamic actions, question forms, window bounds, shadow gutters, and multi-display placement logic.
-- Command-hook mock-server end-to-end behavior and offline fallback.
+- Renderer IPC, dynamic actions, question forms, window bounds, shadow gutters, multi-display placement, and X11 source-window matching.
+- Windows and POSIX command-hook mock-server end-to-end behavior, stable launcher paths, and offline fallback.
 - SignPath external-signing staging, metadata generation, and release configuration.
 
-The following still require manual Windows acceptance: transparent-window behavior, shadow rendering, focus, animation, multi-display/DPI, real client hook round trips, tray behavior, NSIS installation/removal, and signed updates.
+Windows transparent-window behavior, shadows, focus, animation, multi-display/DPI, real-client round trips, tray behavior, NSIS removal, and signed updates still require manual acceptance. macOS/Linux currently have CI protocol, package, launcher, and startup smoke tests only; real client response round trips on those platforms remain unverified.
 
 ## Building and releasing
 
 ### Local build
 
-```powershell
+```shell
 npm run build:dir
 npm run build
 ```
 
-Installer output:
+Host-specific output:
 
 ```text
-dist/Vibe-Halo-Setup-<version>-x64.exe
+Windows: Vibe-Halo-Setup-<version>-x64.exe
+macOS:   Vibe-Halo-<version>-arm64|x64.dmg and .zip
+Linux:   Vibe-Halo-<version>-x64.AppImage and .deb
 ```
 
 Local artifacts are expected to be unsigned and contain `autoUpdateEnabled=false`. Do not publish a local artifact as an official update.
 
-### Official release
+### Unsigned three-platform preview
+
+The `preview-<version>` tag triggers the cross-platform workflow. It tests on Windows 2025, macOS 15 arm64 and Intel, and Ubuntu 24.04; builds on Windows 2025, both macOS architectures, and Ubuntu 22.04; then publishes all packages plus `SHA256SUMS.txt` as a GitHub Pre-release. It deliberately does not publish stable update metadata.
+
+### Signed Windows release
 
 A `v<version>` tag triggers the GitHub Actions release workflow, which:
 
@@ -419,6 +440,7 @@ Normal installations require no manual environment configuration. These variable
 | `VIBE_HALO_RUNTIME_DIR` | Override the loopback runtime-identity directory |
 | `VIBE_HALO_USER_DATA` | Override Electron `userData`; used for test isolation |
 | `VIBE_HALO_TEST=1` | Enable test/smoke behavior and suppress real login startup and updates |
+| `VIBE_HALO_NATIVE_WAYLAND=1` | Force native Wayland instead of XWayland; window positioning/animation may be degraded |
 | `VIBE_HALO_SCREENSHOT` | Save a window capture during the demo test path |
 | `VIBE_HALO_PUBLISHER_NAME` | Set the exact Authenticode publisher Subject and enable the release-build updater gate |
 | `VIBE_HALO_EXTERNAL_SIGNING=1` | Enable the electron-builder external SignPath staging script |
@@ -431,9 +453,9 @@ Signing variables belong only in protected CI. The SignPath API token is a GitHu
 
 ## FAQ
 
-### Is Vibe Halo a Windows alternative to Vibe Island?
+### Is Vibe Halo a cross-platform alternative to Vibe Island?
 
-Vibe Halo provides a similar top-center approval and notification workflow for Windows, but it is an independent open-source project rather than an official Windows edition of Vibe Island. It appears only when an AI coding agent needs a supported permission decision, asks a supported interactive question, or completes a task.
+Vibe Halo provides a similar top-center approval and notification workflow on Windows, macOS, and common x64 Linux systems, but it is an independent open-source project rather than an official Vibe Island edition. It appears only when an AI coding agent needs a supported permission decision, asks a supported interactive question, or completes a task.
 
 ### Can I approve Codex permissions without returning to the terminal?
 
@@ -473,18 +495,19 @@ This is expected. Closing an approval does not choose deny. Vibe Halo returns no
 
 ### There is no update item in the tray
 
-Source runs, local packages, and unsigned builds deliberately disable automatic updates. Update controls exist only in official Windows builds whose publisher signature passes verification.
+Source runs, local packages, and unsigned builds deliberately disable automatic updates. Update controls exist only in official Windows builds whose publisher signature passes verification; macOS/Linux preview packages never enable them.
 
 ## Known boundaries
 
-- The release target is Windows x64; there are no macOS, Linux, or ARM64 packages.
-- The application UI and installer support English and Simplified Chinese; Traditional Chinese currently falls back to English unless Simplified Chinese is selected manually.
+- Release targets are Windows x64, macOS 12+ arm64/x64, and Ubuntu 22.04/24.04 or Debian 12 x64. Other Linux distributions are best-effort through AppImage; Linux arm64, RPM, Snap, Flatpak, and Mac App Store packages are not provided.
+- Native Wayland does not provide the same programmable placement, resize, and focus guarantees. XWayland is preferred; the native backend is explicitly diagnosed as degraded.
+- The application UI and Windows installer support English and Simplified Chinese; unsupported system locales fall back to English unless Simplified Chinese is selected manually.
 - Vibe Halo does not include the upstream desktop pet, animated themes, session dashboard, terminal focus, remote SSH, PWA, or mobile features.
 - Remote approval is not supported, and the service never listens on a LAN interface.
 - Not every client exposes a stable approval or answer protocol. Unsupported capabilities remain reminders or are handed back to the native client.
 - Codex `request_user_input` cannot be answered inside the island.
 - Status-only clients produce completion/attention events, not continuous working animations.
-- Only Codex and ZCode have completed real client end-to-end verification. Other integrations can still contain compatibility bugs even when contract tests pass.
+- Only Codex and ZCode on Windows have completed real client end-to-end verification. macOS/Linux and other integrations can still contain compatibility bugs even when CI and contract tests pass.
 
 ## Contributing
 
@@ -494,7 +517,7 @@ Bug reports, protocol compatibility findings, and improvements focused on the dy
 2. Create a single-purpose branch from the latest `main`.
 3. Preserve incremental third-party configuration handling and native/no-decision fallback semantics.
 4. Add tests for behavioral changes and run `npm test`.
-5. For window, hook, or NSIS work, document the relevant Windows manual acceptance results.
+5. For window, hook, or packaging work, document the relevant host-platform manual or CI acceptance results.
 
 Do not submit real client configurations, runtime tokens, full command logs, or other personal data.
 
@@ -504,7 +527,7 @@ Vibe Halo is derived from [rullerzhou-afk/clawd-on-desk](https://github.com/rull
 
 Compared with upstream, this repository is a deliberate secondary development with a different product direction:
 
-- It narrows a cross-platform desktop pet into a Windows-first top-center dynamic island.
+- It narrows a cross-platform desktop pet into a focused three-platform top-center dynamic island.
 - It removes pet artwork, themes, the animated state machine, remote features, and mobile features.
 - It keeps and restructures the protocol pieces needed for local approvals, structured answers, and completion notifications.
 - It strengthens the global FIFO, renderer isolation, configuration ownership, native fallback, and signed update pipeline.

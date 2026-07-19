@@ -95,7 +95,7 @@ const EN_US = Object.freeze({
   "tray.repairCodexHook": "Repair Codex Hook",
   "tray.diagnostics": "Diagnostics",
   "tray.language": "Language",
-  "tray.followWindows": "Follow Windows",
+  "tray.followSystem": "Follow system",
   "tray.quit": "Quit",
 
   "dialog.later": "Later",
@@ -130,6 +130,9 @@ const EN_US = Object.freeze({
   "notification.updateReadyContent": "{version} was downloaded. Restart from the tray to update.",
 
   "diagnostics.application": "Application: {appName} {version}",
+  "diagnostics.platform": "Platform: {platform} {arch} ({packageKind})",
+  "diagnostics.windowBackend": "Window backend: {value}",
+  "diagnostics.platformDegraded": "Platform fallback: {reason}",
   "diagnostics.autoUpdate": "Automatic updates: {value}",
   "diagnostics.updateIdle": "idle",
   "diagnostics.updateChecking": "checking",
@@ -177,6 +180,8 @@ const EN_US = Object.freeze({
 
   "reason.unknown-agent": "Unknown client",
   "reason.hooks-explicitly-disabled": "Hooks are explicitly disabled by the client",
+  "reason.not-available-on-platform": "This integration is not available on the current platform",
+  "reason.native-wayland-window-control-limited": "native Wayland limits window positioning, resizing, and focus",
   "reason.agent-config-directory-missing": "The client configuration directory is missing",
   "reason.agent-config-missing": "The client configuration is missing",
   "reason.integration-asset-missing": "The integration asset is missing",
@@ -287,7 +292,7 @@ const ZH_CN = Object.freeze({
   "tray.repairCodexHook": "修复 Codex Hook",
   "tray.diagnostics": "诊断信息",
   "tray.language": "语言",
-  "tray.followWindows": "跟随 Windows",
+  "tray.followSystem": "跟随系统",
   "tray.quit": "退出",
 
   "dialog.later": "稍后",
@@ -322,6 +327,9 @@ const ZH_CN = Object.freeze({
   "notification.updateReadyContent": "{version} 已下载，可从托盘重启更新。",
 
   "diagnostics.application": "应用：{appName} {version}",
+  "diagnostics.platform": "平台：{platform} {arch}（{packageKind}）",
+  "diagnostics.windowBackend": "窗口后端：{value}",
+  "diagnostics.platformDegraded": "平台降级：{reason}",
   "diagnostics.autoUpdate": "自动更新：{value}",
   "diagnostics.updateIdle": "空闲",
   "diagnostics.updateChecking": "正在检查",
@@ -369,6 +377,8 @@ const ZH_CN = Object.freeze({
 
   "reason.unknown-agent": "未知客户端",
   "reason.hooks-explicitly-disabled": "客户端明确禁用了 Hooks",
+  "reason.not-available-on-platform": "当前平台不提供此集成",
+  "reason.native-wayland-window-control-limited": "原生 Wayland 限制窗口定位、缩放和聚焦",
   "reason.agent-config-directory-missing": "客户端配置目录不存在",
   "reason.agent-config-missing": "客户端配置不存在",
   "reason.integration-asset-missing": "集成资源不存在",

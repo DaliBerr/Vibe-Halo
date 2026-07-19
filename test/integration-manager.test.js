@@ -28,6 +28,7 @@ function fixture() {
   fs.mkdirSync(home, { recursive: true });
   fs.writeFileSync(hookScriptPath, "// fixture\n");
   const manager = new IntegrationManager({
+    platform: "win32",
     homeDir: home,
     appData: path.join(root, "appdata"),
     backupRoot,
@@ -77,7 +78,7 @@ test("installs exact ZCode process hooks, backs up once, and preserves third-par
   assert.equal(permissionHook.timeoutMs, 135000);
   assert.equal(config.hooks.events.Stop.some(entry => entry.hooks?.[0]?.command === "third-party"), true);
   assert.equal(containsMarker(config), true);
-  assert.equal(isHealthyZcodeIntegration(config), true);
+  assert.equal(isHealthyZcodeIntegration(config, { platform: "win32" }), true);
   const once = fs.readFileSync(configPath, "utf8");
   assert.equal(manager.install("zcode").ok, true);
   assert.equal(fs.readFileSync(configPath, "utf8"), once);
@@ -96,7 +97,7 @@ test("migrates malformed managed ZCode shell commands and reports them unhealthy
   fs.mkdirSync(path.dirname(configPath), { recursive: true });
   const legacyManaged = {
     type: "process",
-    command: commandFor("C:\\Program Files\\Vibe Halo\\Vibe Halo.exe", "C:\\Program Files\\Vibe Halo\\vibe-halo-hook.js", "zcode", "PermissionRequest"),
+    command: commandFor("C:\\Program Files\\Vibe Halo\\Vibe Halo.exe", "C:\\Program Files\\Vibe Halo\\vibe-halo-hook.js", "zcode", "PermissionRequest", { platform: "win32" }),
     timeoutMs: 135000,
   };
   fs.writeFileSync(configPath, `${JSON.stringify({
@@ -120,7 +121,7 @@ test("migrates malformed managed ZCode shell commands and reports them unhealthy
   assert.equal(repaired.keep, true);
   assert.equal(repaired.hooks.events.Stop.some(entry => entry.hooks?.[0]?.command === "third-party.exe"), true);
   assert.equal(JSON.stringify(repaired).includes("cmd.exe /d /s /c"), false);
-  assert.equal(isHealthyZcodeIntegration(repaired), true);
+  assert.equal(isHealthyZcodeIntegration(repaired, { platform: "win32" }), true);
   assert.equal(repaired.hooks.events.PermissionRequest.some(entry => containsMarker(entry) && entry.matcher === undefined), true);
 });
 
@@ -142,7 +143,7 @@ test("repairs ZCode process hooks that detach the packaged GUI executable", () =
   assert.equal(manager.status("zcode").reason, "invalid-zcode-process-hook");
   assert.equal(manager.install("zcode").ok, true);
   const repaired = readJson(configPath);
-  assert.equal(isHealthyZcodeIntegration(repaired), true);
+  assert.equal(isHealthyZcodeIntegration(repaired, { platform: "win32" }), true);
   const repairedCommand = repaired.hooks.events.PermissionRequest.find(containsMarker).hooks[0].args[3];
   const repairedEncoded = repairedCommand.match(/-EncodedCommand\s+(\S+)/)[1];
   assert.match(Buffer.from(repairedEncoded, "base64").toString("utf16le"), /Start-Process.+-NoNewWindow.+-Wait.+-PassThru/);
@@ -165,7 +166,7 @@ test("repairs ZCode's invalid star matcher so approval hooks match every tool", 
   assert.equal(managed.matcher, undefined);
   assert.doesNotThrow(() => new RegExp(managed.matcher || ".*"));
   assert.equal(new RegExp(managed.matcher || ".*").test("Bash"), true);
-  assert.equal(isHealthyZcodeIntegration(repaired), true);
+  assert.equal(isHealthyZcodeIntegration(repaired, { platform: "win32" }), true);
 });
 
 test("does not bypass explicit ZCode or Qwen hook disabling", () => {

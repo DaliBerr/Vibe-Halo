@@ -48,6 +48,7 @@ function fixture(config = "[features]\nhooks = true\n") {
   fs.writeFileSync(hooksPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
   const hookScriptPath = path.resolve(__dirname, "..", "hooks", "vibe-halo-hook.js");
   const manager = new HookManager({
+    platform: "win32",
     executablePath: "C:\\Program Files\\Vibe Halo\\Vibe Halo.exe",
     hookScriptPath,
     paths: {
@@ -134,7 +135,7 @@ test("feature helpers preserve other TOML sections", () => {
 
 test("Windows hook command waits for the Electron GUI executable through cmd.exe", () => {
   assert.equal(
-    buildHookCommand("C:\\Program Files\\Vibe Halo\\Vibe Halo.exe", "C:\\Program Files\\Vibe Halo\\resources\\hook.js"),
+    buildHookCommand("C:\\Program Files\\Vibe Halo\\Vibe Halo.exe", "C:\\Program Files\\Vibe Halo\\resources\\hook.js", [], { platform: "win32" }),
     "$env:ELECTRON_RUN_AS_NODE='1'; cmd.exe /d /s /c '\"C:\\Program Files\\Vibe Halo\\Vibe Halo.exe\" \"C:\\Program Files\\Vibe Halo\\resources\\hook.js\"'"
   );
 });

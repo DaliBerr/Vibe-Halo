@@ -32,6 +32,7 @@ const EVENT_ALIASES = Object.freeze({
 });
 
 function descriptor(id, name, tier, extra = {}) {
+  const platforms = { win32: true, darwin: true, linux: true, ...(extra.platforms || {}) };
   return Object.freeze({
     id,
     name,
@@ -47,7 +48,9 @@ function descriptor(id, name, tier, extra = {}) {
     configKind: extra.configKind || "json",
     configHome: extra.configHome || null,
     executableNames: Object.freeze(extra.executableNames || []),
+    applicationPaths: Object.freeze(Object.fromEntries(Object.entries(extra.applicationPaths || {}).map(([key, values]) => [key, Object.freeze(values)]))),
     configPaths: Object.freeze(extra.configPaths || []),
+    platforms: Object.freeze(platforms),
     liveVerification: extra.liveVerification || "contract-only",
     events: Object.freeze(extra.events || ["PermissionRequest", "Stop", "UserPromptSubmit"]),
   });
@@ -60,6 +63,7 @@ const AGENTS = Object.freeze([
   }),
   descriptor("zcode", "ZCode", "approval", {
     configHome: ".zcode", executableNames: ["ZCode.exe", "zcode"], configPaths: [".zcode/cli/config.json"],
+    applicationPaths: { win32: ["%ProgramFiles%/ZCode/ZCode.exe"], darwin: ["/Applications/ZCode.app", "~/Applications/ZCode.app"] },
     capabilities: { elicitation: true }, liveVerification: "local",
     events: ["PermissionRequest", "Stop", "UserPromptSubmit", "SessionStart"],
   }),
@@ -104,6 +108,7 @@ const AGENTS = Object.freeze([
   }),
   descriptor("cursor-agent", "Cursor Agent", "status", {
     configHome: ".cursor", executableNames: ["cursor-agent.exe", "cursor-agent", "Cursor.exe"],
+    applicationPaths: { win32: ["%LOCALAPPDATA%/Programs/cursor/Cursor.exe"], darwin: ["/Applications/Cursor.app", "~/Applications/Cursor.app"] },
     configPaths: [".cursor/hooks.json"], liveVerification: "local",
   }),
   descriptor("kiro", "Kiro", "status", {

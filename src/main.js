@@ -11,6 +11,7 @@ const {
   Menu,
   nativeImage,
   nativeTheme,
+  Notification,
   screen,
   shell,
   Tray,
@@ -30,25 +31,26 @@ const { IslandServer } = require("./server");
 const { SettingsStore } = require("./settings-store");
 const { ShutdownCoordinator } = require("./shutdown-coordinator");
 const { UpdateManager } = require("./update-manager");
+const { createPlatformAdapter } = require("./platform-adapter");
 const { autoUpdater } = require("electron-updater");
 const appMetadata = require("../package.json");
 
 app.setName(APP_NAME);
 if (process.platform === "win32") app.setAppUserModelId(APP_ID);
 if (process.env.VIBE_HALO_USER_DATA) app.setPath("userData", process.env.VIBE_HALO_USER_DATA);
+const platformAdapter = createPlatformAdapter({
+  platform: process.platform,
+  arch: process.arch,
+  executablePath: process.execPath,
+  packaged: app.isPackaged,
+  runtimeRoot: process.env.VIBE_HALO_RUNTIME_DIR,
+});
+platformAdapter.configureEarly(app);
 
 function hookScriptPath() {
   return app.isPackaged
     ? path.join(process.resourcesPath, "app.asar.unpacked", "hooks", "vibe-halo-hook.js")
     : path.join(__dirname, "..", "hooks", "vibe-halo-hook.js");
-}
-
-function createHookManager(logger) {
-  return new HookManager({
-    executablePath: process.execPath,
-    hookScriptPath: hookScriptPath(),
-    logger,
-  });
 }
 
 function integrationAssetPath() {
@@ -58,14 +60,23 @@ function integrationAssetPath() {
 }
 
 function createIntegrationManager(logger, settings) {
-  const codexManager = createHookManager(logger);
+  const hookRuntime = platformAdapter.prepareHookRuntime(hookScriptPath());
+  const codexManager = new HookManager({
+    executablePath: process.execPath,
+    hookScriptPath: hookRuntime.hookScriptPath,
+    logger,
+    platform: platformAdapter.platform,
+    platformAdapter,
+  });
   return new IntegrationManager({
     assetRoot: integrationAssetPath(),
     backupRoot: path.join(app.getPath("userData"), "integration-backups"),
     codexManager,
     executablePath: process.execPath,
-    hookScriptPath: hookScriptPath(),
+    hookScriptPath: hookRuntime.hookScriptPath,
     logger,
+    platform: platformAdapter.platform,
+    platformAdapter,
     settings,
   });
 }
@@ -178,7 +189,7 @@ function startApplication() {
   function setLogin(enabled) {
     try {
       if (process.env.VIBE_HALO_TEST !== "1") {
-        app.setLoginItemSettings({ openAtLogin: !!enabled, path: process.execPath });
+        platformAdapter.setLoginItem(app, !!enabled);
       }
       settings.set("openAtLogin", !!enabled);
       return true;
@@ -236,8 +247,12 @@ function startApplication() {
       update.percent != null ? t("diagnostics.progressValue", { percent: update.percent }) : "",
       update.error ? t("diagnostics.errorValue", { error: update.error }) : "",
     ].filter(Boolean).join(", ");
+    const platform = platformAdapter.status();
     return [
       t("diagnostics.application", { appName: APP_NAME, version: app.getVersion() }),
+      t("diagnostics.platform", { platform: platform.platform, arch: platform.arch, packageKind: platform.packageKind }),
+      t("diagnostics.windowBackend", { value: platform.windowBackend }),
+      ...(platform.degradedReason ? [t("diagnostics.platformDegraded", { reason: translateReason(localization, platform.degradedReason) })] : []),
       t("diagnostics.autoUpdate", { value: updateValues }),
       t("diagnostics.localService", { value: local.listening ? `127.0.0.1:${local.port}` : t("diagnostics.notRunning") }),
       t("diagnostics.approvals", { value: settings.get("approvalEnabled") ? t("diagnostics.enabled") : t("diagnostics.disabled") }),
@@ -245,7 +260,7 @@ function startApplication() {
       t("diagnostics.language", {
         locale: localization.locale,
         preference: localization.preference === "system"
-          ? t("tray.followWindows")
+          ? t("tray.followSystem")
           : (localization.preference === "zh-CN" ? "简体中文" : "English"),
       }),
       t("diagnostics.clientIntegrations"),
@@ -273,7 +288,12 @@ function startApplication() {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect x="2" y="5" width="28" height="22" rx="11" fill="#111318"/><circle cx="10" cy="16" r="3" fill="#72e5a5"/><path d="M17 12h7M17 16h7M17 20h5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>`;
     const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
     const image = nativeImage.createFromDataURL(dataUrl);
-    return image.isEmpty() ? nativeImage.createEmpty() : image.resize({ width: 16, height: 16 });
+    const resized = image.isEmpty() ? nativeImage.createEmpty() : image.resize({ width: 16, height: 16 });
+    return platformAdapter.configureTrayImage(resized);
+  }
+
+  function showSystemNotification(title, body) {
+    return platformAdapter.showNotification({ tray, Notification, title, body });
   }
 
   function setLanguage(preference) {
@@ -415,7 +435,7 @@ function startApplication() {
         label: t("tray.language"),
         submenu: [
           {
-            label: t("tray.followWindows"),
+            label: t("tray.followSystem"),
             type: "radio",
             checked: settings.get("language") === "system",
             click: () => setLanguage("system"),
@@ -560,14 +580,13 @@ function startApplication() {
   }
 
   app.on("second-instance", () => {
-    if (tray && process.platform === "win32") {
-      try { tray.displayBalloon({ title: APP_NAME, content: t("notification.background") }); } catch {}
-    }
+    showSystemNotification(APP_NAME, t("notification.background"));
   });
 
   app.on("window-all-closed", event => event?.preventDefault?.());
 
   app.whenReady().then(async () => {
+    platformAdapter.configureReady(app);
     logger = createLogger(path.join(app.getPath("userData"), "logs"));
     settings = new SettingsStore(path.join(app.getPath("userData"), "settings.json"));
     localization = createLocalizer({ preference: settings.get("language"), systemLocale: app.getLocale() });
@@ -596,6 +615,7 @@ function startApplication() {
       approvalStore: approvals,
       screen,
       localization,
+      platformAdapter,
       onChanged: () => rebuildTray(),
     });
     island.create();
@@ -631,14 +651,10 @@ function startApplication() {
     });
     updateManager.on("changed", (snapshot, reason) => {
       rebuildTray();
-      if (reason === "downloaded" && tray && process.platform === "win32") {
-        try {
-          tray.displayBalloon({
-            title: t("notification.updateReadyTitle", { appName: APP_NAME }),
-            content: t("notification.updateReadyContent", { version: snapshot.availableVersion || t("fallback.newVersion") }),
-          });
-        } catch {}
-      }
+      if (reason === "downloaded") showSystemNotification(
+        t("notification.updateReadyTitle", { appName: APP_NAME }),
+        t("notification.updateReadyContent", { version: snapshot.availableVersion || t("fallback.newVersion") })
+      );
     });
     updateManager.on("manual-result", result => {
       if (result.kind === "up-to-date") {
@@ -656,7 +672,7 @@ function startApplication() {
     });
     rebuildTray();
     updateManager.start();
-    logger.info("Application ready", { version: app.getVersion(), packaged: app.isPackaged });
+    logger.info("Application ready", { version: app.getVersion(), packaged: app.isPackaged, ...platformAdapter.status() });
     if (process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-approval")) {
       const demo = approvals.enqueue({
         agentId: "codex",
@@ -684,6 +700,21 @@ function startApplication() {
       }, { complete() {} }).entry;
       if (process.argv.includes("--demo-expanded")) {
         setTimeout(() => island.expand(demo.id), 180);
+      }
+      if (process.env.VIBE_HALO_SMOKE_ACTION_FILE) {
+        setTimeout(async () => {
+          try {
+            await island.window.webContents.executeJavaScript("document.querySelector('#actions button.primary')?.click()", true);
+            setTimeout(() => {
+              try {
+                fs.mkdirSync(path.dirname(process.env.VIBE_HALO_SMOKE_ACTION_FILE), { recursive: true });
+                fs.writeFileSync(process.env.VIBE_HALO_SMOKE_ACTION_FILE, approvals.size === 0 ? "resolved\n" : "pending\n");
+              } catch {}
+            }, 180);
+          } catch (error) {
+            logger.warn("Demo approval click failed", { message: error.message });
+          }
+        }, 700);
       }
       if (process.env.VIBE_HALO_SCREENSHOT) {
         setTimeout(async () => {
