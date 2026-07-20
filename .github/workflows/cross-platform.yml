@@ -42,7 +42,7 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npm run build:dir
-      - run: npm run verify:package -- dist/win-unpacked/resources 0.5.2
+      - run: npm run verify:package -- dist/win-unpacked/resources 0.5.3
       - name: Smoke packaged Windows app
         shell: pwsh
         run: |
@@ -89,7 +89,7 @@ jobs:
         run: |
           resources="$(find dist -path '*/Vibe Halo.app/Contents/Resources' -type d -print -quit)"
           test -n "$resources"
-          npm run verify:package -- "$resources" 0.5.2
+          npm run verify:package -- "$resources" 0.5.3
       - name: Smoke packaged macOS app
         shell: bash
         run: |
@@ -128,7 +128,7 @@ jobs:
       - run: npm ci
       - run: sudo apt-get update && sudo apt-get install -y xvfb x11-utils
       - run: npm run build:dir
-      - run: npm run verify:package -- dist/linux-unpacked/resources 0.5.2
+      - run: npm run verify:package -- dist/linux-unpacked/resources 0.5.3
       - name: Smoke packaged Linux app under X11
         shell: bash
         run: |
@@ -193,6 +193,7 @@ jobs:
           # those permissions; --no-sandbox is limited to this CI smoke test.
           run_smoke compact "$executable" --no-sandbox --smoke-test --demo-approval
           run_smoke expanded "$executable" --no-sandbox --smoke-test --demo-approval --demo-expanded
+          run_smoke plan-ready "$executable" --no-sandbox --smoke-test --demo-plan-ready --demo-expanded
           xvfb-run -a env \
             XDG_SESSION_TYPE=wayland \
             HOME="$root/click/home" \
@@ -229,8 +230,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
-          Cross-platform preview of Vibe Halo 0.5.2.
+          Cross-platform preview of Vibe Halo 0.5.3.
 
+          - Codex plan-mode turns now produce a dedicated plan-ready notification
           - Stable, distinct accent colors and compact/expanded badges for all 19 registered clients
           - Tightly framed small-size tray icon for improved notification-area legibility
           - Transparent Halo terminal application icon across all platform packages
@@ -246,5 +248,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" release-assets/* \
             --verify-tag \
             --prerelease \
-            --title "Vibe Halo 0.5.2 — Cross-platform Preview" \
+            --title "Vibe Halo 0.5.3 — Cross-platform Preview" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

@@ -34,6 +34,7 @@ const { APP_ID, APP_NAME } = require("./constants");
 const { agent, listAgents } = require("./agent-registry");
 const { ApprovalStore } = require("./approval-store");
 const { CodexInputMonitor } = require("./codex-input-monitor");
+const { completionFromStop } = require("./completion-event");
 const { CompletionStore } = require("./completion-store");
 const { HookManager } = require("./hook-manager");
 const { createLocalizer, translateReason } = require("./i18n");
@@ -572,22 +573,8 @@ function startApplication() {
     if (data.event !== "Stop") return;
     inputRequests.clearSession(sessionId, "session-stopped", agentId);
     if (approvals.size > 0 || inputRequests.size > 0) return;
-    const cwd = typeof data.cwd === "string" ? data.cwd : "";
-    completions.show({
-      sessionId,
-      agentId,
-      agentName,
-      title: typeof data.session_title === "string" && data.session_title.trim()
-        ? data.session_title.trim()
-        : (cwd ? path.basename(cwd) : ""),
-      titleKey: cwd ? "" : "fallback.completionTitle",
-      titleParams: { agentName },
-      output: typeof data.assistant_last_output === "string" ? data.assistant_last_output : "",
-      outputKey: typeof data.assistant_last_output === "string" ? "" : "fallback.taskCompleted",
-      cwd,
-      sourcePid: Number.isInteger(data.source_pid) ? data.source_pid : null,
-      pidChain: Array.isArray(data.pid_chain) ? data.pid_chain : [],
-    });
+    const completion = completionFromStop(data, descriptor, sessionId);
+    if (completion) completions.show(completion);
   }
 
   app.on("second-instance", () => {
@@ -684,35 +671,52 @@ function startApplication() {
     rebuildTray();
     updateManager.start();
     logger.info("Application ready", { version: app.getVersion(), packaged: app.isPackaged, ...platformAdapter.status() });
-    if (process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-approval")) {
-      const demo = approvals.enqueue({
-        agentId: "codex",
-        agentName: "Codex",
-        kind: "approval",
-        options: [
-          { id: "allow", labelKey: "action.allowOnce", tone: "primary" },
-          { id: "deny", labelKey: "action.deny", tone: "danger" },
-          { id: "native", labelKey: "action.handleInClient", tone: "secondary", overflow: true },
-        ],
-        sessionId: "codex:demo",
-        toolUseId: "demo-tool",
-        toolName: "PowerShell",
-        description: t("demo.description"),
-        toolInput: {
-          command: "npm test -- --test-reporter=spec --test-concurrency=1",
-          cwd: "C:\\Projects\\demo-with-a-longer-workspace-name",
-          timeout_ms: 120000,
+    const demoApproval = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-approval");
+    const demoPlanReady = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-plan-ready");
+    if (demoApproval || demoPlanReady) {
+      let demo;
+      if (demoApproval) {
+        demo = approvals.enqueue({
+          agentId: "codex",
+          agentName: "Codex",
+          kind: "approval",
+          options: [
+            { id: "allow", labelKey: "action.allowOnce", tone: "primary" },
+            { id: "deny", labelKey: "action.deny", tone: "danger" },
+            { id: "native", labelKey: "action.handleInClient", tone: "secondary", overflow: true },
+          ],
+          sessionId: "codex:demo",
+          toolUseId: "demo-tool",
+          toolName: "PowerShell",
           description: t("demo.description"),
-          environment: { CI: "1", FORCE_COLOR: "0" },
-        },
-        cwd: "C:\\Projects\\demo",
-        sourcePid: process.pid,
-        pidChain: [process.pid],
-      }, { complete() {} }).entry;
+          toolInput: {
+            command: "npm test -- --test-reporter=spec --test-concurrency=1",
+            cwd: "C:\\Projects\\demo-with-a-longer-workspace-name",
+            timeout_ms: 120000,
+            description: t("demo.description"),
+            environment: { CI: "1", FORCE_COLOR: "0" },
+          },
+          cwd: "C:\\Projects\\demo",
+          sourcePid: process.pid,
+          pidChain: [process.pid],
+        }, { complete() {} }).entry;
+      } else {
+        handleAgentEvent({
+          event: "Stop",
+          agent_id: "codex",
+          session_id: "codex:demo-plan",
+          permission_mode: "plan",
+          assistant_last_output: t("demo.planReadyOutput"),
+          cwd: "C:\\Projects\\demo",
+          source_pid: process.pid,
+          pid_chain: [process.pid],
+        });
+        demo = completions.current;
+      }
       if (process.argv.includes("--demo-expanded")) {
         setTimeout(() => island.expand(demo.id), 180);
       }
-      if (process.env.VIBE_HALO_SMOKE_ACTION_FILE) {
+      if (demoApproval && process.env.VIBE_HALO_SMOKE_ACTION_FILE) {
         setTimeout(async () => {
           try {
             await island.window.webContents.executeJavaScript("document.querySelector('#actions button.primary')?.click()", true);

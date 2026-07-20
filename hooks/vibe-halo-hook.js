@@ -242,6 +242,11 @@ function normalizeEvent(payload) {
   return raw;
 }
 
+function normalizePermissionMode(value) {
+  const mode = cleanText(value, 40);
+  return ["default", "acceptEdits", "plan", "dontAsk", "bypassPermissions"].includes(mode) ? mode : "";
+}
+
 function buildBody(payload, agentId = "codex") {
   let event = normalizeEvent(payload);
   const rawToolName = cleanText(payload?.tool_name || payload?.toolName || payload?.tool?.name, 160);
@@ -251,6 +256,7 @@ function buildBody(payload, agentId = "codex") {
   if (!["PermissionRequest", "Elicitation", "Stop", "UserPromptSubmit"].includes(event)) return null;
   const meta = readSessionMeta(payload?.transcript_path);
   const processMeta = collectPidChain();
+  const permissionMode = normalizePermissionMode(payload?.permission_mode ?? payload?.permissionMode);
   const body = {
     event,
     agent_id: agentId,
@@ -261,6 +267,7 @@ function buildBody(payload, agentId = "codex") {
     source_pid: processMeta.sourcePid,
     pid_chain: processMeta.pidChain,
   };
+  if (permissionMode) body.permission_mode = permissionMode;
   if (event === "PermissionRequest" || event === "Elicitation") {
     const input = normalizeToolInput(payload?.tool_input || payload?.toolInput || payload?.input || payload?.arguments) || {};
     body.tool_name = rawToolName || (event === "Elicitation" ? "Elicitation" : "Unknown");
@@ -400,6 +407,7 @@ module.exports = {
   extractAssistantOutput,
   normalizeSessionId,
   normalizeEvent,
+  normalizePermissionMode,
   normalizeToolInput,
   parseAgentId,
   parseEventArg,

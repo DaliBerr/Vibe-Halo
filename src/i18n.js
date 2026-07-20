@@ -39,6 +39,7 @@ const EN_US = Object.freeze({
   "renderer.waitingChoiceSummary": "Waiting for your choice",
   "renderer.completedCompact": "{agentName} completed",
   "renderer.completedSummary": "Completed",
+  "renderer.planReadySummary": "Plan ready",
   "renderer.waitingYourAnswer": "{agentName} is waiting for your answer",
   "renderer.returnToClient": "Return to {agentName} to finish the choice in its native interface.",
   "renderer.taskCompleted": "Task completed",
@@ -62,6 +63,8 @@ const EN_US = Object.freeze({
   "fallback.returnToCodex": "Return to the native Codex interface to finish the choice.",
   "fallback.completionTitle": "{agentName} completed",
   "fallback.taskCompleted": "Task completed",
+  "fallback.planReadyTitle": "Codex plan is ready",
+  "fallback.planReadyContent": "Review the completed plan in Codex.",
   "fallback.passiveApprovalTitle": "{agentName} is waiting for native approval",
   "fallback.passiveApprovalContent": "Approve {toolName} in the {agentName} client.",
   "fallback.tool": "tool",
@@ -200,6 +203,7 @@ const EN_US = Object.freeze({
   "reason.missing": "Missing",
   "reason.healthy": "Healthy",
   "demo.description": "Run the full test suite and review the result. This deliberately long description verifies that action buttons remain visible at high DPI and across multiple lines.",
+  "demo.planReadyOutput": "1. Inspect the affected modules.\n2. Implement the bounded change.\n3. Run protocol, renderer, and package verification.",
 });
 
 const ZH_CN = Object.freeze({
@@ -238,6 +242,7 @@ const ZH_CN = Object.freeze({
   "renderer.waitingChoiceSummary": "等待你的选择",
   "renderer.completedCompact": "{agentName} 已完成",
   "renderer.completedSummary": "已完成",
+  "renderer.planReadySummary": "计划已就绪",
   "renderer.waitingYourAnswer": "{agentName} 等待你的回答",
   "renderer.returnToClient": "请回到 {agentName} 原生界面完成选择。",
   "renderer.taskCompleted": "任务已完成",
@@ -261,6 +266,8 @@ const ZH_CN = Object.freeze({
   "fallback.returnToCodex": "请回到 Codex 原生界面完成选择。",
   "fallback.completionTitle": "{agentName} 已完成",
   "fallback.taskCompleted": "任务已完成",
+  "fallback.planReadyTitle": "Codex 计划已就绪",
+  "fallback.planReadyContent": "请回到 Codex 查看已完成的计划。",
   "fallback.passiveApprovalTitle": "{agentName} 等待原生审批",
   "fallback.passiveApprovalContent": "请在 {agentName} 客户端中完成 {toolName} 审批。",
   "fallback.tool": "工具",
@@ -399,6 +406,7 @@ const ZH_CN = Object.freeze({
   "reason.missing": "缺失",
   "reason.healthy": "健康",
   "demo.description": "运行完整测试套件并读取结果。这个说明故意较长，用于确认高 DPI 和多行文字下操作按钮仍保持可见。",
+  "demo.planReadyOutput": "1. 检查受影响的模块。\n2. 实现经过边界限制的改动。\n3. 运行协议、界面与安装包验证。",
 });
 
 const CATALOGS = Object.freeze({ "en-US": EN_US, "zh-CN": ZH_CN });
@@ -408,7 +416,7 @@ const RENDERER_KEYS = Object.freeze([
   "copyPatch", "copied", "moreActions", "more", "parameter", "option",
   "otherAnswerOptional", "enterAnswer", "content", "waitingInput", "waitingAnswerCompact",
   "approvalRequestCompact", "waitingChoiceCompact", "waitingChoiceSummary", "completedCompact",
-  "completedSummary", "waitingYourAnswer",
+  "completedSummary", "planReadySummary", "waitingYourAnswer",
   "returnToClient", "taskCompleted",
 ]);
 

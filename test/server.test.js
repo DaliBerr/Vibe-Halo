@@ -125,11 +125,12 @@ test("headless, disabled and oversized permissions fail open", async () => {
   assert.equal(oversized.body, "{}");
 });
 
-test("accepts completion events and cleans its runtime file", async () => {
+test("accepts completion events with bounded Codex plan mode and cleans its runtime file", async () => {
   const { events, root, server } = await fixture();
-  const response = await request(server, "/event", { event: "Stop", agent_id: "codex", session_id: "s1" });
+  const response = await request(server, "/event", { event: "Stop", agent_id: "codex", session_id: "s1", permission_mode: "plan" });
   assert.equal(response.status, 204);
   assert.equal(events.length, 1);
+  assert.equal(events[0].permission_mode, "plan");
   const runtimePath = path.join(root, "runtime.json");
   assert.equal(fs.existsSync(runtimePath), true);
   servers.splice(servers.indexOf(server), 1);

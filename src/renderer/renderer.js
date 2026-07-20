@@ -56,6 +56,7 @@ const defaultStrings = Object.freeze({
   waitingChoiceSummary: "Waiting for your choice",
   completedCompact: "{agentName} completed",
   completedSummary: "Completed",
+  planReadySummary: "Plan ready",
   waitingYourAnswer: "{agentName} is waiting for your answer",
   returnToClient: "Return to {agentName} to finish the choice in its native interface.",
   taskCompleted: "Task completed",
@@ -297,7 +298,9 @@ function render(next) {
   applyAgentAppearance(item, agentName);
   compactSummary.textContent = isActionable
     ? (isElicitation ? ui("waitingAnswerCompact") : formatUi("approvalRequestCompact", { toolName: item.toolName }))
-    : (isInputRequest ? ui("waitingChoiceSummary") : ui("completedSummary"));
+    : (isInputRequest
+      ? ui("waitingChoiceSummary")
+      : ui(item.completionKind === "plan" ? "planReadySummary" : "completedSummary"));
   compact.setAttribute("aria-label", `${agentName} · ${compactSummary.textContent}`);
   count.hidden = (!isActionable && !isInputRequest) || next.pendingCount <= 1;
   count.textContent = String(next.pendingCount);

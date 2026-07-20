@@ -44,6 +44,7 @@ class CompletionStore extends EventEmitter {
     const item = {
       id: crypto.randomUUID(),
       type: "completion",
+      completionKind: input.completionKind === "plan" ? "plan" : "task",
       agentId: clean(input.agentId, 80) || "codex",
       agentName,
       sessionId: clean(input.sessionId, 240),

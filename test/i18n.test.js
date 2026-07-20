@@ -80,7 +80,8 @@ test("renderer strings are bounded to the active locale", () => {
   assert.equal(chinese.copyContent, "复制内容");
   assert.equal(chinese.waitingChoiceSummary, "等待你的选择");
   assert.equal(chinese.completedSummary, "已完成");
-  assert.equal(Object.keys(chinese).length, 25);
+  assert.equal(chinese.planReadySummary, "计划已就绪");
+  assert.equal(Object.keys(chinese).length, 26);
   localization.setPreference("en-US");
   assert.equal(localization.rendererStrings().copyContent, "Copy content");
 });
@@ -106,4 +107,26 @@ test("client-provided questions, options, titles, and outputs remain unchanged",
   state = controller.state();
   assert.equal(state.current.title, "完成标题");
   assert.equal(state.current.output, "客户端输出");
+});
+
+test("plan-ready completions retranslate without changing their semantic kind", () => {
+  const localization = createLocalizer({ preference: "en-US", systemLocale: "en-US" });
+  const completions = new CompletionStore();
+  const controller = controllerFixture(localization, new ApprovalStore(), new InputRequestStore(), completions);
+  completions.show({
+    agentId: "codex",
+    agentName: "Codex",
+    completionKind: "plan",
+    titleKey: "fallback.planReadyTitle",
+    outputKey: "fallback.planReadyContent",
+  });
+  let state = controller.state();
+  assert.equal(state.current.completionKind, "plan");
+  assert.equal(state.current.title, "Codex plan is ready");
+  assert.equal(state.current.output, "Review the completed plan in Codex.");
+  localization.setPreference("zh-CN");
+  state = controller.state();
+  assert.equal(state.current.completionKind, "plan");
+  assert.equal(state.current.title, "Codex 计划已就绪");
+  assert.equal(state.current.output, "请回到 Codex 查看已完成的计划。");
 });

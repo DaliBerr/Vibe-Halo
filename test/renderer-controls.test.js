@@ -34,3 +34,8 @@ test("client identity uses a labeled compact chip and matching expanded badge", 
   assert.match(javascript, /compactAgent\.textContent = agentName/);
   assert.match(javascript, /agentBadge\.textContent = glyph/);
 });
+
+test("Codex plan completions use a dedicated compact summary", () => {
+  assert.match(javascript, /item\.completionKind === "plan" \? "planReadySummary" : "completedSummary"/);
+  assert.match(javascript, /planReadySummary: "Plan ready"/);
+});

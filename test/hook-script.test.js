@@ -8,6 +8,7 @@ const {
   normalizeSessionId,
   parseAgentId,
   parseEventArg,
+  normalizePermissionMode,
   sanitizePermissionResponse,
 } = require("../hooks/vibe-halo-hook");
 
@@ -39,6 +40,15 @@ test("normalizes generic client argv and payload fields", () => {
   assert.equal(body.session_id, "claude-code:s");
   assert.equal(body.request_id, "r");
   assert.deepEqual(body.permission_suggestions, [{ type: "setMode", mode: "acceptEdits", destination: "session" }]);
+});
+
+test("forwards only documented Codex permission modes", () => {
+  const plan = buildBody({ hook_event_name: "Stop", session_id: "plan", permission_mode: "plan" });
+  assert.equal(plan.permission_mode, "plan");
+  assert.equal(normalizePermissionMode("acceptEdits"), "acceptEdits");
+  assert.equal(normalizePermissionMode("unknown"), "");
+  const invalid = buildBody({ hook_event_name: "Stop", session_id: "bad", permission_mode: "unknown" });
+  assert.equal(Object.hasOwn(invalid, "permission_mode"), false);
 });
 
 test("keeps bounded ZCode AskUserQuestion fields for native-like rendering", () => {

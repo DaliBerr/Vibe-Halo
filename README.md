@@ -10,7 +10,7 @@
 
 Handle supported permission requests and interactive questions, and receive completion notifications without constantly switching back to agent terminals.
 
-![Version](https://img.shields.io/badge/version-0.5.2-6d7cff)
+![Version](https://img.shields.io/badge/version-0.5.3-6d7cff)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)
 ![Electron](https://img.shields.io/badge/Electron-41-47848f)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
@@ -94,6 +94,7 @@ AI coding clients often wait in the background for a permission decision, a foll
 - Allow once, deny, hand back to the client, and similar actions are mapped only when the source protocol actually provides them.
 - OpenCode displays `Always` only when the original request explicitly advertises that capability.
 - Duplicate requests from the same client are coalesced, and the final result is fanned out to every waiting connection.
+- When a Codex turn stops in Plan mode, Vibe Halo shows a dedicated plan-ready notification with the completed plan output when available.
 - Completion notifications normally remain visible for 8 seconds; a new prompt or approval preempts an older completion.
 - UI priority is fixed: **approval/exact interaction > input reminder > completion notification**.
 
