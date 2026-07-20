@@ -101,4 +101,19 @@ test("signed prepackaged apps receive a public update config with an exact publi
   assert.match(content, /updaterCacheDirName: vibe-halo-updater/);
   assert.match(content, /publisherName:\n  - "CN=SignPath Foundation, O=SignPath Foundation"/);
   assert.equal(cleanPublisher("bad\nname"), "");
+  assert.throws(() => updateConfig("bad\nname"), /bounded and single-line/);
+});
+
+test("unsigned release apps receive a public update config without a publisher", t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-halo-unsigned-update-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(root, "Vibe Halo.exe"), "unsigned-app-placeholder");
+
+  const target = writeConfig(root);
+  const content = fs.readFileSync(target, "utf8");
+
+  assert.equal(content, updateConfig());
+  assert.match(content, /provider: github/);
+  assert.match(content, /channel: latest/);
+  assert.doesNotMatch(content, /publisherName/);
 });

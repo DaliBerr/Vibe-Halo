@@ -10,7 +10,7 @@
 
 Handle supported permission requests and interactive questions, and receive completion notifications without constantly switching back to agent terminals.
 
-![Version](https://img.shields.io/badge/version-0.5.3-6d7cff)
+![Version](https://img.shields.io/badge/version-0.5.4-6d7cff)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)
 ![Electron](https://img.shields.io/badge/Electron-41-47848f)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
@@ -108,11 +108,11 @@ AI coding clients often wait in the background for a permission decision, a foll
 
 ### Updates
 
-- Automatic updates are enabled only in official Windows builds whose publisher signature matches the trusted configuration. macOS and Linux updates remain disabled until a signed and notarized distribution path exists.
-- Signed builds check and download stable releases from GitHub Releases in the background.
+- Automatic updates are enabled only in official Windows stable builds. The default stable channel is unsigned and uses GitHub Releases plus SHA-512 integrity metadata; macOS and Linux updates remain disabled.
+- Official Windows stable builds check and download stable releases from GitHub Releases in the background.
 - Installation always requires an explicit “Restart and update” action from the tray; a normal quit does not install an update.
 - Before updating, the local server is stopped and pending approvals/questions are returned to their native client flows.
-- Local and unsigned builds deliberately keep automatic updates disabled.
+- Source, local, and preview builds deliberately keep automatic updates disabled.
 
 ## Client support
 
@@ -243,7 +243,7 @@ The tray exposes the following controls in English mode:
 | **Repair Codex Hook** | Incrementally repairs Vibe Halo-managed Codex configuration |
 | **Diagnostics** | Shows service, queue, integration verification, update status, active locale, and log location |
 | **Language** | Chooses Follow system, English, or Simplified Chinese; the island and queued items update immediately |
-| **Check for updates** | Appears only in trusted, signed release builds |
+| **Check for updates** | Appears only in official Windows stable builds |
 
 ### Remove integrations
 
@@ -265,7 +265,7 @@ The Windows NSIS uninstaller invokes the same cleanup path. On macOS, dragging t
 - IPC validates the current request ID, option ID, types, answer counts, and answer lengths.
 - Logs omit process tokens and full command content and rotate by size.
 - The app has no telemetry, account system, cloud synchronization, or remote approval service.
-- A signed build contacts public GitHub Releases only for update checks. Source and unsigned builds keep the updater disabled.
+- An official Windows stable build contacts public GitHub Releases only for update checks. Source, local, and preview builds keep the updater disabled.
 - Client configuration uses atomic writes, first-state backups, and ownership markers. Explicit hook disables are preserved.
 
 The runtime identity is stored by default at:
@@ -393,9 +393,9 @@ The automated suite covers:
 - Settings migration, automatic detection, user-disable overrides, diagnostics, and update state.
 - Renderer IPC, dynamic actions, question forms, window bounds, shadow gutters, multi-display placement, and X11 source-window matching.
 - Windows and POSIX command-hook mock-server end-to-end behavior, stable launcher paths, and offline fallback.
-- SignPath external-signing staging, metadata generation, and release configuration.
+- Unsigned/signed release gates, public update configuration, SignPath staging, and final-byte metadata generation.
 
-Windows transparent-window behavior, shadows, focus, animation, multi-display/DPI, real-client round trips, tray behavior, NSIS removal, and signed updates still require manual acceptance. macOS/Linux currently have CI protocol, package, launcher, and startup smoke tests only; real client response round trips on those platforms remain unverified.
+Windows transparent-window behavior, shadows, focus, animation, multi-display/DPI, real-client round trips, tray behavior, NSIS removal, and live N-to-N+1 updates still require manual acceptance. macOS/Linux currently have CI protocol, package, launcher, and startup smoke tests only; real client response round trips on those platforms remain unverified.
 
 ## Building and releasing
 
@@ -420,18 +420,17 @@ Local artifacts are expected to be unsigned and contain `autoUpdateEnabled=false
 
 The `preview-<version>` tag triggers the cross-platform workflow. It tests on Windows 2025, macOS 15 arm64 and Intel, and Ubuntu 24.04; builds on Windows 2025, both macOS architectures, and Ubuntu 22.04; then publishes all packages plus `SHA256SUMS.txt` as a GitHub Pre-release. It deliberately does not publish stable update metadata.
 
-### Signed Windows release
+### Windows stable release
 
 A `v<version>` tag triggers the GitHub Actions release workflow, which:
 
 1. Verifies that the tag matches the package version and points to a commit on `main`.
 2. Installs dependencies and runs the complete test suite.
-3. Builds the app and signs the application executable, NSIS elevation helper, generated uninstaller, and final installer in sequence.
-4. Verifies the exact Authenticode certificate Subject for every executable.
-5. Regenerates the blockmap, SHA-256 list, and `latest.yml` from the final signed installer bytes.
-6. Silently installs, verifies installed files, uninstalls, and only then publishes the GitHub Release.
+3. Builds an update-enabled Windows x64 NSIS installer. The default route is unsigned; setting the protected `VIBE_HALO_SIGNPATH_ENABLED=1` repository variable activates the retained SignPath pipeline.
+4. Regenerates the blockmap, SHA-256 list, and `latest.yml` from the final installer bytes.
+5. Silently installs, verifies installed files and updater configuration, uninstalls, and only then publishes a stable Latest GitHub Release.
 
-See [docs/RELEASING.md](docs/RELEASING.md) for the SignPath Foundation setup, repository variables, secret, artifact configuration, and release procedure.
+See [docs/RELEASING.md](docs/RELEASING.md) for the default unsigned release procedure and the optional SignPath configuration.
 
 ## Environment variables
 
@@ -447,14 +446,15 @@ Normal installations require no manual environment configuration. These variable
 | `VIBE_HALO_TEST=1` | Enable test/smoke behavior and suppress real login startup and updates |
 | `VIBE_HALO_NATIVE_WAYLAND=1` | Force native Wayland instead of XWayland; window positioning/animation may be degraded |
 | `VIBE_HALO_SCREENSHOT` | Save a window capture during the demo test path |
-| `VIBE_HALO_PUBLISHER_NAME` | Set the exact Authenticode publisher Subject and enable the release-build updater gate |
+| `VIBE_HALO_AUTO_UPDATE=1` | Embed the official Windows stable-channel updater gate; protected release builds only |
+| `VIBE_HALO_PUBLISHER_NAME` | Set the exact Authenticode publisher Subject for the optional SignPath route |
 | `VIBE_HALO_EXTERNAL_SIGNING=1` | Enable the electron-builder external SignPath staging script |
 | `VIBE_HALO_SIGN_STAGE_DIR` | Staging directory for external signing artifacts |
 | `VIBE_HALO_SIGNED_ELEVATE` | Path to the signed NSIS elevation helper |
 | `VIBE_HALO_SIGNED_UNINSTALLER` | Path to the signed generated uninstaller |
 | `VIBE_HALO_RELEASE_DATE` | Supply a reproducible release date for update metadata |
 
-Signing variables belong only in protected CI. The SignPath API token is a GitHub Actions secret—not an application environment variable—and must never appear in source, logs, or release assets.
+The repository variable `VIBE_HALO_SIGNPATH_ENABLED=1` activates optional SignPath signing; absent or `0` keeps the stable release unsigned. Signing variables belong only in protected CI. The SignPath API token is a GitHub Actions secret—not an application environment variable—and must never appear in source, logs, or release assets.
 
 ## FAQ
 
@@ -500,7 +500,7 @@ This is expected. Closing an approval does not choose deny. Vibe Halo returns no
 
 ### There is no update item in the tray
 
-Source runs, local packages, and unsigned builds deliberately disable automatic updates. Update controls exist only in official Windows builds whose publisher signature passes verification; macOS/Linux preview packages never enable them.
+Source runs, local packages, and preview builds deliberately disable automatic updates. Update controls exist only in official Windows stable builds created with `VIBE_HALO_AUTO_UPDATE=1`; macOS/Linux packages never enable them.
 
 ## Known boundaries
 

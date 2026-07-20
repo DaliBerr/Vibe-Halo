@@ -6,8 +6,9 @@ const asar = require("@electron/asar");
 
 const resourcesDir = path.resolve(process.argv[2] || "");
 const expectedVersion = String(process.argv[3] || "").trim();
+const expectAutoUpdate = process.argv.includes("--expect-auto-update");
 if (!resourcesDir || !expectedVersion) {
-  throw new Error("usage: node scripts/verify-packaged-app.js <resources-dir> <version>");
+  throw new Error("usage: node scripts/verify-packaged-app.js <resources-dir> <version> [--expect-auto-update]");
 }
 
 const asarPath = path.join(resourcesDir, "app.asar");
@@ -32,6 +33,8 @@ for (const required of [
 const metadata = JSON.parse(asar.extractFile(asarPath, "package.json").toString("utf8"));
 if (metadata.version !== expectedVersion) throw new Error(`version mismatch: ${metadata.version}`);
 if (metadata.license !== "AGPL-3.0-only") throw new Error(`license mismatch: ${metadata.license}`);
-if (metadata.autoUpdateEnabled !== false) throw new Error("unsigned package unexpectedly enables auto-update");
+if (metadata.autoUpdateEnabled !== expectAutoUpdate) {
+  throw new Error(`auto-update mismatch: expected ${expectAutoUpdate}, received ${metadata.autoUpdateEnabled}`);
+}
 
 process.stdout.write(`Verified Vibe Halo ${expectedVersion} package at ${resourcesDir}\n`);

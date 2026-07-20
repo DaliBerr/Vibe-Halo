@@ -4,6 +4,7 @@ const path = require("path");
 
 const publisherName = (process.env.VIBE_HALO_PUBLISHER_NAME || "").trim();
 const externalSigning = process.env.VIBE_HALO_EXTERNAL_SIGNING === "1";
+const autoUpdateEnabled = process.env.VIBE_HALO_AUTO_UPDATE === "1";
 
 const signtoolOptions = {
   signingHashAlgorithms: ["sha256"],
@@ -27,7 +28,7 @@ module.exports = {
     "README.zh-CN.md",
   ],
   extraMetadata: {
-    autoUpdateEnabled: Boolean(publisherName),
+    autoUpdateEnabled,
     desktopName: "com.vibe.halo",
   },
   electronUpdaterCompatibility: ">=6.0.0",
@@ -42,7 +43,7 @@ module.exports = {
     target: [{ target: "nsis", arch: ["x64"] }],
     artifactName: "Vibe-Halo-Setup-${version}-${arch}.${ext}",
     icon: "build/icon.png",
-    verifyUpdateCodeSignature: true,
+    verifyUpdateCodeSignature: Boolean(publisherName),
     signtoolOptions,
   },
   mac: {

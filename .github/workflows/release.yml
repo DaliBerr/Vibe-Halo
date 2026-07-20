@@ -1,4 +1,4 @@
-name: Signed Windows release
+name: Windows stable release
 
 on:
   push:
@@ -14,11 +14,12 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  VIBE_HALO_SIGNPATH_ENABLED: ${{ vars.VIBE_HALO_SIGNPATH_ENABLED || '0' }}
   SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
   SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
   SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
   SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
-  VIBE_HALO_PUBLISHER_NAME: ${{ vars.SIGNPATH_PUBLISHER_NAME }}
+  SIGNPATH_PUBLISHER_NAME: ${{ vars.SIGNPATH_PUBLISHER_NAME }}
 
 jobs:
   release:
@@ -47,20 +48,33 @@ jobs:
           git fetch origin main --no-tags
           git merge-base --is-ancestor $env:GITHUB_SHA origin/main
           if ($LASTEXITCODE -ne 0) { throw "Release tag must point to a commit on main" }
-          $required = @(
-            "SIGNPATH_ORGANIZATION_ID",
-            "SIGNPATH_PROJECT_SLUG",
-            "SIGNPATH_SIGNING_POLICY_SLUG",
-            "SIGNPATH_ARTIFACT_CONFIGURATION_SLUG",
-            "VIBE_HALO_PUBLISHER_NAME"
-          )
-          foreach ($name in $required) {
-            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
-              throw "Missing repository variable: $name"
+          if ($env:VIBE_HALO_SIGNPATH_ENABLED -notin @("0", "1")) {
+            throw "VIBE_HALO_SIGNPATH_ENABLED must be 0 or 1"
+          }
+          if ($env:VIBE_HALO_SIGNPATH_ENABLED -eq "1") {
+            $required = @(
+              "SIGNPATH_ORGANIZATION_ID",
+              "SIGNPATH_PROJECT_SLUG",
+              "SIGNPATH_SIGNING_POLICY_SLUG",
+              "SIGNPATH_ARTIFACT_CONFIGURATION_SLUG",
+              "SIGNPATH_PUBLISHER_NAME"
+            )
+            foreach ($name in $required) {
+              if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+                throw "Missing repository variable: $name"
+              }
+            }
+            if ([string]::IsNullOrWhiteSpace($env:SIGNPATH_API_TOKEN_CHECK)) {
+              throw "Missing repository secret: SIGNPATH_API_TOKEN"
             }
           }
-          if ([string]::IsNullOrWhiteSpace($env:SIGNPATH_API_TOKEN_CHECK)) {
-            throw "Missing repository secret: SIGNPATH_API_TOKEN"
+
+      - name: Configure release build
+        shell: pwsh
+        run: |
+          "VIBE_HALO_AUTO_UPDATE=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if ($env:VIBE_HALO_SIGNPATH_ENABLED -eq "1") {
+            "VIBE_HALO_PUBLISHER_NAME=$env:SIGNPATH_PUBLISHER_NAME" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           }
 
       - name: Install dependencies
@@ -69,10 +83,19 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Build unpacked application
+      - name: Build unpacked release application
         run: npm run build:dir
 
+      - name: Write public update configuration
+        shell: pwsh
+        run: node scripts/write-app-update-config.js "dist/win-unpacked" $env:VIBE_HALO_PUBLISHER_NAME
+
+      - name: Build unsigned installer
+        if: env.VIBE_HALO_SIGNPATH_ENABLED != '1'
+        run: npm run build:prepackaged
+
       - name: Stage NSIS signing dependencies
+        if: env.VIBE_HALO_SIGNPATH_ENABLED == '1'
         shell: pwsh
         env:
           VIBE_HALO_EXTERNAL_SIGNING: "1"
@@ -84,6 +107,7 @@ jobs:
           Copy-Item -LiteralPath "dist/sign-stage/elevate.exe" -Destination "dist/sign-stage/app/elevate.exe" -Force
 
       - name: Upload unsigned application executables
+        if: env.VIBE_HALO_SIGNPATH_ENABLED == '1'
         id: upload-app
         uses: actions/upload-artifact@v7
         with:
@@ -93,6 +117,7 @@ jobs:
           retention-days: 1
 
       - name: Sign application executables
+        if: env.VIBE_HALO_SIGNPATH_ENABLED == '1'
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -105,6 +130,7 @@ jobs:
           output-artifact-directory: ${{ github.workspace }}/dist/signed-app
 
       - name: Inject signed application executable
+        if: env.VIBE_HALO_SIGNPATH_ENABLED == '1'
         shell: pwsh
         run: |
           Copy-Item -LiteralPath "dist/signed-app/Vibe Halo.exe" -Destination "dist/win-unpacked/Vibe Halo.exe" -Force
@@ -112,6 +138,7 @@ jobs:
           node scripts/write-app-update-config.js "dist/win-unpacked" $env:VIBE_HALO_PUBLISHER_NAME
 
       - name: Stage generated uninstaller
+        if: env.VIBE_HALO_SIGNPATH_ENABLED == '1'
         shell: pwsh
         env:
           VIBE_HALO_EXTERNAL_SIGNING: "1"
@@ -120,6 +147,7 @@ jobs:
         run: npm run build:prepackaged
 
       - name: Upload unsigned uninstaller
+        if: env.VIBE_HALO_SIGNPATH_ENABLED == '1'
         id: upload-uninstaller
         uses: actions/upload-artifact@v7
         with:
@@ -129,6 +157,7 @@ jobs:
           retention-days: 1
 
       - name: Sign uninstaller
+        if: env.VIBE_HALO_SIGNPATH_ENABLED == '1'
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -141,6 +170,7 @@ jobs:
           output-artifact-directory: ${{ github.workspace }}/dist/signed-uninstaller
 
       - name: Build installer with signed uninstaller
+        if: env.VIBE_HALO_SIGNPATH_ENABLED == '1'
         shell: pwsh
         env:
           VIBE_HALO_EXTERNAL_SIGNING: "1"
@@ -150,6 +180,7 @@ jobs:
         run: npm run build:prepackaged
 
       - name: Upload unsigned installer
+        if: env.VIBE_HALO_SIGNPATH_ENABLED == '1'
         id: upload-installer
         uses: actions/upload-artifact@v7
         with:
@@ -159,6 +190,7 @@ jobs:
           retention-days: 1
 
       - name: Sign installer
+        if: env.VIBE_HALO_SIGNPATH_ENABLED == '1'
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -170,16 +202,19 @@ jobs:
           wait-for-completion: true
           output-artifact-directory: ${{ github.workspace }}/dist/signed-installer
 
-      - name: Generate signed update metadata
+      - name: Generate final update metadata
         shell: pwsh
         run: |
           $version = node -p "require('./package.json').version"
           $installer = "dist/Vibe-Halo-Setup-$version-x64.exe"
-          Copy-Item -LiteralPath "dist/signed-installer/installer.exe" -Destination $installer -Force
+          if ($env:VIBE_HALO_SIGNPATH_ENABLED -eq "1") {
+            Copy-Item -LiteralPath "dist/signed-installer/installer.exe" -Destination $installer -Force
+          }
+          if (-not (Test-Path -LiteralPath $installer)) { throw "Final installer is missing: $installer" }
           $env:VIBE_HALO_RELEASE_DATE = git show -s --format=%cI $env:GITHUB_SHA
           node scripts/generate-update-metadata.js --installer $installer --version $version --out-dir dist
 
-      - name: Verify signed package
+      - name: Verify release package
         shell: pwsh
         run: |
           $version = node -p "require('./package.json').version"
@@ -192,28 +227,40 @@ jobs:
               throw "Unexpected publisher for $file: $publisher"
             }
           }
-          Assert-Signature "dist/win-unpacked/Vibe Halo.exe"
-          Assert-Signature "dist/win-unpacked/resources/elevate.exe"
-          Assert-Signature "dist/signed-uninstaller/uninstaller.exe"
-          Assert-Signature $installer
-          node -e "const asar=require('@electron/asar'); const p=JSON.parse(asar.extractFile('dist/win-unpacked/resources/app.asar','package.json')); if(p.version!=='$version'||p.autoUpdateEnabled!==true) process.exit(1)"
+          npm run verify:package -- "dist/win-unpacked/resources" $version --expect-auto-update
           $updateConfig = Get-Content "dist/win-unpacked/resources/app-update.yml" -Raw
-          if ($updateConfig -notmatch [regex]::Escape($env:VIBE_HALO_PUBLISHER_NAME)) { throw "Publisher is missing from app-update.yml" }
-          $asarList = node node_modules/@electron/asar/bin/asar.js list "dist/win-unpacked/resources/app.asar"
-          if ($asarList -notcontains "\LICENSE" -or $asarList -notcontains "\NOTICE.md") { throw "LICENSE or NOTICE.md is missing from app.asar" }
+          foreach ($expected in @("provider: github", "owner: DaliBerr", "repo: Vibe-Halo", "channel: latest")) {
+            if ($updateConfig -notmatch [regex]::Escape($expected)) { throw "Missing update configuration: $expected" }
+          }
+          if ($env:VIBE_HALO_SIGNPATH_ENABLED -eq "1") {
+            Assert-Signature "dist/win-unpacked/Vibe Halo.exe"
+            Assert-Signature "dist/win-unpacked/resources/elevate.exe"
+            Assert-Signature "dist/signed-uninstaller/uninstaller.exe"
+            Assert-Signature $installer
+            if ($updateConfig -notmatch [regex]::Escape($env:VIBE_HALO_PUBLISHER_NAME)) { throw "Publisher is missing from app-update.yml" }
+          } elseif ($updateConfig -match "publisherName") {
+            throw "Unsigned update configuration must not contain publisherName"
+          }
+          $latest = Get-Content "dist/latest.yml" -Raw
+          if ($latest -notmatch [regex]::Escape("Vibe-Halo-Setup-$version-x64.exe")) { throw "latest.yml does not name the final installer" }
           $installDir = Join-Path $env:RUNNER_TEMP "vibe-halo-release-install"
           $process = Start-Process -FilePath $installer -ArgumentList @("/S", "/D=$installDir") -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Silent installer failed with $($process.ExitCode)" }
-          Assert-Signature (Join-Path $installDir "Vibe Halo.exe")
-          Assert-Signature (Join-Path $installDir "resources/elevate.exe")
-          $uninstaller = Join-Path $installDir "Uninstall Vibe Halo.exe"
-          if (-not (Test-Path $uninstaller)) { throw "Installed uninstaller is missing" }
-          Assert-Signature $uninstaller
+          npm run verify:package -- (Join-Path $installDir "resources") $version --expect-auto-update
           $installedUpdateConfig = Join-Path $installDir "resources/app-update.yml"
           if (-not (Test-Path $installedUpdateConfig)) { throw "Installed app-update.yml is missing" }
+          if ($env:VIBE_HALO_SIGNPATH_ENABLED -eq "1") {
+            Assert-Signature (Join-Path $installDir "Vibe Halo.exe")
+            Assert-Signature (Join-Path $installDir "resources/elevate.exe")
+          } elseif ((Get-Content $installedUpdateConfig -Raw) -match "publisherName") {
+            throw "Installed unsigned update configuration must not contain publisherName"
+          }
+          $uninstaller = Join-Path $installDir "Uninstall Vibe Halo.exe"
+          if (-not (Test-Path $uninstaller)) { throw "Installed uninstaller is missing" }
+          if ($env:VIBE_HALO_SIGNPATH_ENABLED -eq "1") { Assert-Signature $uninstaller }
           Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait
 
-      - name: Publish draft release assets
+      - name: Publish stable release assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

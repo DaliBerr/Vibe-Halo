@@ -8,6 +8,7 @@ const test = require("node:test");
 function loadBuildConfig(environment = {}) {
   const file = path.join(__dirname, "..", "electron-builder.config.cjs");
   const previous = {
+    VIBE_HALO_AUTO_UPDATE: process.env.VIBE_HALO_AUTO_UPDATE,
     VIBE_HALO_PUBLISHER_NAME: process.env.VIBE_HALO_PUBLISHER_NAME,
     VIBE_HALO_EXTERNAL_SIGNING: process.env.VIBE_HALO_EXTERNAL_SIGNING,
   };
@@ -23,7 +24,7 @@ function loadBuildConfig(environment = {}) {
   return config;
 }
 
-test("ordinary packages stay update-disabled while signed release packages are pinned to GitHub", () => {
+test("ordinary packages stay update-disabled while release builds opt into updates independently of signing", () => {
   const local = loadBuildConfig();
   assert.equal(local.extraMetadata.autoUpdateEnabled, false);
   assert.equal(local.win.signtoolOptions.publisherName, undefined);
@@ -47,14 +48,21 @@ test("ordinary packages stay update-disabled while signed release packages are p
   assert.equal(local.linux.artifactName, "Vibe-Halo-${version}-x64.${ext}");
   assert.equal(local.linux.syncDesktopName, true);
 
-  const release = loadBuildConfig({
+  const unsignedRelease = loadBuildConfig({ VIBE_HALO_AUTO_UPDATE: "1" });
+  assert.equal(unsignedRelease.extraMetadata.autoUpdateEnabled, true);
+  assert.equal(unsignedRelease.win.verifyUpdateCodeSignature, false);
+  assert.equal(unsignedRelease.win.signtoolOptions.publisherName, undefined);
+
+  const signedRelease = loadBuildConfig({
+    VIBE_HALO_AUTO_UPDATE: "1",
     VIBE_HALO_PUBLISHER_NAME: "CN=SignPath Foundation, O=SignPath Foundation",
     VIBE_HALO_EXTERNAL_SIGNING: "1",
   });
-  assert.equal(release.extraMetadata.autoUpdateEnabled, true);
-  assert.equal(release.win.signtoolOptions.publisherName, "CN=SignPath Foundation, O=SignPath Foundation");
-  assert.match(release.win.signtoolOptions.sign, /stage-windows-signing\.js$/);
-  assert.deepEqual(release.win.signtoolOptions.signingHashAlgorithms, ["sha256"]);
+  assert.equal(signedRelease.extraMetadata.autoUpdateEnabled, true);
+  assert.equal(signedRelease.win.verifyUpdateCodeSignature, true);
+  assert.equal(signedRelease.win.signtoolOptions.publisherName, "CN=SignPath Foundation, O=SignPath Foundation");
+  assert.match(signedRelease.win.signtoolOptions.sign, /stage-windows-signing\.js$/);
+  assert.deepEqual(signedRelease.win.signtoolOptions.signingHashAlgorithms, ["sha256"]);
 });
 
 test("cross-platform preview workflow tests and packages every promised architecture", () => {
@@ -72,12 +80,15 @@ test("cross-platform preview workflow tests and packages every promised architec
   assert.doesNotMatch(workflow, /latest(?:-mac)?\.(?:yml|yaml)/);
 });
 
-test("release workflow signs all PE layers before publishing update metadata", () => {
+test("release workflow defaults to unsigned updates while preserving the optional SignPath path", () => {
   const workflow = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "release.yml"), "utf8");
   assert.equal((workflow.match(/signpath\/github-action-submit-signing-request@v2/g) || []).length, 3);
+  assert.match(workflow, /VIBE_HALO_SIGNPATH_ENABLED:.*'0'/);
+  assert.match(workflow, /if: env\.VIBE_HALO_SIGNPATH_ENABLED != '1'/);
+  assert.match(workflow, /if: env\.VIBE_HALO_SIGNPATH_ENABLED == '1'/);
   assert.match(workflow, /actions\/upload-artifact@v7/);
-  assert.ok(workflow.indexOf("Sign installer") < workflow.indexOf("Generate signed update metadata"));
-  assert.ok(workflow.indexOf("Verify signed package") < workflow.indexOf("Publish draft release assets"));
+  assert.ok(workflow.indexOf("Sign installer") < workflow.indexOf("Generate final update metadata"));
+  assert.ok(workflow.indexOf("Verify release package") < workflow.indexOf("Publish stable release assets"));
   assert.doesNotMatch(workflow, /IsNullOrWhiteSpace\("\$\{\{ secrets\./);
   assert.match(workflow, /gh release edit .*--draft=false --latest/);
 });

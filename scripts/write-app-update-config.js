@@ -14,15 +14,16 @@ function cleanPublisher(value) {
 
 function updateConfig(publisherName) {
   const publisher = cleanPublisher(publisherName);
-  if (!publisher) throw new Error("A bounded publisher name is required");
+  if (typeof publisherName === "string" && publisherName.length > 0 && !publisher) {
+    throw new Error("Publisher name must be bounded and single-line");
+  }
   return [
     "provider: github",
     "owner: DaliBerr",
     "repo: Vibe-Halo",
     "channel: latest",
     "updaterCacheDirName: vibe-halo-updater",
-    "publisherName:",
-    `  - ${JSON.stringify(publisher)}`,
+    ...(publisher ? ["publisherName:", `  - ${JSON.stringify(publisher)}`] : []),
     "",
   ].join("\n");
 }
@@ -41,7 +42,7 @@ function writeConfig(appDir, publisherName) {
 
 if (require.main === module) {
   try {
-    const target = writeConfig(process.argv[2], process.argv[3]);
+    const target = writeConfig(process.argv[2], process.argv[3] || "");
     process.stdout.write(`${target}\n`);
   } catch (error) {
     process.stderr.write(`${error.message}\n`);

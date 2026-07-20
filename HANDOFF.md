@@ -1,12 +1,12 @@
 # Vibe Halo Project Handoff
 
 Updated: 2026-07-20
-Current version: `0.5.3`
+Current version: `0.5.4`
 Source directory: `C:\Tools\Clawd-island`
 
 ## Current Scope
 
-Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for AI coding clients. Version 0.5.3 adds a dedicated, bilingual plan-ready notification when a Codex `Stop` Hook reports `permission_mode: plan`. It retains the 0.5.2 client identity palette and tray-icon improvements plus the 0.5.0 platform runtime, stable POSIX Hook launcher, macOS accessory lifecycle, Linux X11/XWayland selection, centered mini-island, one window, one global approval FIFO, loopback-only transport, strict renderer isolation, and fail-open behavior.
+Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for AI coding clients. Version 0.5.4 makes the Windows x64 stable updater independent from Authenticode signing: official release builds opt into GitHub Releases updates with SHA-512 metadata, while SignPath remains an optional, default-disabled enhancement. It retains the 0.5.3 Codex plan-ready notification, the 0.5.2 identity palette and tray improvements, and the 0.5.0 cross-platform runtime.
 
 - Dynamic-island approvals: Codex, ZCode, Qwen Code, Copilot CLI, Claude Code, CodeBuddy, Hermes, and OpenCode.
 - Exact interactive answers: ZCode `AskUserQuestion`, Claude/CodeBuddy Elicitation, and Hermes clarify.
@@ -28,7 +28,7 @@ The application does not contain desktop pets, remote approvals, a theme system,
 - `src/completion-event.js`: bounded `Stop` normalization and Codex plan-mode classification using the documented Hook permission mode.
 - `src/main.js`: service wiring, auto-scan, diagnostics, tray integration manager, and notification lifecycle.
 - `src/platform-adapter.js`: platform/config paths, stable Hook runtime, process detection, login startup, notifications, package kind, and window-backend diagnostics.
-- `src/update-manager.js`: signed-build gating, background update checks/downloads, bounded status, and explicit restart installation.
+- `src/update-manager.js`: release-build gating, background update checks/downloads, bounded status, and explicit restart installation.
 - `src/i18n.js`: complete `en-US`/`zh-CN` catalogs, system locale resolution, bounded interpolation, and renderer string projection.
 - `src/shutdown-coordinator.js`: idempotent ordered shutdown that returns pending decisions to native client flows before update installation.
 - `src/island-controller.js` and `src/renderer/`: current-item IPC validation, dynamic actions, overflow menu, interactive forms, sizing, focus, and animation.
@@ -43,9 +43,9 @@ The application does not contain desktop pets, remote approvals, a theme system,
 
 ## Verification Status
 
-- Automated suite: 137 tests on Windows (136 passed, one POSIX-only process test skipped), covering 19 adapters, Codex plan-mode Hook forwarding/classification/localization, unique client identity palettes/badges, the tightly framed 1x/2x tray icon pipeline and its safe fallback, platform contracts, codecs, forms, global FIFO, server authentication/bounds, Windows/POSIX Hook paths, offline fallback, X11 source-window matching, installers, backups, idempotence, explicit disables, safe uninstall, IPC, sizing, stores, localization, icon assets, settings migration, and legacy regressions. The POSIX process-runner test executes on macOS/Linux CI.
-- Automatic-update suite: signed-build gating, scheduler state, download/install transitions, sanitized errors, ordered fail-open shutdown, external signing staging/injection, and signed-byte metadata regeneration.
-- Windows: Codex/ZCode retain existing real-client validation. The 0.5.3 unpacked app passed package verification and an expanded plan-ready screenshot smoke test. The local `Vibe-Halo-Setup-0.5.3-x64.exe` is unsigned, update-disabled, 102,839,971 bytes, and has SHA-256 `001AEE03DA6EB0EA68A18C703DC1C1126688E70F4DFA9E07D2EA28DED4EF2BDB`; exact CI-built hashes are recorded in the preview Release's `SHA256SUMS.txt`.
+- Automated suite: 138 tests on Windows (137 passed, one POSIX-only process test skipped), covering 19 adapters, Codex plan-mode Hook forwarding/classification/localization, unique client identity palettes/badges, the tightly framed 1x/2x tray icon pipeline and its safe fallback, platform contracts, codecs, forms, global FIFO, server authentication/bounds, Windows/POSIX Hook paths, offline fallback, X11 source-window matching, installers, backups, idempotence, explicit disables, safe uninstall, IPC, sizing, stores, localization, icon assets, settings migration, and legacy regressions. The POSIX process-runner test executes on macOS/Linux CI.
+- Automatic-update suite: independent release/update and signing gates, unsigned/signed public update configs, scheduler state, download/install transitions, sanitized errors, ordered fail-open shutdown, retained external signing staging/injection, and final-byte metadata regeneration.
+- Windows: Codex/ZCode retain existing real-client validation. Normal 0.5.4 packages remain update-disabled; an update-enabled unsigned release-mode package passed package verification plus silent install/uninstall. The local `Vibe-Halo-Setup-0.5.4-x64.exe` is 102,840,146 bytes with SHA-256 `C9B0731D010882CE70E07C022A0560B70FAEC4AC4A0EF32AE479A11195C9C41F`.
 - macOS/Linux: first release is limited to CI contract, package, stable-runner, and isolated startup smoke tests. No real-client round-trip claim may be made until tested on physical installations.
 - Codex: trusted Hook health detected; command Hook single-allow path returned the exact Codex protocol.
 - ZCode 3.3.0: native process hooks use `cmd.exe` plus explicit arguments and a waiting, no-new-window PowerShell launcher. This is required because a direct PowerShell invocation detaches the packaged GUI-subsystem Electron process and returns empty stdout to ZCode before the Hook decision is ready. Health checks repair that legacy launcher, invalid wildcard matchers, and malformed 0.2.0 shell-command entries. Real approval, completion, structured `AskUserQuestion`, exact `updatedInput.answers` round-trips, immediate single-choice submission, and the final allow response are verified against the running app.
@@ -70,8 +70,8 @@ npm run build
 - macOS runs as an accessory application without Dock presence or Accessibility/Screen Recording permissions.
 - The stable POSIX launcher lives at `~/.vibe-halo/bin/vibe-halo-hook-runner`; remove all integrations before deleting the app on macOS/Linux.
 - `preview-0.5.3` is a GitHub Pre-release built by `.github/workflows/cross-platform.yml`; it includes all platform packages and `SHA256SUMS.txt` but no stable update metadata. macOS packages are ad-hoc signed only, without Developer ID signing or notarization, and macOS/Linux auto-update stays disabled.
-- Windows local artifacts remain unsigned and update-disabled. The separate stable `v*` workflow still signs the app EXE and NSIS elevation helper, then the generated uninstaller and final installer in order, and regenerates `latest.yml` and the blockmap.
-- Version 0.2.3 requires one final manual bootstrap install of a signed release. The SignPath Foundation application has been submitted and is awaiting approval, so no public auto-update release may be created until approval and publisher verification are complete.
+- Windows local and preview artifacts remain update-disabled. The stable `v*` workflow defaults to an unsigned, update-enabled NSIS release and regenerates `latest.yml` and the blockmap from final bytes. Setting repository variable `VIBE_HALO_SIGNPATH_ENABLED=1` restores the retained three-stage SignPath path.
+- Version 0.5.4 is the one-time manually installed bootstrap release. A later stable version is required to verify the live N-to-N+1 automatic update path.
 - Keep `LICENSE`, `NOTICE.md`, and upstream attribution in every release.
 - `dist/`, `node_modules/`, `.smoke/`, logs, and contributor-local `AGENTS.local.md` are not committed.
 - After moving source or installing a different build, run integration repair and review changed Codex Hook commands in `/hooks`.
