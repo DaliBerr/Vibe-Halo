@@ -25,6 +25,12 @@ for (const required of [
   "/assets/icons/16x16.png",
   "/assets/icons/32x32.png",
   "/src/platform-adapter.js",
+  "/src/history-store.js",
+  "/src/history-window-controller.js",
+  "/src/history-preload.js",
+  "/src/history-renderer/index.html",
+  "/src/history-renderer/style.css",
+  "/src/history-renderer/renderer.js",
   "/hooks/vibe-halo-hook.js",
 ]) {
   if (!entries.has(required)) throw new Error(`packaged file missing: ${required}`);

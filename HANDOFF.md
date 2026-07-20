@@ -1,12 +1,12 @@
 # Vibe Halo Project Handoff
 
 Updated: 2026-07-20
-Current version: `0.5.5`
+Current version: `0.5.6`
 Source directory: `C:\Tools\Clawd-island`
 
 ## Current Scope
 
-Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for AI coding clients. Version 0.5.5 makes the Windows x64 stable updater independent from Authenticode signing: official release builds opt into GitHub Releases updates with SHA-512 metadata, while SignPath remains an optional, default-disabled enhancement. It retains the 0.5.3 Codex plan-ready notification, the 0.5.2 identity palette and tray improvements, and the 0.5.0 cross-platform runtime.
+Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for AI coding clients. Version 0.5.6 adds a separate tray-opened right-side recent-event window while keeping the live top-center island independent. Approval, question, best-effort Codex native-answer, and Codex plan records are retained for 30 days/200 items under a 16 MiB cap; ordinary completion notifications are excluded. History uses Electron secure storage when available and an explicitly warned plaintext fallback otherwise. The Windows x64 stable updater remains independent from Authenticode signing: official release builds opt into GitHub Releases updates with SHA-512 metadata, while SignPath is an optional, default-disabled enhancement.
 
 - Dynamic-island approvals: Codex, ZCode, Qwen Code, Copilot CLI, Claude Code, CodeBuddy, Hermes, and OpenCode.
 - Exact interactive answers: ZCode `AskUserQuestion`, Claude/CodeBuddy Elicitation, and Hermes clarify.
@@ -32,6 +32,8 @@ The application does not contain desktop pets, remote approvals, a theme system,
 - `src/i18n.js`: complete `en-US`/`zh-CN` catalogs, system locale resolution, bounded interpolation, and renderer string projection.
 - `src/shutdown-coordinator.js`: idempotent ordered shutdown that returns pending decisions to native client flows before update installation.
 - `src/island-controller.js` and `src/renderer/`: current-item IPC validation, dynamic actions, overflow menu, interactive forms, sizing, focus, and animation.
+- `src/history-store.js` and `src/history-events.js`: fixed-schema event capture, sensitive-field redaction, 128 KiB record bounds, retention/capacity pruning, atomic encrypted/plaintext persistence, and corruption fallback.
+- `src/history-window-controller.js`, `src/history-preload.js`, and `src/history-renderer/`: isolated right-side history window, bounded list/detail IPC, fixed-region copy controls, filtering, localization, multi-display placement, and five-second pointer-leave fade.
 
 ## Safety Invariants
 
@@ -40,12 +42,14 @@ The application does not contain desktop pets, remote approvals, a theme system,
 - Integration changes are incremental, backed up separately per client, and remove only Vibe Halo-owned entries. Explicit client-level hook disabling is preserved.
 - OpenCode uses a random loopback reverse bridge with a 32-byte bearer token, bounded pending IDs, replay protection, and a local-only target.
 - Renderer navigation/new windows are blocked; Node is disabled and context isolation stays enabled.
+- History never stores runtime/bridge tokens, authentication headers, cookies, PID chains, or original protocol payloads. The history renderer cannot choose paths or arbitrary clipboard text and cannot replay client actions.
 
 ## Verification Status
 
-- Automated suite: 138 tests on Windows (137 passed, one POSIX-only process test skipped), covering 19 adapters, Codex plan-mode Hook forwarding/classification/localization, unique client identity palettes/badges, the tightly framed 1x/2x tray icon pipeline and its safe fallback, platform contracts, codecs, forms, global FIFO, server authentication/bounds, Windows/POSIX Hook paths, offline fallback, X11 source-window matching, installers, backups, idempotence, explicit disables, safe uninstall, IPC, sizing, stores, localization, icon assets, settings migration, and legacy regressions. The POSIX process-runner test executes on macOS/Linux CI.
+- Automated suite: 167 tests on Windows (166 passed, one POSIX-only process test skipped), including history retention/capacity, encrypted/plaintext persistence, corrupt-file fallback, structured redaction, semantic event capture, Codex native-answer parsing, duplicate suppression, isolated IPC, localization, right-side placement, fade lifecycle, renderer structure, package contents, and every existing 19-adapter/platform/update regression. The POSIX process-runner test executes on macOS/Linux CI.
 - Automatic-update suite: independent release/update and signing gates, unsigned/signed public update configs, scheduler state, download/install transitions, sanitized errors, ordered fail-open shutdown, retained external signing staging/injection, and final-byte metadata regeneration.
 - Windows: Codex/ZCode retain existing real-client validation. Normal packages remain update-disabled; the update-enabled unsigned `Vibe-Halo-Setup-0.5.5-x64.exe` passed package verification plus silent install/uninstall. The local artifact is 102,840,149 bytes with SHA-256 `20388D5D2B655B35554B71FD7F1C3F0C98C829FD7F53C58096AF1B56CF9DFED2`; 0.5.5 also corrects the CI-only PowerShell parser failure found by the unpublished `v0.5.4` run.
+- Windows 0.5.6 local acceptance: the update-disabled unsigned `Vibe-Halo-Setup-0.5.6-x64.exe` is 102,856,176 bytes with SHA-256 `B0E6417D4C60792184D21B0AA7F568B5E8B9A5E36DC30129E235E360AE237CAE`. Package-content verification passed, and isolated Electron smoke runs captured the live island, history list, and approval detail simultaneously. A second launch reloaded encrypted history, increased the retained count, and exposed no example command plaintext in the envelope.
 - macOS/Linux: first release is limited to CI contract, package, stable-runner, and isolated startup smoke tests. No real-client round-trip claim may be made until tested on physical installations.
 - Codex: trusted Hook health detected; command Hook single-allow path returned the exact Codex protocol.
 - ZCode 3.3.0: native process hooks use `cmd.exe` plus explicit arguments and a waiting, no-new-window PowerShell launcher. This is required because a direct PowerShell invocation detaches the packaged GUI-subsystem Electron process and returns empty stdout to ZCode before the Hook decision is ready. Health checks repair that legacy launcher, invalid wildcard matchers, and malformed 0.2.0 shell-command entries. Real approval, completion, structured `AskUserQuestion`, exact `updatedInput.answers` round-trips, immediate single-choice submission, and the final allow response are verified against the running app.
@@ -64,14 +68,14 @@ npm run build:dir
 npm run build
 ```
 
-- Electron 41, CommonJS, native HTML/CSS/JavaScript, and a single transparent window.
+- Electron 41, CommonJS, native HTML/CSS/JavaScript, one transparent live-island window, and one optional transparent history window.
 - Preview artifacts: Windows x64 NSIS; macOS 12+ arm64/x64 DMG and ZIP; Linux x64 AppImage and deb for Ubuntu 22.04/24.04 and Debian 12.
 - Linux prefers X11/XWayland; `VIBE_HALO_NATIVE_WAYLAND=1` forces a diagnosed degraded native-Wayland mode.
 - macOS runs as an accessory application without Dock presence or Accessibility/Screen Recording permissions.
 - The stable POSIX launcher lives at `~/.vibe-halo/bin/vibe-halo-hook-runner`; remove all integrations before deleting the app on macOS/Linux.
 - `preview-0.5.3` is a GitHub Pre-release built by `.github/workflows/cross-platform.yml`; it includes all platform packages and `SHA256SUMS.txt` but no stable update metadata. macOS packages are ad-hoc signed only, without Developer ID signing or notarization, and macOS/Linux auto-update stays disabled.
 - Windows local and preview artifacts remain update-disabled. The stable `v*` workflow defaults to an unsigned, update-enabled NSIS release and regenerates `latest.yml` and the blockmap from final bytes. Setting repository variable `VIBE_HALO_SIGNPATH_ENABLED=1` restores the retained three-stage SignPath path.
-- Version 0.5.5 is the one-time manually installed bootstrap release. The `v0.5.4` workflow failed before publication and its immutable tag was not moved. A later stable version is required to verify the live N-to-N+1 automatic update path.
+- Version 0.5.5 is the manually installed updater bootstrap. Version 0.5.6 is the first intended live N-to-N+1 acceptance target; record the final installed update result here after the stable release is published.
 - Keep `LICENSE`, `NOTICE.md`, and upstream attribution in every release.
 - `dist/`, `node_modules/`, `.smoke/`, logs, and contributor-local `AGENTS.local.md` are not committed.
 - After moving source or installing a different build, run integration repair and review changed Codex Hook commands in `/hooks`.

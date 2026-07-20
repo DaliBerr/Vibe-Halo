@@ -5,7 +5,7 @@ const os = require("os");
 const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { CodexInputMonitor, normalizeQuestions } = require("../src/codex-input-monitor");
+const { CodexInputMonitor, normalizeOutputAnswers, normalizeQuestions } = require("../src/codex-input-monitor");
 
 function record(type, payload, timestamp = new Date().toISOString()) {
   return `${JSON.stringify({ timestamp, type, payload })}\n`;
@@ -59,11 +59,19 @@ test("detects exact request_user_input and clears it on matching output", () => 
     monitor.scanNow();
     assert.equal(resolved.length, 1);
     assert.equal(resolved[0].requestKey, requested[0].requestKey);
+    assert.deepEqual(resolved[0].answers, { surface: ["Codex 原生界面"] });
+    assert.equal(resolved[0].answerAvailable, true);
     assert.equal(monitor.status().pendingCount, 0);
   } finally {
     monitor.stop();
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("bounds native Codex answers and safely ignores unknown output shapes", () => {
+  assert.deepEqual(normalizeOutputAnswers(JSON.stringify({ answers: { q1: { answers: ["A", "B"] } } })), { q1: ["A", "B"] });
+  assert.deepEqual(normalizeOutputAnswers(JSON.stringify({ result: "unknown" })), {});
+  assert.deepEqual(normalizeOutputAnswers("not-json"), {});
 });
 
 test("does not flash for resolved history or text that merely mentions the tool", () => {

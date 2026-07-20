@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const { EventEmitter } = require("events");
 const { INPUT_REMINDER_TIMEOUT_MS } = require("./constants");
+const { sanitizeValue } = require("./history-store");
 
 function clean(value, max) {
   return typeof value === "string"
@@ -33,6 +34,14 @@ function publicItem(item) {
   return safe;
 }
 
+function finalizedItem(item) {
+  const safe = publicItem(item);
+  delete safe.sourcePid;
+  delete safe.pidChain;
+  safe.questions = sanitizeValue(safe.questions, "questions");
+  return safe;
+}
+
 function cleanQuestions(value) {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 10).map((question, index) => {
@@ -58,6 +67,7 @@ class InputRequestStore extends EventEmitter {
     this.timeoutMs = options.timeoutMs || INPUT_REMINDER_TIMEOUT_MS;
     this.setTimer = options.setTimeout || setTimeout;
     this.clearTimer = options.clearTimeout || clearTimeout;
+    this.now = options.now || Date.now;
     this.queue = [];
     this.byRequestKey = new Map();
   }
@@ -111,21 +121,28 @@ class InputRequestStore extends EventEmitter {
     return { entry: item, duplicate: false };
   }
 
-  resolve(requestKey) {
+  resolve(requestKey, result = {}) {
     const item = this.byRequestKey.get(requestKey);
-    return item ? this.removeById(item.id, "answered") : false;
+    return item ? this.removeById(item.id, "answered", result) : false;
   }
 
   dismiss(id) {
     return this.removeById(id, "dismissed");
   }
 
-  removeById(id, reason) {
+  removeById(id, reason, result = {}) {
     const index = this.queue.findIndex(item => item.id === id);
     if (index < 0) return false;
     const [item] = this.queue.splice(index, 1);
     this.byRequestKey.delete(item.requestKey);
     if (item.timer) this.clearTimer(item.timer);
+    this.emit("finalized", {
+      entry: finalizedItem(item),
+      reason,
+      answers: result && typeof result.answers === "object" ? sanitizeValue(result.answers, "answers") : {},
+      answerAvailable: result?.answerAvailable === true,
+      finalizedAt: this.now(),
+    });
     this.emit("changed", this.snapshot(), reason);
     return true;
   }
@@ -148,6 +165,9 @@ class InputRequestStore extends EventEmitter {
     if (this.queue.length === 0) return false;
     for (const item of this.queue) {
       if (item.timer) this.clearTimer(item.timer);
+      this.emit("finalized", {
+        entry: finalizedItem(item), reason, answers: {}, answerAvailable: false, finalizedAt: this.now(),
+      });
     }
     this.queue = [];
     this.byRequestKey.clear();
@@ -164,6 +184,9 @@ class InputRequestStore extends EventEmitter {
     for (const item of removed) {
       this.byRequestKey.delete(item.requestKey);
       if (item.timer) this.clearTimer(item.timer);
+      this.emit("finalized", {
+        entry: finalizedItem(item), reason, answers: {}, answerAvailable: false, finalizedAt: this.now(),
+      });
     }
     this.queue = this.queue.filter(item => item.sessionId !== normalized || (normalizedAgent && item.agentId !== normalizedAgent));
     this.emit("changed", this.snapshot(), reason);

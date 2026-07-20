@@ -82,3 +82,15 @@ test("keeps bounded structured questions for the native-like reminder layout", (
   assert.equal(current.questions.length, 1);
   assert.equal(current.questions[0].options[0].label, "提醒");
 });
+
+test("emits finalized reminder details and parsed native answers", () => {
+  const { store } = fixture();
+  const finalized = [];
+  store.on("finalized", value => finalized.push(value));
+  store.enqueue({ requestKey: "question", content: "Pick one", questions: [{ id: "choice", question: "Pick" }] });
+  assert.equal(store.resolve("question", { answers: { choice: "A" }, answerAvailable: true }), true);
+  assert.equal(finalized.length, 1);
+  assert.equal(finalized[0].entry.content, "Pick one");
+  assert.deepEqual(finalized[0].answers, { choice: "A" });
+  assert.equal(finalized[0].answerAvailable, true);
+});

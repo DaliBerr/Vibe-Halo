@@ -10,7 +10,7 @@
 
 Handle supported permission requests and interactive questions, and receive completion notifications without constantly switching back to agent terminals.
 
-![Version](https://img.shields.io/badge/version-0.5.5-6d7cff)
+![Version](https://img.shields.io/badge/version-0.5.6-6d7cff)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)
 ![Electron](https://img.shields.io/badge/Electron-41-47848f)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
@@ -67,7 +67,7 @@ See [Installation and setup](#installation-and-setup) for source builds, integra
 
 ## Why Vibe Halo
 
-AI coding clients often wait in the background for a permission decision, a follow-up answer, or a finished task that is easy to miss. Vibe Halo brings those intervention points into one lightweight window while preserving each client's native flow as the final fallback.
+AI coding clients often wait in the background for a permission decision, a follow-up answer, or a finished task that is easy to miss. Vibe Halo brings those intervention points into lightweight desktop surfaces while preserving each client's native flow as the final fallback.
 
 - **Appears only when needed** — the window is fully hidden when there is no active item and never occupies the taskbar.
 - **Top-center placement** — the compact island sits at the top of the active display and accounts for multiple monitors and DPI scaling.
@@ -75,6 +75,7 @@ AI coding clients often wait in the background for a permission decision, a foll
 - **Clear provenance** — the title always identifies the client that produced the event.
 - **Fail-open to the native UI** — close, disconnect, timeout, malformed response, and unknown option paths never invent a decision.
 - **Local by design** — agent events use a token-authenticated loopback service; there is no remote approval endpoint.
+- **Optional local history** — a tray-opened right-side panel keeps bounded approval, question, and Codex plan details without occupying the desktop permanently.
 
 ## Key features
 
@@ -97,6 +98,14 @@ AI coding clients often wait in the background for a permission decision, a foll
 - When a Codex turn stops in Plan mode, Vibe Halo shows a dedicated plan-ready notification with the completed plan output when available.
 - Completion notifications normally remain visible for 8 seconds; a new prompt or approval preempts an older completion.
 - UI priority is fixed: **approval/exact interaction > input reminder > completion notification**.
+
+### Recent events
+
+- Open **Recent events** from the tray to show a separate 460 × 720 right-side panel; the live top-center island remains independent and stays above it.
+- The list can be filtered by all events, approvals, questions, plans, or source client. Selecting an entry opens read-only details with separate copy controls for commands, parameters, answers, content, and working directories.
+- Approval outcomes—including allow, deny, return-to-client, timeout, disconnect, and close—are retained. Exact in-island answers and best-effort Codex `request_user_input` answers are retained; incompatible Codex output is marked as unavailable.
+- Codex plan-ready output is retained. Ordinary task-completion notifications are deliberately excluded.
+- History keeps at most 200 events for 30 days and caps its file at 16 MiB. Moving the pointer away closes the panel after five seconds; the tray is its only entry point.
 
 ### Integration management
 
@@ -146,6 +155,8 @@ flowchart LR
     H --> D
     D --> B
     B --> A
+    D --> J["Bounded local history"]
+    J --> K["Tray-opened right-side panel"]
     I["Integration Manager"] -. "backup, incremental install, health" .-> B
 ```
 
@@ -237,6 +248,8 @@ The tray exposes the following controls in English mode:
 | --- | --- |
 | **Enable approvals** | Global island-approval switch; when disabled, approvals return to the client while completion notifications continue |
 | **Input reminders** | Controls read-only input reminders and native-approval reminders |
+| **Recent events** | Opens the independent right-side history panel and shows the current retained count |
+| **Record recent events** | Stops or resumes future history capture without deleting existing records |
 | **Launch at login** | Controls operating-system login startup |
 | **Client integrations** | Shows status and provides per-client disable/enable, rescan, repair, and uninstall-all actions |
 | **Review Codex Hook…** | Explains how to complete the official Codex `/hooks` trust review |
@@ -267,6 +280,9 @@ The Windows NSIS uninstaller invokes the same cleanup path. On macOS, dragging t
 - The app has no telemetry, account system, cloud synchronization, or remote approval service.
 - An official Windows stable build contacts public GitHub Releases only for update checks. Source, local, and preview builds keep the updater disabled.
 - Client configuration uses atomic writes, first-state backups, and ownership markers. Explicit hook disables are preserved.
+- Recent-event records contain locally visible commands, parameters, paths, questions, and answers. Obvious structured secret fields are replaced with `[REDACTED]`, but command strings can still contain secrets typed by the user.
+- The history file uses Electron `safeStorage` encryption when a secure backend is available. If encryption is unavailable—or Linux reports `basic_text`—Vibe Halo stores history as plaintext, displays a persistent warning in the panel, and shows a one-time warning before first opening it.
+- History is never synchronized or sent to a remote service. Corrupt or undecryptable history does not block startup or approvals and is left untouched while the current run falls back to empty in-memory history.
 
 The runtime identity is stored by default at:
 
@@ -279,6 +295,7 @@ Settings, logs, and integration backups live under Electron's `userData` directo
 ```text
 %APPDATA%\Vibe Halo\
 ├── settings.json
+├── history.json
 ├── logs\main.log
 └── integration-backups\
 ```
@@ -290,11 +307,11 @@ Settings, logs, and integration backups live under Electron's `userData` directo
 | Layer | Technology |
 | --- | --- |
 | Desktop runtime | Electron 41, CommonJS, Node.js |
-| UI | Native HTML, CSS, and JavaScript in one transparent `BrowserWindow` |
+| UI | Native HTML, CSS, and JavaScript in one live-island window plus one optional history window |
 | Local transport | Node HTTP, loopback-only, per-process token |
 | Platform integration | `PlatformAdapter`, `koffi` on Windows, POSIX launchers, system tray |
 | Packaging | x64 NSIS; arm64/x64 DMG and ZIP; x64 AppImage and deb |
-| Automatic updates | Windows-only signed stable channel; disabled for macOS/Linux previews |
+| Automatic updates | Official Windows stable channel (unsigned by default, optional SignPath); disabled for macOS/Linux |
 | Tests | Node's built-in test runner |
 | Release | GitHub Actions, electron-builder, SignPath Foundation |
 
@@ -314,10 +331,15 @@ The project has no database, web backend, frontend framework, Docker deployment,
 │   ├── input-request-store.js   # Input and native-approval reminder queue
 │   ├── completion-store.js      # Completion-notification lifecycle
 │   ├── codex-input-monitor.js   # Read-only Codex session JSONL monitor
-│   ├── island-controller.js     # Single window, placement, priority, IPC, animation
+│   ├── island-controller.js     # Live island placement, priority, IPC, animation
+│   ├── history-store.js         # Bounded encrypted/plaintext recent-event persistence
+│   ├── history-events.js        # Approval, question, native-answer, and plan mapping
+│   ├── history-window-controller.js # Isolated right-side history window and IPC
+│   ├── history-preload.js       # Constrained history renderer bridge
 │   ├── update-manager.js        # Signed-build gate, checks, downloads, explicit install
 │   ├── shutdown-coordinator.js  # Ordered safe shutdown shared by quit and update
-│   └── renderer/                # Native dynamic-island UI
+│   ├── renderer/                # Native dynamic-island UI
+│   └── history-renderer/        # Native read-only history UI
 ├── hooks/
 │   ├── vibe-halo-hook.js        # Self-contained generic command hook
 │   └── integrations/            # Managed Hermes, OpenCode, OpenClaw, and Pi assets
@@ -371,7 +393,7 @@ npm start -- --smoke-test
 
 ### Development principles
 
-- Preserve CommonJS, the native renderer, and the single-window architecture.
+- Preserve CommonJS and the native renderers. Keep the window boundary to one live island plus one optional tray-opened history window.
 - Protocol, queue, timeout, IPC, window-size, and integration-installer changes require regression tests.
 - Never commit `node_modules/`, `dist/`, `.smoke/`, logs, credentials, or local runtime data.
 - After changing hook command paths, run “Repair all” and review the changed commands again in Codex `/hooks`.
@@ -392,6 +414,7 @@ The automated suite covers:
 - JSON, JSONC, TOML, and plugin backup, idempotence, third-party preservation, and safe uninstall behavior.
 - Settings migration, automatic detection, user-disable overrides, diagnostics, and update state.
 - Renderer IPC, dynamic actions, question forms, window bounds, shadow gutters, multi-display placement, and X11 source-window matching.
+- History retention/capacity, encryption/plaintext fallback, corruption recovery, redaction, semantic event capture, isolated IPC, filters, details, localization, right-side placement, fade timing, and dual-window smoke screenshots.
 - Windows and POSIX command-hook mock-server end-to-end behavior, stable launcher paths, and offline fallback.
 - Unsigned/signed release gates, public update configuration, SignPath staging, and final-byte metadata generation.
 
@@ -512,6 +535,7 @@ Source runs, local packages, and preview builds deliberately disable automatic u
 - Not every client exposes a stable approval or answer protocol. Unsupported capabilities remain reminders or are handed back to the native client.
 - Codex `request_user_input` cannot be answered inside the island.
 - Status-only clients produce completion/attention events, not continuous working animations.
+- Recent events are local and can contain sensitive content. Structured secret-looking keys are redacted, but users should still review commands before enabling history on shared machines; ordinary completion notifications are never recorded.
 - Only Codex and ZCode on Windows have completed real client end-to-end verification. macOS/Linux and other integrations can still contain compatibility bugs even when CI and contract tests pass.
 
 ## Contributing

@@ -15,9 +15,16 @@ test("persists integration ownership independently from approval toggle", () => 
     assert.equal(first.get("integrationInstalled"), true);
     assert.equal(first.get("inputReminderEnabled"), true);
     assert.equal(first.get("language"), "system");
+    assert.equal(first.get("historyEnabled"), true);
+    assert.equal(first.get("historyPlaintextWarningSeen"), false);
+    assert.equal(first.get("historyStorageVersion"), 1);
     first.set("integrationInstalled", false);
     first.set("approvalEnabled", false);
     first.set("inputReminderEnabled", false);
+    first.set("historyEnabled", false);
+    first.set("historyPlaintextWarningSeen", true);
+    assert.equal(first.set("historyStorageVersion", 2), true);
+    assert.equal(first.set("historyStorageVersion", 0), false);
     assert.equal(first.set("language", "en-US"), true);
     assert.equal(first.set("language", "fr-FR"), false);
     first.setIntegration("zcode", { disabledByUser: true, detected: true, reason: "disabled-by-user" });
@@ -26,6 +33,9 @@ test("persists integration ownership independently from approval toggle", () => 
     assert.equal(second.get("approvalEnabled"), false);
     assert.equal(second.get("inputReminderEnabled"), false);
     assert.equal(second.get("language"), "en-US");
+    assert.equal(second.get("historyEnabled"), false);
+    assert.equal(second.get("historyPlaintextWarningSeen"), true);
+    assert.equal(second.get("historyStorageVersion"), 2);
     assert.equal(second.getIntegration("zcode").disabledByUser, true);
     assert.equal(second.getIntegration("zcode").detected, true);
   } finally {

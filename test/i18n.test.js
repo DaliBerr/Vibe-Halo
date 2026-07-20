@@ -86,6 +86,15 @@ test("renderer strings are bounded to the active locale", () => {
   assert.equal(localization.rendererStrings().copyContent, "Copy content");
 });
 
+test("history strings switch language without translating client content", () => {
+  const localization = createLocalizer({ preference: "en-US", systemLocale: "zh-CN" });
+  assert.equal(localization.historyStrings().title, "Recent events");
+  assert.equal(localization.historyStrings().filterQuestion, "Questions");
+  localization.setPreference("zh-CN");
+  assert.equal(localization.historyStrings().title, "最近事件");
+  assert.equal(localization.historyStrings().storageEncrypted, "已加密");
+});
+
 test("client-provided questions, options, titles, and outputs remain unchanged", () => {
   const localization = createLocalizer({ preference: "en-US", systemLocale: "zh-CN" });
   const inputRequests = new InputRequestStore();

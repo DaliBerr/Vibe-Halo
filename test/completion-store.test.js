@@ -38,8 +38,11 @@ test("expanded completion persists and prompt clears only matching session", () 
 
 test("completion kind is restricted to task or plan", () => {
   const { store } = fixture();
+  const shown = [];
+  store.on("shown", item => shown.push(item));
   store.show({ sessionId: "plan", completionKind: "plan" });
   assert.equal(store.snapshot().completionKind, "plan");
   store.show({ sessionId: "other", completionKind: "unsafe" });
   assert.equal(store.snapshot().completionKind, "task");
+  assert.deepEqual(shown.map(item => item.completionKind), ["plan", "task"]);
 });

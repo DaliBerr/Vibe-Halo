@@ -64,6 +64,7 @@ class CompletionStore extends EventEmitter {
     item.timer = this.setTimer(() => this.clear("auto-close"), this.timeoutMs);
     if (item.timer && typeof item.timer.unref === "function") item.timer.unref();
     this.current = item;
+    this.emit("shown", this.snapshot());
     this.emit("changed", this.snapshot(), "shown");
     return item;
   }

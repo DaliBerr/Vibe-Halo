@@ -68,6 +68,23 @@ function formatQuestions(questions) {
   return lines.join("\n").slice(0, 6000);
 }
 
+function normalizeOutputAnswers(value) {
+  const data = parseArguments(value);
+  if (!data.answers || typeof data.answers !== "object" || Array.isArray(data.answers)) return {};
+  const output = {};
+  for (const [rawKey, rawAnswer] of Object.entries(data.answers).slice(0, 10)) {
+    const key = safeText(rawKey, 120);
+    if (!key) continue;
+    const nested = rawAnswer && typeof rawAnswer === "object" && !Array.isArray(rawAnswer)
+      ? rawAnswer.answers
+      : rawAnswer;
+    const values = Array.isArray(nested) ? nested : [nested];
+    const cleaned = values.slice(0, 20).map(answer => safeText(answer, 2000)).filter(Boolean);
+    if (cleaned.length) output[key] = Array.isArray(nested) ? cleaned : cleaned[0];
+  }
+  return output;
+}
+
 function sessionIdFromFile(filePath) {
   const match = path.basename(filePath).match(/([0-9a-f]{8}-[0-9a-f-]{27,})\.jsonl$/i);
   return match ? match[1] : "codex:unknown";
@@ -295,7 +312,8 @@ class CodexInputMonitor {
       this.pending.delete(requestKey);
       if (pending.notified) {
         this.lastEventAt = new Date(now).toISOString();
-        this.onResolved(pending);
+        const answers = normalizeOutputAnswers(payload.output);
+        this.onResolved({ ...pending, answers, answerAvailable: Object.keys(answers).length > 0 });
         this.logger.info("Codex input request resolved", { sessionId: pending.sessionId });
       }
     }
@@ -330,6 +348,7 @@ module.exports = {
   CodexInputMonitor,
   formatQuestions,
   normalizeQuestions,
+  normalizeOutputAnswers,
   requestKeyFor,
   sessionIdFromFile,
 };

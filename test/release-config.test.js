@@ -77,6 +77,9 @@ test("cross-platform preview workflow tests and packages every promised architec
   assert.match(workflow, /build:linux:x64/);
   assert.match(workflow, /SHA256SUMS\.txt/);
   assert.match(workflow, /--prerelease/);
+  assert.match(workflow, /VIBE_HALO_HISTORY_SCREENSHOT/);
+  assert.match(workflow, /VIBE_HALO_HISTORY_DETAIL_SCREENSHOT/);
+  assert.match(workflow, /--demo-history/);
   assert.doesNotMatch(workflow, /latest(?:-mac)?\.(?:yml|yaml)/);
 });
 

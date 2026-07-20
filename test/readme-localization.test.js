@@ -34,3 +34,14 @@ test("both READMEs describe all preview platforms and honest validation boundari
   assert.match(english, /real client response round trips on those platforms remain unverified/);
   assert.match(chinese, /真实客户端回传尚未实机验证/);
 });
+
+test("both READMEs document tray-only local history and sensitive storage", () => {
+  assert.match(english, /Open \*\*Recent events\*\* from the tray/);
+  assert.match(english, /Ordinary task-completion notifications are deliberately excluded/);
+  assert.match(english, /safeStorage/);
+  assert.match(english, /30 days/);
+  assert.match(chinese, /从托盘打开“最近事件”/);
+  assert.match(chinese, /普通任务完成通知明确不进入历史/);
+  assert.match(chinese, /safeStorage/);
+  assert.match(chinese, /30 天/);
+});

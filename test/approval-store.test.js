@@ -94,3 +94,19 @@ test("only removes a request after all duplicate connections disconnect", () => 
   assert.equal(store.disconnect(entry.id, second), true);
   assert.equal(store.size, 0);
 });
+
+test("emits one finalized snapshot with the semantic decision and answers", () => {
+  const { store } = fixture();
+  const finalized = [];
+  store.on("finalized", value => finalized.push(value));
+  store.enqueue(request({
+    kind: "elicitation",
+    questions: [{ id: "choice", question: "Pick", options: [{ id: "a", label: "A" }] }],
+    options: [{ id: "submit", label: "Submit" }],
+  }), waiter([]));
+  store.resolve("id-1", "submit", { answers: { choice: "a" } });
+  assert.equal(finalized.length, 1);
+  assert.equal(finalized[0].entry.type, "elicitation");
+  assert.equal(finalized[0].entry.toolInput.command, "npm test");
+  assert.deepEqual(finalized[0].decision.answers, { choice: "a" });
+});

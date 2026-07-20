@@ -70,7 +70,7 @@ module.exports = {
     artifactName: "Vibe-Halo-${version}-x64.${ext}",
     category: "Utility",
     synopsis: "Approval and notification island for AI coding agents",
-    description: "Vibe Halo presents supported AI coding agent approvals, questions, and completion notifications in a top-center island.",
+    description: "Vibe Halo presents AI coding agent approvals, questions, plan notifications, and local recent-event history.",
     maintainer: "DaliBerr <DaliBerr@users.noreply.github.com>",
     vendor: "Vibe Halo contributors",
     executableName: "vibe-halo",

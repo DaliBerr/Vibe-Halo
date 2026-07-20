@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>Vibe Halo — Recent events</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="history" class="history-panel" role="dialog" aria-labelledby="title" aria-live="polite">
+    <section id="list-view" class="view list-view">
+      <header class="panel-header">
+        <div class="heading">
+          <div class="halo-mark" aria-hidden="true">H</div>
+          <div class="heading-copy">
+            <h1 id="title">Recent events</h1>
+            <p id="subtitle"></p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="clear" class="text-button" type="button">Clear all</button>
+          <button id="close" class="icon-button" type="button" aria-label="Close history">×</button>
+        </div>
+      </header>
+
+      <div id="plaintext-warning" class="warning" hidden></div>
+      <p id="privacy-note" class="privacy-note"></p>
+
+      <div id="filters" class="filters" role="toolbar" aria-label="Event filters">
+        <div id="kind-filters" class="filter-pills">
+          <button type="button" data-kind="all" class="active"></button>
+          <button type="button" data-kind="approval"></button>
+          <button type="button" data-kind="question"></button>
+          <button type="button" data-kind="plan"></button>
+        </div>
+        <select id="client-filter" aria-label="Client filter"></select>
+      </div>
+
+      <div id="event-list" class="event-list" role="list"></div>
+      <div id="empty" class="empty" hidden></div>
+    </section>
+
+    <section id="detail-view" class="view detail-view" hidden>
+      <header class="panel-header detail-header">
+        <button id="back" class="back-button" type="button">‹ <span></span></button>
+        <div class="header-actions">
+          <button id="delete" class="text-button danger-text" type="button"></button>
+          <button id="detail-close" class="icon-button" type="button" aria-label="Close history">×</button>
+        </div>
+      </header>
+      <div id="detail-scroll" class="detail-scroll">
+        <div class="detail-identity">
+          <div id="detail-badge" class="agent-badge" aria-hidden="true">A</div>
+          <div class="detail-heading">
+            <h1 id="detail-title"></h1>
+            <p id="detail-subtitle"></p>
+          </div>
+          <span id="detail-outcome" class="outcome-pill"></span>
+        </div>
+        <div id="truncated" class="warning" hidden></div>
+        <div id="detail-sections" class="detail-sections"></div>
+      </div>
+    </section>
+  </main>
+  <script src="./renderer.js"></script>
+</body>
+</html>

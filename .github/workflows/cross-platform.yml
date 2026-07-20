@@ -42,7 +42,8 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npm run build:dir
-      - run: npm run verify:package -- dist/win-unpacked/resources 0.5.5
+      - shell: pwsh
+        run: npm run verify:package -- dist/win-unpacked/resources $(node -p "require('./package.json').version")
       - name: Smoke packaged Windows app
         shell: pwsh
         run: |
@@ -54,11 +55,15 @@ jobs:
           $env:VIBE_HALO_RUNTIME_DIR = Join-Path $root "runtime"
           $env:VIBE_HALO_TEST = "1"
           $env:VIBE_HALO_SCREENSHOT = Join-Path $root "island.png"
+          $env:VIBE_HALO_HISTORY_SCREENSHOT = Join-Path $root "history-list.png"
+          $env:VIBE_HALO_HISTORY_DETAIL_SCREENSHOT = Join-Path $root "history-detail.png"
           $process = Start-Process -FilePath "dist/win-unpacked/Vibe Halo.exe" `
-            -ArgumentList "--smoke-test", "--demo-approval", "--demo-expanded" `
+            -ArgumentList "--smoke-test", "--demo-approval", "--demo-expanded", "--demo-history" `
             -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Windows smoke exited with $($process.ExitCode)" }
           if (-not (Test-Path $env:VIBE_HALO_SCREENSHOT)) { throw "Windows smoke screenshot missing" }
+          if (-not (Test-Path $env:VIBE_HALO_HISTORY_SCREENSHOT)) { throw "Windows history-list screenshot missing" }
+          if (-not (Test-Path $env:VIBE_HALO_HISTORY_DETAIL_SCREENSHOT)) { throw "Windows history-detail screenshot missing" }
       - run: npm run build:win
       - uses: actions/upload-artifact@v7
         with:
@@ -89,7 +94,7 @@ jobs:
         run: |
           resources="$(find dist -path '*/Vibe Halo.app/Contents/Resources' -type d -print -quit)"
           test -n "$resources"
-          npm run verify:package -- "$resources" 0.5.5
+          npm run verify:package -- "$resources" "$(node -p "require('./package.json').version")"
       - name: Smoke packaged macOS app
         shell: bash
         run: |
@@ -102,8 +107,12 @@ jobs:
           VIBE_HALO_RUNTIME_DIR="$root/runtime" \
           VIBE_HALO_TEST=1 \
           VIBE_HALO_SCREENSHOT="$root/island.png" \
-          "$executable" --disable-gpu --smoke-test --demo-approval --demo-expanded
+          VIBE_HALO_HISTORY_SCREENSHOT="$root/history-list.png" \
+          VIBE_HALO_HISTORY_DETAIL_SCREENSHOT="$root/history-detail.png" \
+          "$executable" --disable-gpu --smoke-test --demo-approval --demo-expanded --demo-history
           test -s "$root/island.png"
+          test -s "$root/history-list.png"
+          test -s "$root/history-detail.png"
           test -x "$root/runtime/bin/vibe-halo-hook-runner"
           test -f "$root/runtime/hooks/vibe-halo-hook.js"
           test "$(stat -f '%Lp' "$root/runtime/bin/vibe-halo-hook-runner")" = "700"
@@ -128,7 +137,7 @@ jobs:
       - run: npm ci
       - run: sudo apt-get update && sudo apt-get install -y xvfb x11-utils
       - run: npm run build:dir
-      - run: npm run verify:package -- dist/linux-unpacked/resources 0.5.5
+      - run: npm run verify:package -- dist/linux-unpacked/resources "$(node -p "require('./package.json').version")"
       - name: Smoke packaged Linux app under X11
         shell: bash
         run: |
@@ -142,8 +151,12 @@ jobs:
             VIBE_HALO_RUNTIME_DIR="$root/runtime" \
             VIBE_HALO_TEST=1 \
             VIBE_HALO_SCREENSHOT="$root/island.png" \
-            "$executable" --no-sandbox --smoke-test --demo-approval --demo-expanded
+            VIBE_HALO_HISTORY_SCREENSHOT="$root/history-list.png" \
+            VIBE_HALO_HISTORY_DETAIL_SCREENSHOT="$root/history-detail.png" \
+            "$executable" --no-sandbox --smoke-test --demo-approval --demo-expanded --demo-history
           test -s "$root/island.png"
+          test -s "$root/history-list.png"
+          test -s "$root/history-detail.png"
           test -x "$root/runtime/bin/vibe-halo-hook-runner"
           test -f "$root/runtime/hooks/vibe-halo-hook.js"
           test "$(stat -c '%a' "$root/runtime/bin/vibe-halo-hook-runner")" = "700"
@@ -196,6 +209,20 @@ jobs:
           run_smoke plan-ready "$executable" --no-sandbox --smoke-test --demo-plan-ready --demo-expanded
           xvfb-run -a env \
             XDG_SESSION_TYPE=wayland \
+            HOME="$root/history/home" \
+            XDG_CONFIG_HOME="$root/history/config" \
+            VIBE_HALO_USER_DATA="$root/history/userdata" \
+            VIBE_HALO_RUNTIME_DIR="$root/history/runtime" \
+            VIBE_HALO_TEST=1 \
+            VIBE_HALO_SCREENSHOT="$root/history/island.png" \
+            VIBE_HALO_HISTORY_SCREENSHOT="$root/history/history-list.png" \
+            VIBE_HALO_HISTORY_DETAIL_SCREENSHOT="$root/history/history-detail.png" \
+            "$executable" --no-sandbox --smoke-test --demo-approval --demo-expanded --demo-history
+          test -s "$root/history/island.png"
+          test -s "$root/history/history-list.png"
+          test -s "$root/history/history-detail.png"
+          xvfb-run -a env \
+            XDG_SESSION_TYPE=wayland \
             HOME="$root/click/home" \
             XDG_CONFIG_HOME="$root/click/config" \
             VIBE_HALO_USER_DATA="$root/click/userdata" \
@@ -230,9 +257,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
-          Cross-platform preview of Vibe Halo 0.5.5.
+          Cross-platform preview of Vibe Halo 0.5.6.
 
-          - Codex plan-mode turns now produce a dedicated plan-ready notification
+          - Tray-only recent-event history in an independent right-side panel
+          - Encrypted-at-rest history when Electron secure storage is available, with an explicit plaintext warning otherwise
+          - Approval, question, Codex native-answer, and plan details retained for 30 days or 200 events; ordinary completion notifications are excluded
           - Stable, distinct accent colors and compact/expanded badges for all 19 registered clients
           - Tightly framed small-size tray icon for improved notification-area legibility
           - Transparent Halo terminal application icon across all platform packages
@@ -249,5 +278,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" release-assets/* \
             --verify-tag \
             --prerelease \
-            --title "Vibe Halo 0.5.5 — Cross-platform Preview" \
+            --title "Vibe Halo 0.5.6 — Cross-platform Preview" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

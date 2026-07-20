@@ -26,6 +26,7 @@ const {
   nativeImage,
   nativeTheme,
   Notification,
+  safeStorage,
   screen,
   shell,
   Tray,
@@ -37,6 +38,9 @@ const { CodexInputMonitor } = require("./codex-input-monitor");
 const { completionFromStop } = require("./completion-event");
 const { CompletionStore } = require("./completion-store");
 const { HookManager } = require("./hook-manager");
+const { approvalHistoryRecord, inputHistoryRecord, planHistoryRecord } = require("./history-events");
+const { HistoryStore } = require("./history-store");
+const { HistoryWindowController } = require("./history-window-controller");
 const { createLocalizer, translateReason } = require("./i18n");
 const { IntegrationManager } = require("./integration-manager");
 const { IslandController } = require("./island-controller");
@@ -113,6 +117,8 @@ function startApplication() {
 
   let tray = null;
   let island = null;
+  let history = null;
+  let historyWindow = null;
   let server = null;
   let inputMonitor = null;
   let hookManager = null;
@@ -154,6 +160,20 @@ function startApplication() {
             run: () => {
               inputRequests.clear("shutdown");
               completions.clear("shutdown");
+            },
+          },
+          {
+            name: "history-window",
+            run: () => {
+              historyWindow?.destroy();
+              historyWindow = null;
+            },
+          },
+          {
+            name: "history-store",
+            run: () => {
+              history?.stop();
+              history = null;
             },
           },
           {
@@ -263,6 +283,9 @@ function startApplication() {
       update.error ? t("diagnostics.errorValue", { error: update.error }) : "",
     ].filter(Boolean).join(", ");
     const platform = platformAdapter.status();
+    const historyStatus = history?.snapshot() || {
+      count: 0, mode: "memory", filePath: "-", lastError: "", retentionDays: 30, maxEntries: 200,
+    };
     return [
       t("diagnostics.application", { appName: APP_NAME, version: app.getVersion() }),
       t("diagnostics.platform", { platform: platform.platform, arch: platform.arch, packageKind: platform.packageKind }),
@@ -272,6 +295,13 @@ function startApplication() {
       t("diagnostics.localService", { value: local.listening ? `127.0.0.1:${local.port}` : t("diagnostics.notRunning") }),
       t("diagnostics.approvals", { value: settings.get("approvalEnabled") ? t("diagnostics.enabled") : t("diagnostics.disabled") }),
       t("diagnostics.inputReminders", { value: settings.get("inputReminderEnabled") ? t("diagnostics.enabled") : t("diagnostics.disabled") }),
+      t("diagnostics.history", {
+        count: historyStatus.count,
+        enabled: settings.get("historyEnabled") ? t("diagnostics.enabled") : t("diagnostics.disabled"),
+        mode: t(`history.storage${historyStatus.mode[0]?.toUpperCase()}${historyStatus.mode.slice(1)}`),
+        error: historyStatus.lastError || t("diagnostics.none"),
+      }),
+      t("diagnostics.historyFile", { path: historyStatus.filePath || "-" }),
       t("diagnostics.language", {
         locale: localization.locale,
         preference: localization.preference === "system"
@@ -313,7 +343,25 @@ function startApplication() {
     localization.setPreference(preference);
     if (island) island.refresh("language");
     else rebuildTray();
+    historyWindow?.refresh();
     return true;
+  }
+
+  async function openHistory() {
+    if (!history || !historyWindow) return false;
+    const status = history.snapshot();
+    if (status.mode === "plaintext" && !settings.get("historyPlaintextWarningSeen")) {
+      await dialog.showMessageBox({
+        type: "warning",
+        buttons: [t("renderer.close")],
+        defaultId: 0,
+        title: t("dialog.plaintextHistoryTitle"),
+        message: t("history.unencryptedWarning"),
+        detail: t("dialog.plaintextHistoryDetail"),
+      });
+      settings.set("historyPlaintextWarningSeen", true);
+    }
+    return historyWindow.open();
   }
 
   function rebuildTray() {
@@ -406,6 +454,16 @@ function startApplication() {
           else inputRequests.clear("disabled");
           rebuildTray();
         },
+      },
+      {
+        label: t("tray.recentEvents", { count: history?.snapshot().count || 0 }),
+        click: () => openHistory(),
+      },
+      {
+        label: t("tray.recordHistory"),
+        type: "checkbox",
+        checked: settings.get("historyEnabled"),
+        click: item => { settings.set("historyEnabled", item.checked); rebuildTray(); },
       },
       {
         label: t("tray.launchAtLogin"),
@@ -602,6 +660,33 @@ function startApplication() {
       }
     }
 
+    history = new HistoryStore({
+      filePath: path.join(app.getPath("userData"), "history.json"),
+      safeStorage,
+      platform: process.platform,
+      logger,
+    });
+    history.load();
+    const appendHistory = record => {
+      if (record && settings.get("historyEnabled")) history.append(record);
+    };
+    approvals.on("finalized", event => appendHistory(approvalHistoryRecord(event)));
+    inputRequests.on("finalized", event => appendHistory(inputHistoryRecord(event)));
+    completions.on("shown", item => appendHistory(planHistoryRecord(item)));
+    history.on("changed", () => rebuildTray());
+    historyWindow = new HistoryWindowController({
+      BrowserWindow,
+      clipboard,
+      dialog,
+      historyStore: history,
+      ipcMain,
+      localization,
+      logger,
+      nativeTheme,
+      platformAdapter,
+      screen,
+    });
+
     island = new IslandController({
       BrowserWindow,
       clipboard,
@@ -624,7 +709,10 @@ function startApplication() {
         if (!settings.get("inputReminderEnabled")) return false;
         return !!inputRequests.enqueue({ ...request, agentId: "codex", agentName: "Codex" }).entry;
       },
-      onResolved: request => inputRequests.resolve(request.requestKey),
+      onResolved: request => inputRequests.resolve(request.requestKey, {
+        answers: request.answers,
+        answerAvailable: request.answerAvailable,
+      }),
     });
     inputMonitor.start();
 
@@ -673,6 +761,7 @@ function startApplication() {
     logger.info("Application ready", { version: app.getVersion(), packaged: app.isPackaged, ...platformAdapter.status() });
     const demoApproval = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-approval");
     const demoPlanReady = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-plan-ready");
+    const demoHistory = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-history");
     if (demoApproval || demoPlanReady) {
       let demo;
       if (demoApproval) {
@@ -759,10 +848,82 @@ function startApplication() {
         }, 1400);
       }
     }
+    if (demoHistory) {
+      const now = Date.now();
+      history.append({
+        kind: "approval",
+        agentId: "zcode",
+        agentName: "ZCode",
+        sessionId: "zcode:history-demo",
+        title: t("demo.description"),
+        toolName: "Bash",
+        description: t("demo.description"),
+        cwd: "C:\\Projects\\demo",
+        toolInput: {
+          command: "npm test -- --test-reporter=spec",
+          cwd: "C:\\Projects\\demo",
+          timeout_ms: 120000,
+          environment: { CI: "1", API_TOKEN: "redacted-demo" },
+        },
+        outcome: "allow",
+        reason: "allow",
+        createdAt: now - 240_000,
+        finalizedAt: now - 230_000,
+      });
+      history.append({
+        kind: "question",
+        agentId: "codex",
+        agentName: "Codex",
+        sessionId: "codex:history-demo",
+        titleKey: "fallback.codexWaitingChoice",
+        questions: [{
+          id: "approach",
+          header: "Approach",
+          question: "Which implementation should be used?",
+          options: [{ id: "panel", label: "Right-side panel", description: "Keep the island independent." }],
+        }],
+        answers: { approach: ["Right-side panel"] },
+        answerAvailable: true,
+        outcome: "submit",
+        reason: "answered",
+        createdAt: now - 180_000,
+        finalizedAt: now - 170_000,
+      });
+      history.append({
+        kind: "plan",
+        agentId: "codex",
+        agentName: "Codex",
+        sessionId: "codex:history-plan",
+        titleKey: "fallback.planReadyTitle",
+        content: t("demo.planReadyOutput"),
+        outcome: "ready",
+        reason: "shown",
+        createdAt: now - 60_000,
+        finalizedAt: now - 60_000,
+      });
+      historyWindow.open();
+      if (process.env.VIBE_HALO_HISTORY_SCREENSHOT) {
+        setTimeout(async () => {
+          try {
+            const image = await historyWindow.window.webContents.capturePage();
+            fs.mkdirSync(path.dirname(process.env.VIBE_HALO_HISTORY_SCREENSHOT), { recursive: true });
+            fs.writeFileSync(process.env.VIBE_HALO_HISTORY_SCREENSHOT, image.toPNG());
+            if (process.env.VIBE_HALO_HISTORY_DETAIL_SCREENSHOT) {
+              await historyWindow.window.webContents.executeJavaScript(`document.querySelector('.event-card:last-child')?.click()`, true);
+              await new Promise(resolve => setTimeout(resolve, 180));
+              const detail = await historyWindow.window.webContents.capturePage();
+              fs.writeFileSync(process.env.VIBE_HALO_HISTORY_DETAIL_SCREENSHOT, detail.toPNG());
+            }
+          } catch (error) {
+            logger.warn("Demo history screenshot failed", { message: error.message });
+          }
+        }, 1000);
+      }
+    }
     if (process.argv.includes("--smoke-test")) {
       const smokeDelay = process.env.VIBE_HALO_SMOKE_ACTION_FILE
         ? 4200
-        : (process.env.VIBE_HALO_SCREENSHOT ? 2600 : 1500);
+        : (process.env.VIBE_HALO_HISTORY_DETAIL_SCREENSHOT ? 3400 : (process.env.VIBE_HALO_SCREENSHOT ? 2600 : 1500));
       setTimeout(() => requestQuit(), smokeDelay);
     }
   }).catch(error => {

@@ -10,6 +10,9 @@ const DEFAULTS = Object.freeze({
   openAtLogin: true,
   initialized: false,
   language: "system",
+  historyEnabled: true,
+  historyPlaintextWarningSeen: false,
+  historyStorageVersion: 1,
 });
 
 const LANGUAGE_VALUES = Object.freeze(["system", "en-US", "zh-CN"]);
@@ -46,6 +49,7 @@ class SettingsStore {
       for (const key of Object.keys(DEFAULTS)) {
         if (typeof DEFAULTS[key] === "boolean" && typeof raw[key] === "boolean") this.value[key] = raw[key];
         else if (key === "language" && LANGUAGE_VALUES.includes(raw[key])) this.value[key] = raw[key];
+        else if (key === "historyStorageVersion" && Number.isInteger(raw[key]) && raw[key] >= 1) this.value[key] = raw[key];
       }
       this.integrationStates = cleanIntegrationState(raw.integrations);
       if (!this.integrationStates.codex && raw.integrationInstalled === false) {
@@ -66,6 +70,7 @@ class SettingsStore {
     if (!Object.prototype.hasOwnProperty.call(DEFAULTS, key)) return false;
     if (typeof DEFAULTS[key] === "boolean" && typeof value !== "boolean") return false;
     if (key === "language" && !LANGUAGE_VALUES.includes(value)) return false;
+    if (key === "historyStorageVersion" && (!Number.isInteger(value) || value < 1)) return false;
     this.value[key] = value;
     this.save();
     return true;

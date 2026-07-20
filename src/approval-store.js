@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const { EventEmitter } = require("events");
 const { APPROVAL_TIMEOUT_MS } = require("./constants");
+const { sanitizeValue } = require("./history-store");
 
 function stableStringify(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -192,12 +193,24 @@ class ApprovalStore extends EventEmitter {
     if (index >= 0) this.entries.splice(index, 1);
     this.byKey.delete(entry.key);
     entry.state = finalState;
+    const finalizedEntry = publicEntry(entry);
+    finalizedEntry.toolInput = sanitizeValue(finalizedEntry.toolInput, "toolInput");
+    const finalizedDecision = output && typeof output === "object"
+      ? sanitizeValue(output, "decision")
+      : null;
     if (completeWaiters) {
       for (const waiter of entry.waiters) {
         try { waiter.complete(output); } catch {}
       }
     }
     entry.waiters.clear();
+    this.emit("finalized", {
+      entry: finalizedEntry,
+      state: finalState,
+      reason,
+      decision: finalizedDecision,
+      finalizedAt: this.now(),
+    });
     this.emit("resolved", { id: entry.id, state: finalState, reason });
     this.emit("changed", this.snapshot(), reason);
   }
