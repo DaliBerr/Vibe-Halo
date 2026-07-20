@@ -717,19 +717,35 @@ function startApplication() {
         setTimeout(() => island.expand(demo.id), 180);
       }
       if (demoApproval && process.env.VIBE_HALO_SMOKE_ACTION_FILE) {
+        const actionFile = process.env.VIBE_HALO_SMOKE_ACTION_FILE;
+        const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
+        const reportActionResult = () => {
+          try {
+            fs.mkdirSync(path.dirname(actionFile), { recursive: true });
+            fs.writeFileSync(actionFile, approvals.size === 0 ? "resolved\n" : "pending\n");
+          } catch {}
+        };
         setTimeout(async () => {
           try {
-            await island.window.webContents.executeJavaScript("document.querySelector('#actions button.primary')?.click()", true);
-            setTimeout(() => {
-              try {
-                fs.mkdirSync(path.dirname(process.env.VIBE_HALO_SMOKE_ACTION_FILE), { recursive: true });
-                fs.writeFileSync(process.env.VIBE_HALO_SMOKE_ACTION_FILE, approvals.size === 0 ? "resolved\n" : "pending\n");
-              } catch {}
-            }, 180);
+            let clicked = false;
+            for (let attempt = 0; attempt < 20 && !clicked; attempt += 1) {
+              clicked = await island.window.webContents.executeJavaScript(`(() => {
+                const button = document.querySelector('#actions button.primary');
+                if (!button) return false;
+                button.click();
+                return true;
+              })()`, true);
+              if (!clicked) await wait(100);
+            }
+            for (let attempt = 0; attempt < 20 && approvals.size > 0; attempt += 1) {
+              await wait(50);
+            }
+            reportActionResult();
           } catch (error) {
             logger.warn("Demo approval click failed", { message: error.message });
+            reportActionResult();
           }
-        }, 700);
+        }, 250);
       }
       if (process.env.VIBE_HALO_SCREENSHOT) {
         setTimeout(async () => {
@@ -744,7 +760,9 @@ function startApplication() {
       }
     }
     if (process.argv.includes("--smoke-test")) {
-      const smokeDelay = process.env.VIBE_HALO_SCREENSHOT ? 2600 : 1500;
+      const smokeDelay = process.env.VIBE_HALO_SMOKE_ACTION_FILE
+        ? 4200
+        : (process.env.VIBE_HALO_SCREENSHOT ? 2600 : 1500);
       setTimeout(() => requestQuit(), smokeDelay);
     }
   }).catch(error => {
