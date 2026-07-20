@@ -42,7 +42,7 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npm run build:dir
-      - run: npm run verify:package -- dist/win-unpacked/resources 0.5.4
+      - run: npm run verify:package -- dist/win-unpacked/resources 0.5.5
       - name: Smoke packaged Windows app
         shell: pwsh
         run: |
@@ -89,7 +89,7 @@ jobs:
         run: |
           resources="$(find dist -path '*/Vibe Halo.app/Contents/Resources' -type d -print -quit)"
           test -n "$resources"
-          npm run verify:package -- "$resources" 0.5.4
+          npm run verify:package -- "$resources" 0.5.5
       - name: Smoke packaged macOS app
         shell: bash
         run: |
@@ -128,7 +128,7 @@ jobs:
       - run: npm ci
       - run: sudo apt-get update && sudo apt-get install -y xvfb x11-utils
       - run: npm run build:dir
-      - run: npm run verify:package -- dist/linux-unpacked/resources 0.5.4
+      - run: npm run verify:package -- dist/linux-unpacked/resources 0.5.5
       - name: Smoke packaged Linux app under X11
         shell: bash
         run: |
@@ -230,7 +230,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
-          Cross-platform preview of Vibe Halo 0.5.4.
+          Cross-platform preview of Vibe Halo 0.5.5.
 
           - Codex plan-mode turns now produce a dedicated plan-ready notification
           - Stable, distinct accent colors and compact/expanded badges for all 19 registered clients
@@ -249,5 +249,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" release-assets/* \
             --verify-tag \
             --prerelease \
-            --title "Vibe Halo 0.5.4 — Cross-platform Preview" \
+            --title "Vibe Halo 0.5.5 — Cross-platform Preview" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

@@ -10,7 +10,7 @@
 
 集中处理客户端明确支持的权限请求与交互问题，并在任务完成时提醒你，减少来回切换 Agent 终端。
 
-![Version](https://img.shields.io/badge/version-0.5.4-6d7cff)
+![Version](https://img.shields.io/badge/version-0.5.5-6d7cff)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)
 ![Electron](https://img.shields.io/badge/Electron-41-47848f)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)

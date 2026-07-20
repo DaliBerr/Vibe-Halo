@@ -90,5 +90,6 @@ test("release workflow defaults to unsigned updates while preserving the optiona
   assert.ok(workflow.indexOf("Sign installer") < workflow.indexOf("Generate final update metadata"));
   assert.ok(workflow.indexOf("Verify release package") < workflow.indexOf("Publish stable release assets"));
   assert.doesNotMatch(workflow, /IsNullOrWhiteSpace\("\$\{\{ secrets\./);
+  assert.doesNotMatch(workflow, /\$(?!env:)[A-Za-z_][A-Za-z0-9_]*:/);
   assert.match(workflow, /gh release edit .*--draft=false --latest/);
 });

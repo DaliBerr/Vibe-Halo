@@ -23,7 +23,7 @@ Leave `VIBE_HALO_SIGNPATH_ENABLED` absent or set it to `0`. A `v<version>` tag o
 3. Builds the final unsigned NSIS installer and regenerates its blockmap, `latest.yml`, and `SHA256SUMS.txt` from the final bytes.
 4. Verifies the packaged updater gate and configuration, performs a silent install/uninstall smoke test, and publishes a non-draft, non-prerelease Latest Release.
 
-Version `0.5.4` is the one-time bootstrap release. Install it manually; automatic updating can first be proven when a later stable version is published. Do not move or replace a published tag. If a tagged release fails, fix the workflow and increment the application version.
+Version `0.5.5` is the one-time bootstrap release; the immutable `v0.5.4` tag failed validation before publication. Install 0.5.5 manually; automatic updating can first be proven when a later stable version is published. Do not move or replace a published tag. If a tagged release fails, fix the workflow and increment the application version.
 
 ## Optional SignPath route
 

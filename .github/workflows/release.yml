@@ -224,7 +224,7 @@ jobs:
             if ($signature.Status -ne "Valid") { throw "Invalid Authenticode signature: $file ($($signature.Status))" }
             $publisher = $signature.SignerCertificate.Subject
             if ($publisher -ne $env:VIBE_HALO_PUBLISHER_NAME) {
-              throw "Unexpected publisher for $file: $publisher"
+              throw "Unexpected publisher for ${file}: $publisher"
             }
           }
           npm run verify:package -- "dist/win-unpacked/resources" $version --expect-auto-update
