@@ -31,12 +31,17 @@ const EVENT_ALIASES = Object.freeze({
   sessionstart: "UserPromptSubmit",
 });
 
+function appearance(glyph, accent, inkLight, inkDark) {
+  return Object.freeze({ glyph, accent, inkLight, inkDark });
+}
+
 function descriptor(id, name, tier, extra = {}) {
   const platforms = { win32: true, darwin: true, linux: true, ...(extra.platforms || {}) };
   return Object.freeze({
     id,
     name,
     tier,
+    appearance: extra.appearance,
     capabilities: Object.freeze({
       approval: tier === "approval",
       elicitation: false,
@@ -58,76 +63,95 @@ function descriptor(id, name, tier, extra = {}) {
 
 const AGENTS = Object.freeze([
   descriptor("codex", "Codex", "approval", {
+    appearance: appearance("C", "#10A37F", "#06705A", "#5EE5B5"),
     configKind: "codex-toml", configHome: ".codex", executableNames: ["codex.exe", "codex"],
     configPaths: [".codex/config.toml"], liveVerification: "local",
   }),
   descriptor("zcode", "ZCode", "approval", {
+    appearance: appearance("Z", "#6D5EF7", "#5145CD", "#B9B3FF"),
     configHome: ".zcode", executableNames: ["ZCode.exe", "zcode"], configPaths: [".zcode/cli/config.json"],
     applicationPaths: { win32: ["%ProgramFiles%/ZCode/ZCode.exe"], darwin: ["/Applications/ZCode.app", "~/Applications/ZCode.app"] },
     capabilities: { elicitation: true }, liveVerification: "local",
     events: ["PermissionRequest", "Stop", "UserPromptSubmit", "SessionStart"],
   }),
   descriptor("qwen-code", "Qwen Code", "approval", {
+    appearance: appearance("Q", "#4F46E5", "#3730A3", "#A9B4FF"),
     configHome: ".qwen", executableNames: ["qwen.exe", "qwen"], configPaths: [".qwen/settings.json"],
   }),
   descriptor("copilot-cli", "Copilot CLI", "approval", {
+    appearance: appearance("Co", "#087EA4", "#075985", "#7DD3FC"),
     configHome: ".copilot", executableNames: ["copilot.exe", "copilot"], configPaths: [".copilot/hooks/hooks.json"],
   }),
   descriptor("claude-code", "Claude Code", "approval", {
+    appearance: appearance("Cl", "#D97706", "#9A4C00", "#FDBA74"),
     configHome: ".claude", executableNames: ["claude.exe", "claude"], configPaths: [".claude/settings.json"],
     capabilities: { elicitation: true }, events: ["PermissionRequest", "Elicitation", "Stop", "UserPromptSubmit"],
   }),
   descriptor("codebuddy", "CodeBuddy", "approval", {
+    appearance: appearance("CB", "#C026D3", "#86198F", "#F0ABFC"),
     configHome: ".codebuddy", executableNames: ["codebuddy.exe", "codebuddy"], configPaths: [".codebuddy/settings.json"],
     capabilities: { elicitation: true }, events: ["PermissionRequest", "Elicitation", "Stop", "UserPromptSubmit"],
   }),
   descriptor("hermes", "Hermes", "approval", {
+    appearance: appearance("H", "#B88700", "#7A5300", "#F5D36C"),
     transport: "python-plugin", configKind: "plugin", configHome: ".hermes",
     executableNames: ["hermes.exe", "hermes"], configPaths: [".hermes/config.yaml"],
     capabilities: { elicitation: true }, events: ["PermissionRequest", "Elicitation", "Stop", "UserPromptSubmit"],
   }),
   descriptor("opencode", "OpenCode", "approval", {
+    appearance: appearance("O", "#0F8B8D", "#0F6766", "#67E8E0"),
     transport: "reverse-bridge", configKind: "plugin", configHome: ".config/opencode",
     executableNames: ["opencode.exe", "opencode"], configPaths: [".config/opencode/opencode.json", ".config/opencode/opencode.jsonc"],
   }),
   descriptor("kimi-code", "Kimi Code", "passive", {
+    appearance: appearance("K", "#00A86B", "#047857", "#6EE7B7"),
     configKind: "toml", configHome: ".kimi-code", executableNames: ["kimi.exe", "kimi"],
     configPaths: [".kimi-code/config.toml", ".kimi/config.toml"],
   }),
   descriptor("qoder", "Qoder", "passive", {
+    appearance: appearance("Qd", "#E65A47", "#B23A2B", "#FDA08E"),
     configHome: ".qoder", executableNames: ["qoder.exe", "qoder"], configPaths: [".qoder/settings.json"],
   }),
   descriptor("qoderwork", "QoderWork", "passive", {
+    appearance: appearance("QW", "#D43F8D", "#9D174D", "#F9A8D4"),
     configHome: ".qoderwork", executableNames: ["qoderwork.exe", "qoderwork"], configPaths: [".qoderwork/settings.json"],
   }),
   descriptor("gemini-cli", "Gemini CLI", "status", {
+    appearance: appearance("G", "#4285F4", "#1557B0", "#93C5FD"),
     configHome: ".gemini", executableNames: ["gemini.exe", "gemini"], configPaths: [".gemini/settings.json"],
   }),
   descriptor("antigravity", "Antigravity", "status", {
+    appearance: appearance("A", "#9333EA", "#6B21A8", "#D8B4FE"),
     configHome: ".gemini", executableNames: ["antigravity.exe", "antigravity"], configPaths: [".gemini/config/hooks.json"],
   }),
   descriptor("cursor-agent", "Cursor Agent", "status", {
+    appearance: appearance("Cu", "#475569", "#334155", "#CBD5E1"),
     configHome: ".cursor", executableNames: ["cursor-agent.exe", "cursor-agent", "Cursor.exe"],
     applicationPaths: { win32: ["%LOCALAPPDATA%/Programs/cursor/Cursor.exe"], darwin: ["/Applications/Cursor.app", "~/Applications/Cursor.app"] },
     configPaths: [".cursor/hooks.json"], liveVerification: "local",
   }),
   descriptor("kiro", "Kiro", "status", {
+    appearance: appearance("Ki", "#D946EF", "#A21CAF", "#F5D0FE"),
     configKind: "json-directory", configHome: ".kiro", executableNames: ["kiro.exe", "kiro-cli.exe", "kiro-cli"],
     configPaths: [".kiro/agents"],
   }),
   descriptor("codewhale", "CodeWhale", "status", {
+    appearance: appearance("CW", "#0077B6", "#075077", "#7DD3FC"),
     configKind: "toml", configHome: ".codewhale", executableNames: ["codewhale.exe", "codewhale"],
     configPaths: [".codewhale/config.toml"],
   }),
   descriptor("pi", "Pi", "status", {
+    appearance: appearance("Pi", "#CA8A04", "#854D0E", "#FDE68A"),
     transport: "extension", configKind: "extension", configHome: ".pi", executableNames: ["pi.exe", "pi"],
     configPaths: [".pi/agent/extensions"],
   }),
   descriptor("openclaw", "OpenClaw", "status", {
+    appearance: appearance("OC", "#DC2626", "#B91C1C", "#FCA5A5"),
     transport: "plugin", configKind: "plugin", configHome: ".openclaw", executableNames: ["openclaw.exe", "openclaw"],
     configPaths: [".openclaw/openclaw.json"],
   }),
   descriptor("reasonix", "Reasonix", "status", {
+    appearance: appearance("R", "#65A30D", "#4D7C0F", "#BEF264"),
     configHome: "reasonix", executableNames: ["reasonix.exe", "reasonix"], configPaths: ["reasonix/settings.json"],
   }),
 ]);

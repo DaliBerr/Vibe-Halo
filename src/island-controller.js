@@ -1,6 +1,7 @@
 "use strict";
 
 const path = require("path");
+const { agent } = require("./agent-registry");
 const { formatApprovalInput } = require("./approval-presenter");
 const { createLocalizer } = require("./i18n");
 const { locateDisplay } = require("./window-locator");
@@ -314,8 +315,13 @@ class IslandController {
     const localize = (value, key, params) => value || (key ? this.localization.t(key, params) : "");
     const {
       titleKey, titleParams, contentKey, contentParams, outputKey, outputParams,
+      agentAppearance: ignoredAppearance,
       ...safe
     } = entry;
+    const descriptor = agent(entry.agentId);
+    safe.agentAppearance = descriptor?.appearance || {
+      glyph: "A", accent: "#64748B", inkLight: "#334155", inkDark: "#CBD5E1",
+    };
     if (Object.prototype.hasOwnProperty.call(entry, "title")) safe.title = localize(entry.title, titleKey, titleParams);
     if (Object.prototype.hasOwnProperty.call(entry, "content")) safe.content = localize(entry.content, contentKey, contentParams);
     if (Object.prototype.hasOwnProperty.call(entry, "output")) safe.output = localize(entry.output, outputKey, outputParams);

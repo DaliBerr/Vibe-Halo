@@ -24,3 +24,13 @@ test("compact expand indicator uses a fixed SVG box instead of a font glyph", ()
   assert.doesNotMatch(html, />\s*⌄\s*</);
   assert.match(css, /\.compact-chevron\s*\{[^}]*width:\s*18px[^}]*height:\s*18px[^}]*place-items:\s*center/s);
 });
+
+test("client identity uses a labeled compact chip and matching expanded badge", () => {
+  assert.match(html, /id="compact-agent" class="agent-chip">Codex<\/span>/);
+  assert.match(html, /id="agent-badge" class="agent-badge"[^>]*>C<\/span>/);
+  assert.match(css, /\.agent-chip\s*\{[^}]*--agent-accent|\.agent-chip\s*\{[^}]*color-mix\([^)]*var\(--agent-accent\)/s);
+  assert.match(css, /\.agent-badge\s*\{[^}]*color-mix\([^)]*var\(--agent-accent\)/s);
+  assert.match(javascript, /function applyAgentAppearance\(item, agentName\)/);
+  assert.match(javascript, /compactAgent\.textContent = agentName/);
+  assert.match(javascript, /agentBadge\.textContent = glyph/);
+});

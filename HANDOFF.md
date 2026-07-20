@@ -1,12 +1,12 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-07-19
+Updated: 2026-07-20
 Current version: `0.5.1`
 Source directory: `C:\Tools\Clawd-island`
 
 ## Current Scope
 
-Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for AI coding clients. Version 0.5.1 adopts the new transparent Halo terminal icon across application packages and the tray, adds matching README branding, and retains the 0.5.0 platform runtime, stable POSIX Hook launcher, macOS accessory lifecycle, Linux X11/XWayland selection, centered mini-island, one window, one global approval FIFO, loopback-only transport, strict renderer isolation, and fail-open behavior.
+Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for AI coding clients. Version 0.5.1 adopts the new transparent Halo terminal icon across application packages and a tightly framed small-size tray representation, gives all 19 registered clients a stable accent color and unique one- or two-character badge in both island states, and retains the 0.5.0 platform runtime, stable POSIX Hook launcher, macOS accessory lifecycle, Linux X11/XWayland selection, centered mini-island, one window, one global approval FIFO, loopback-only transport, strict renderer isolation, and fail-open behavior.
 
 - Dynamic-island approvals: Codex, ZCode, Qwen Code, Copilot CLI, Claude Code, CodeBuddy, Hermes, and OpenCode.
 - Exact interactive answers: ZCode `AskUserQuestion`, Claude/CodeBuddy Elicitation, and Hermes clarify.
@@ -41,7 +41,7 @@ The application does not contain desktop pets, remote approvals, a theme system,
 
 ## Verification Status
 
-- Automated suite: 126 tests on Windows before cross-platform CI (125 passed, one POSIX-only process test skipped), covering 19 adapters, platform contracts, codecs, forms, global FIFO, server authentication/bounds, Windows/POSIX Hook paths, offline fallback, X11 source-window matching, installers, backups, idempotence, explicit disables, safe uninstall, IPC, sizing, stores, localization, icon assets, settings migration, and legacy regressions. The POSIX process-runner test executes on macOS/Linux CI.
+- Automated suite: 130 tests on Windows (129 passed, one POSIX-only process test skipped), covering 19 adapters, unique client identity palettes/badges, the tightly framed 1x/2x tray icon pipeline and its safe fallback, platform contracts, codecs, forms, global FIFO, server authentication/bounds, Windows/POSIX Hook paths, offline fallback, X11 source-window matching, installers, backups, idempotence, explicit disables, safe uninstall, IPC, sizing, stores, localization, icon assets, settings migration, and legacy regressions. The POSIX process-runner test executes on macOS/Linux CI.
 - Automatic-update suite: signed-build gating, scheduler state, download/install transitions, sanitized errors, ordered fail-open shutdown, external signing staging/injection, and signed-byte metadata regeneration.
 - Windows: Codex/ZCode retain existing real-client validation. The 0.5.1 unpacked app passed package verification. `Vibe-Halo-Setup-0.5.1-x64.exe` is unsigned, update-disabled, 102,837,420 bytes, and has SHA-256 `A3A36BE8B3017D175020EA4C1B62C8C9ADB5B7A1C20B187FB68C4A4D28FEF27E`.
 - macOS/Linux: first release is limited to CI contract, package, stable-runner, and isolated startup smoke tests. No real-client round-trip claim may be made until tested on physical installations.

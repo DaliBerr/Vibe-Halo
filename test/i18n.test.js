@@ -61,6 +61,9 @@ test("language switching retranslates queued Vibe Halo chrome without changing p
   assert.deepEqual(english.current.options.map(option => option.label), ["Allow once", "Deny", "Handle in client"]);
   assert.equal(english.current.description, "客户端原文");
   assert.equal(english.current.presentation.primary, "npm test");
+  assert.deepEqual(english.current.agentAppearance, {
+    glyph: "Z", accent: "#6D5EF7", inkLight: "#5145CD", inkDark: "#B9B3FF",
+  });
 
   localization.setPreference("zh-CN");
   const chinese = controller.state();
@@ -75,7 +78,9 @@ test("renderer strings are bounded to the active locale", () => {
   const localization = createLocalizer({ preference: "system", systemLocale: "zh-CN" });
   const chinese = localization.rendererStrings();
   assert.equal(chinese.copyContent, "复制内容");
-  assert.equal(Object.keys(chinese).length, 23);
+  assert.equal(chinese.waitingChoiceSummary, "等待你的选择");
+  assert.equal(chinese.completedSummary, "已完成");
+  assert.equal(Object.keys(chinese).length, 25);
   localization.setPreference("en-US");
   assert.equal(localization.rendererStrings().copyContent, "Copy content");
 });

@@ -3,7 +3,8 @@
 const island = document.getElementById("island");
 const compact = document.getElementById("compact");
 const expanded = document.getElementById("expanded");
-const compactTitle = document.getElementById("compact-title");
+const compactAgent = document.getElementById("compact-agent");
+const compactSummary = document.getElementById("compact-summary");
 const count = document.getElementById("count");
 const title = document.getElementById("title");
 const subtitle = document.getElementById("subtitle");
@@ -24,6 +25,7 @@ const actions = document.getElementById("actions");
 const overflowActions = document.getElementById("overflow-actions");
 const overflowToggle = document.getElementById("overflow-toggle");
 const overflowMenu = document.getElementById("overflow-menu");
+const agentBadge = document.getElementById("agent-badge");
 
 const canvas = document.createElement("canvas");
 const context = canvas.getContext("2d");
@@ -51,7 +53,9 @@ const defaultStrings = Object.freeze({
   waitingAnswerCompact: "Waiting for an answer",
   approvalRequestCompact: "{toolName} approval request",
   waitingChoiceCompact: "{agentName} is waiting for your choice",
+  waitingChoiceSummary: "Waiting for your choice",
   completedCompact: "{agentName} completed",
+  completedSummary: "Completed",
   waitingYourAnswer: "{agentName} is waiting for your answer",
   returnToClient: "Return to {agentName} to finish the choice in its native interface.",
   taskCompleted: "Task completed",
@@ -75,6 +79,23 @@ function applyStaticStrings() {
   rawSummary.textContent = ui("rawDetails");
   overflowToggle.setAttribute("aria-label", ui("moreActions"));
   overflowToggle.textContent = ui("more");
+}
+
+function applyAgentAppearance(item, agentName) {
+  const source = item?.agentAppearance || {};
+  const color = value => (typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : null);
+  const accent = color(source.accent) || "#64748B";
+  const inkLight = color(source.inkLight) || "#334155";
+  const inkDark = color(source.inkDark) || "#CBD5E1";
+  const glyph = typeof source.glyph === "string" && /^.{1,2}$/u.test(source.glyph)
+    ? source.glyph
+    : "A";
+  document.documentElement.style.setProperty("--agent-accent", accent);
+  document.documentElement.style.setProperty("--agent-ink-light", inkLight);
+  document.documentElement.style.setProperty("--agent-ink-dark", inkDark);
+  compactAgent.textContent = agentName;
+  compactAgent.title = agentName;
+  agentBadge.textContent = glyph;
 }
 
 function clearElement(element) {
@@ -273,11 +294,11 @@ function render(next) {
   compact.hidden = isExpanded;
   expanded.hidden = !isExpanded;
   const agentName = item.agentName || "Codex";
-  compactTitle.textContent = isActionable
-    ? `${agentName} · ${isElicitation ? ui("waitingAnswerCompact") : formatUi("approvalRequestCompact", { toolName: item.toolName })}`
-    : (isInputRequest
-      ? formatUi("waitingChoiceCompact", { agentName })
-      : formatUi("completedCompact", { agentName }));
+  applyAgentAppearance(item, agentName);
+  compactSummary.textContent = isActionable
+    ? (isElicitation ? ui("waitingAnswerCompact") : formatUi("approvalRequestCompact", { toolName: item.toolName }))
+    : (isInputRequest ? ui("waitingChoiceSummary") : ui("completedSummary"));
+  compact.setAttribute("aria-label", `${agentName} · ${compactSummary.textContent}`);
   count.hidden = (!isActionable && !isInputRequest) || next.pendingCount <= 1;
   count.textContent = String(next.pendingCount);
   title.textContent = isActionable

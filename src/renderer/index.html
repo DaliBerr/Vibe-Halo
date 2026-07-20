@@ -11,7 +11,11 @@
   <main id="island" class="island compact" role="dialog" aria-live="polite">
     <section id="compact" class="compact-view" tabindex="0">
       <span id="pulse" class="pulse"></span>
-      <span id="compact-title" class="compact-title">Codex</span>
+      <span id="compact-title" class="compact-title">
+        <span id="compact-agent" class="agent-chip">Codex</span>
+        <span class="compact-separator" aria-hidden="true">·</span>
+        <span id="compact-summary" class="compact-summary"></span>
+      </span>
       <span id="count" class="count" hidden></span>
       <span class="compact-chevron" aria-hidden="true">
         <svg class="chevron-icon" viewBox="0 0 16 16" focusable="false">
@@ -28,7 +32,7 @@
       </button>
       <header>
         <div class="identity">
-          <span class="codex-mark">C</span>
+          <span id="agent-badge" class="agent-badge" aria-hidden="true">C</span>
           <div class="identity-copy">
             <div id="title" class="title"></div>
             <div id="subtitle" class="subtitle"></div>

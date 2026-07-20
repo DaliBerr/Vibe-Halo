@@ -44,6 +44,7 @@ const { createLogger } = require("./logger");
 const { IslandServer } = require("./server");
 const { SettingsStore } = require("./settings-store");
 const { ShutdownCoordinator } = require("./shutdown-coordinator");
+const { createTrayImage } = require("./tray-icon");
 const { UpdateManager } = require("./update-manager");
 const { autoUpdater } = require("electron-updater");
 const appMetadata = require("../package.json");
@@ -299,14 +300,7 @@ function startApplication() {
 
   function trayImage() {
     const iconDir = path.join(__dirname, "..", "assets", "icons");
-    const image = nativeImage.createFromPath(path.join(iconDir, "16x16.png"));
-    if (!image.isEmpty()) {
-      try {
-        const retina = nativeImage.createFromPath(path.join(iconDir, "32x32.png"));
-        if (!retina.isEmpty()) image.addRepresentation({ scaleFactor: 2, dataURL: retina.toDataURL() });
-      } catch {}
-    }
-    return platformAdapter.configureTrayImage(image.isEmpty() ? nativeImage.createEmpty() : image);
+    return platformAdapter.configureTrayImage(createTrayImage(nativeImage, path.join(iconDir, "32x32.png")));
   }
 
   function showSystemNotification(title, body) {

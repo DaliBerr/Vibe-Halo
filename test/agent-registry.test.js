@@ -14,9 +14,16 @@ test("registers all 19 bounded client adapters", () => {
   const adapters = listAgents();
   assert.equal(adapters.length, 19);
   assert.equal(new Set(adapters.map(value => value.id)).size, 19);
+  assert.equal(new Set(adapters.map(value => value.appearance.glyph)).size, 19);
+  assert.equal(new Set(adapters.map(value => value.appearance.accent)).size, 19);
   for (const value of adapters) {
     assert.equal(typeof value.name, "string");
     assert.equal(typeof value.capabilities.completion, "boolean");
+    assert.match(value.appearance.glyph, /^.{1,2}$/u);
+    assert.match(value.appearance.accent, /^#[0-9A-F]{6}$/);
+    assert.match(value.appearance.inkLight, /^#[0-9A-F]{6}$/);
+    assert.match(value.appearance.inkDark, /^#[0-9A-F]{6}$/);
+    assert.equal(Object.isFrozen(value.appearance), true);
     const request = normalizeRequest(value.id, {
       event: "Stop", session_id: "s", tool_name: "x".repeat(300), tool_input: { value: "y".repeat(5000) },
     });

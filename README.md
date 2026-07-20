@@ -81,6 +81,8 @@ AI coding clients often wait in the background for a permission decision, a foll
 ### Dynamic-island interaction
 
 - The compact view shows the client, a short event summary, and pending count; click it to expand.
+- Every registered client has a stable color and one- or two-character badge. The compact client chip and expanded badge match, while the separate status dot keeps its approval/input/completion meaning.
+- The tray uses a small-size optimized, tightly framed representation so the Halo mark remains legible at common system-tray scaling levels.
 - The expanded view presents commands, patches, queries, descriptions, working directories, and bounded structured parameters.
 - Use the small island control at the top center—or press `Esc`—to collapse without dismissing the item or deciding an approval.
 - The action bar stays fixed at the bottom. When more than three options exist, lower-frequency actions move into a “More” menu.
