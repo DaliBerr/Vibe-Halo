@@ -28,6 +28,10 @@ test("history renderer supports localization, dark and light surfaces, badges, a
   assert.match(css, /\.event-list\s*\{[^}]*overflow-x:\s*hidden/s);
   assert.match(css, /\.event-title\s*\{[^}]*display:\s*block[^}]*text-overflow:\s*ellipsis/s);
   assert.match(javascript, /historyAPI\.pointer\(false\)/);
+  assert.match(css, /body\s*\{[^}]*padding:\s*28px 40px 52px/s);
+  assert.match(css, /\.panel-header\s*\{[^}]*-webkit-app-region:\s*drag/s);
+  assert.match(css, /\.panel-header button\s*\{[^}]*-webkit-app-region:\s*no-drag/s);
+  assert.doesNotMatch(css, /padding:\s*8px 8px 18px/);
 });
 
 test("copying is limited to main-process region ids", () => {

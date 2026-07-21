@@ -1,18 +1,18 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-07-20
-Current version: `0.5.6`
+Updated: 2026-07-21
+Current version: `0.5.7`
 Source directory: `C:\Tools\Clawd-island`
 
 ## Current Scope
 
-Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for AI coding clients. Version 0.5.6 adds a separate tray-opened right-side recent-event window while keeping the live top-center island independent. Approval, question, best-effort Codex native-answer, and Codex plan records are retained for 30 days/200 items under a 16 MiB cap; ordinary completion notifications are excluded. History uses Electron secure storage when available and an explicitly warned plaintext fallback otherwise. The Windows x64 stable updater remains independent from Authenticode signing: official release builds opt into GitHub Releases updates with SHA-512 metadata, while SignPath is an optional, default-disabled enhancement.
+Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for AI coding clients. Version 0.5.7 expands the history window's transparent shadow gutter, makes its top headers native draggable while preserving multi-display constraints, and recognizes ZCode Plan-mode Stop events alongside Codex. Approval, question, best-effort Codex native-answer, and Codex/ZCode plan records are retained for 30 days/200 items under a 16 MiB cap; ordinary completion notifications are excluded. History uses Electron secure storage when available and an explicitly warned plaintext fallback otherwise. The Windows x64 stable updater remains independent from Authenticode signing: official release builds opt into GitHub Releases updates with SHA-512 metadata, while SignPath is an optional, default-disabled enhancement.
 
 - Dynamic-island approvals: Codex, ZCode, Qwen Code, Copilot CLI, Claude Code, CodeBuddy, Hermes, and OpenCode.
 - Exact interactive answers: ZCode `AskUserQuestion`, Claude/CodeBuddy Elicitation, and Hermes clarify.
 - Native approval reminders: Kimi Code, Qoder, and QoderWork.
 - Completion/status notifications: Gemini CLI, Antigravity, Cursor Agent, Kiro, CodeWhale, Pi, OpenClaw, Reasonix, and the approval clients.
-- Codex plan-mode turns receive a distinct plan-ready title and compact summary; completed plan output is shown when the Hook supplies it, with a localized fallback otherwise.
+- Codex and ZCode plan-mode turns receive a distinct, client-aware plan-ready title and compact summary; completed plan output is shown when the Hook supplies it, with a localized fallback otherwise.
 - Codex `request_user_input` remains a read-only reminder because Codex does not expose a stable command-hook answer protocol.
 
 The application does not contain desktop pets, remote approvals, a theme system, or the old Clawd on Desk multi-agent state machine.
@@ -25,7 +25,7 @@ The application does not contain desktop pets, remote approvals, a theme system,
 - `hooks/integrations/`: managed OpenCode reverse bridge, Hermes plugin, Pi extension, and OpenClaw plugin.
 - `src/server.js`: authenticated `127.0.0.1` gateway with a 256 KiB request limit and adapter routing.
 - `src/approval-store.js`: semantic decisions, `agentId`-isolated deduplication, connection fan-out, and the shared FIFO.
-- `src/completion-event.js`: bounded `Stop` normalization and Codex plan-mode classification using the documented Hook permission mode.
+- `src/completion-event.js`: bounded `Stop` normalization and Codex/ZCode plan-mode classification using the documented Hook permission mode.
 - `src/main.js`: service wiring, auto-scan, diagnostics, tray integration manager, and notification lifecycle.
 - `src/platform-adapter.js`: platform/config paths, stable Hook runtime, process detection, login startup, notifications, package kind, and window-backend diagnostics.
 - `src/update-manager.js`: release-build gating, background update checks/downloads, bounded status, and explicit restart installation.
@@ -73,9 +73,9 @@ npm run build
 - Linux prefers X11/XWayland; `VIBE_HALO_NATIVE_WAYLAND=1` forces a diagnosed degraded native-Wayland mode.
 - macOS runs as an accessory application without Dock presence or Accessibility/Screen Recording permissions.
 - The stable POSIX launcher lives at `~/.vibe-halo/bin/vibe-halo-hook-runner`; remove all integrations before deleting the app on macOS/Linux.
-- `preview-0.5.3` is a GitHub Pre-release built by `.github/workflows/cross-platform.yml`; it includes all platform packages and `SHA256SUMS.txt` but no stable update metadata. macOS packages are ad-hoc signed only, without Developer ID signing or notarization, and macOS/Linux auto-update stays disabled.
+- `preview-0.5.7` is the intended GitHub Pre-release built by `.github/workflows/cross-platform.yml`; it includes all platform packages and `SHA256SUMS.txt` but no stable update metadata. macOS packages are ad-hoc signed only, without Developer ID signing or notarization, and macOS/Linux auto-update stays disabled.
 - Windows local and preview artifacts remain update-disabled. The stable `v*` workflow defaults to an unsigned, update-enabled NSIS release and regenerates `latest.yml` and the blockmap from final bytes. Setting repository variable `VIBE_HALO_SIGNPATH_ENABLED=1` restores the retained three-stage SignPath path.
-- Version 0.5.5 is the manually installed updater bootstrap. Version 0.5.6 is the first intended live N-to-N+1 acceptance target; record the final installed update result here after the stable release is published.
+- Version 0.5.5 is the manually installed updater bootstrap. The live 0.5.5 → 0.5.6 update check, download, explicit restart installation, and encrypted-history persistence acceptance passed on Windows.
 - Keep `LICENSE`, `NOTICE.md`, and upstream attribution in every release.
 - `dist/`, `node_modules/`, `.smoke/`, logs, and contributor-local `AGENTS.local.md` are not committed.
 - After moving source or installing a different build, run integration repair and review changed Codex Hook commands in `/hooks`.

@@ -42,9 +42,17 @@ test("normalizes generic client argv and payload fields", () => {
   assert.deepEqual(body.permission_suggestions, [{ type: "setMode", mode: "acceptEdits", destination: "session" }]);
 });
 
-test("forwards only documented Codex permission modes", () => {
+test("forwards documented permission modes and bounded plan output", () => {
   const plan = buildBody({ hook_event_name: "Stop", session_id: "plan", permission_mode: "plan" });
   assert.equal(plan.permission_mode, "plan");
+  const zcodePlan = buildBody({
+    hook_event_name: "Stop",
+    session_id: "zcode-plan",
+    permission_mode: "plan",
+    last_assistant_message: "1. Inspect\n2. Implement\n3. Verify",
+  }, "zcode");
+  assert.equal(zcodePlan.permission_mode, "plan");
+  assert.equal(zcodePlan.assistant_last_output, "1. Inspect\n2. Implement\n3. Verify");
   assert.equal(normalizePermissionMode("acceptEdits"), "acceptEdits");
   assert.equal(normalizePermissionMode("unknown"), "");
   const invalid = buildBody({ hook_event_name: "Stop", session_id: "bad", permission_mode: "unknown" });

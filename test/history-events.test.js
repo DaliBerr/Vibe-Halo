@@ -84,7 +84,7 @@ test("records plans and excludes ordinary task completion notifications", () => 
     agentId: "codex",
     agentName: "Codex",
     sessionId: "session-3",
-    titleKey: "fallback.planReadyTitle",
+    titleKey: "fallback.agentPlanReadyTitle",
     titleParams: { agentName: "Codex" },
     output: "1. Make the change",
     outputKey: "",

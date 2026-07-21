@@ -10,7 +10,7 @@
 
 Handle supported permission requests and interactive questions, and receive completion notifications without constantly switching back to agent terminals.
 
-![Version](https://img.shields.io/badge/version-0.5.6-6d7cff)
+![Version](https://img.shields.io/badge/version-0.5.7-6d7cff)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)
 ![Electron](https://img.shields.io/badge/Electron-41-47848f)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
@@ -35,7 +35,7 @@ Vibe Halo appears at the top of the active display when you need to intervene. S
 
 ## Quick start
 
-1. Download the package for your platform from [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases): Windows x64 NSIS, macOS 12+ arm64/x64 DMG or ZIP, or Linux x64 AppImage/deb.
+1. Download the Windows x64 stable installer from the latest [GitHub Release](https://github.com/DaliBerr/Vibe-Halo/releases), or choose the newest **Cross-platform Preview** for macOS 12+ arm64/x64 DMG/ZIP and Linux x64 AppImage/deb packages.
 2. Launch Vibe Halo and open **Client integrations** from the tray to inspect detected clients and integration health.
 3. If you use Codex, enter `/hooks` in Codex and review the installed Vibe Halo command hooks before triggering an approval.
 
@@ -75,7 +75,7 @@ AI coding clients often wait in the background for a permission decision, a foll
 - **Clear provenance** — the title always identifies the client that produced the event.
 - **Fail-open to the native UI** — close, disconnect, timeout, malformed response, and unknown option paths never invent a decision.
 - **Local by design** — agent events use a token-authenticated loopback service; there is no remote approval endpoint.
-- **Optional local history** — a tray-opened right-side panel keeps bounded approval, question, and Codex plan details without occupying the desktop permanently.
+- **Optional local history** — a tray-opened, freely draggable side panel keeps bounded approval, question, and Codex/ZCode plan details without occupying the desktop permanently.
 
 ## Key features
 
@@ -95,16 +95,16 @@ AI coding clients often wait in the background for a permission decision, a foll
 - Allow once, deny, hand back to the client, and similar actions are mapped only when the source protocol actually provides them.
 - OpenCode displays `Always` only when the original request explicitly advertises that capability.
 - Duplicate requests from the same client are coalesced, and the final result is fanned out to every waiting connection.
-- When a Codex turn stops in Plan mode, Vibe Halo shows a dedicated plan-ready notification with the completed plan output when available.
+- When a Codex or ZCode turn stops in Plan mode, Vibe Halo shows a dedicated plan-ready notification with the completed plan output when available.
 - Completion notifications normally remain visible for 8 seconds; a new prompt or approval preempts an older completion.
 - UI priority is fixed: **approval/exact interaction > input reminder > completion notification**.
 
 ### Recent events
 
-- Open **Recent events** from the tray to show a separate 460 × 720 right-side panel; the live top-center island remains independent and stays above it.
+- Open **Recent events** from the tray to show a separate 460 × 720 right-side panel; drag either view's top header to reposition it. The live top-center island remains independent and stays above it.
 - The list can be filtered by all events, approvals, questions, plans, or source client. Selecting an entry opens read-only details with separate copy controls for commands, parameters, answers, content, and working directories.
 - Approval outcomes—including allow, deny, return-to-client, timeout, disconnect, and close—are retained. Exact in-island answers and best-effort Codex `request_user_input` answers are retained; incompatible Codex output is marked as unavailable.
-- Codex plan-ready output is retained. Ordinary task-completion notifications are deliberately excluded.
+- Codex and ZCode plan-ready output is retained. Ordinary task-completion notifications are deliberately excluded.
 - History keeps at most 200 events for 30 days and caps its file at 16 MiB. Moving the pointer away closes the panel after five seconds; the tray is its only entry point.
 
 ### Integration management
@@ -171,13 +171,13 @@ flowchart LR
 
 ### Use a release build
 
-Download the current package from [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases):
+Download Windows stable builds or the newest three-platform Preview from [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases):
 
-| Platform | Supported baseline | Artifacts |
+| Platform | Supported baseline | Channel and artifacts |
 | --- | --- | --- |
-| Windows | Windows 10/11 x64 | `Vibe-Halo-Setup-<version>-x64.exe` |
-| macOS | macOS 12+, Apple Silicon or Intel | `Vibe-Halo-<version>-arm64.dmg` / `.zip`, `Vibe-Halo-<version>-x64.dmg` / `.zip` |
-| Linux | Ubuntu 22.04/24.04 or Debian 12 x64 | `Vibe-Halo-<version>-x64.AppImage`, `Vibe-Halo-<version>-x64.deb` |
+| Windows | Windows 10/11 x64 | Latest stable or Preview: `Vibe-Halo-Setup-<version>-x64.exe` |
+| macOS | macOS 12+, Apple Silicon or Intel | Cross-platform Preview: `Vibe-Halo-<version>-arm64.dmg` / `.zip`, `Vibe-Halo-<version>-x64.dmg` / `.zip` |
+| Linux | Ubuntu 22.04/24.04 or Debian 12 x64 | Cross-platform Preview: `Vibe-Halo-<version>-x64.AppImage`, `Vibe-Halo-<version>-x64.deb` |
 
 Other Linux distributions may work with the AppImage, but are not part of the first release guarantee. Preview packages are not publisher-signed; verify the published SHA-256 list and download only from this repository.
 

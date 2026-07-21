@@ -9,7 +9,10 @@ const {
   HistoryWindowController,
   HISTORY_MAX_DETAIL_IPC_BYTES,
   HISTORY_MAX_LIST_IPC_BYTES,
+  HISTORY_GUTTER,
+  HISTORY_WINDOW,
   calculateHistoryBounds,
+  constrainHistoryBounds,
   historyDetail,
   historyListState,
   outcomeKey,
@@ -72,6 +75,7 @@ class FakeWindow extends EventEmitter {
   setMenuBarVisibility() {}
   loadFile(value) { this.file = value; }
   setBounds(value) { this.bounds = value; }
+  getBounds() { return { ...this.bounds }; }
   show() { this.visible = true; }
   focus() { this.focused = true; }
   hide() { this.visible = false; }
@@ -109,11 +113,17 @@ function controllerFixture() {
 
 test("history bounds stay pinned to the right and clamp small work areas", () => {
   assert.deepEqual(calculateHistoryBounds({ workArea: { x: 100, y: 50, width: 1200, height: 800 } }), {
-    x: 824, y: 66, width: 460, height: 720,
+    x: 760, y: 50, width: 540, height: 800,
   });
   assert.deepEqual(calculateHistoryBounds({ workArea: { x: 0, y: 0, width: 330, height: 500 } }), {
-    x: 16, y: 16, width: 298, height: 468,
+    x: 0, y: 0, width: 330, height: 500,
   });
+  assert.deepEqual(HISTORY_GUTTER, { left: 40, right: 40, top: 28, bottom: 52 });
+  assert.equal(HISTORY_WINDOW.contentWidth, 460);
+  assert.deepEqual(constrainHistoryBounds(
+    { x: -500, y: 900, width: 540, height: 800 },
+    { workArea: { x: 100, y: 50, width: 1200, height: 800 } },
+  ), { x: 100, y: 50, width: 540, height: 800 });
   assert.equal(calculateHistoryBounds(null), null);
 });
 
@@ -140,6 +150,7 @@ test("isolated IPC validates sender, ids, copy regions, and supports deletion", 
   assert.equal(win.options.webPreferences.sandbox, true);
   assert.equal(win.options.webPreferences.contextIsolation, true);
   assert.equal(win.options.webPreferences.nodeIntegration, false);
+  assert.equal(win.options.movable, true);
   assert.deepEqual(win.alwaysOnTop, [true, "floating"]);
   assert.deepEqual(win.webContents.openHandler(), { action: "deny" });
   assert.equal(await ipcMain.invoke("history:list", { sender: {} }), null);
@@ -159,7 +170,7 @@ test("opening resets the list and pointer leave fades after five seconds", () =>
   controller.open();
   const win = controller.window;
   assert.equal(win.visible, true);
-  assert.deepEqual(win.bounds, { x: 824, y: 66, width: 460, height: 720 });
+  assert.deepEqual(win.bounds, { x: 760, y: 50, width: 540, height: 800 });
   assert.ok(win.webContents.messages.some(message => message[0] === "history:reset"));
   ipcMain.emit("history:pointer", { sender: win.webContents }, { inside: false });
   const leave = [...timers.values()].find(timer => timer.delay === 5000);
@@ -196,7 +207,26 @@ test("display removal constrains a visible history window to the primary work ar
   screen.getAllDisplays = () => [];
   screen.getPrimaryDisplay = () => fallback;
   screen.emit("display-removed", {}, { id: 1 });
-  assert.deepEqual(controller.window.bounds, { x: -476, y: 26, width: 460, height: 568 });
+  assert.deepEqual(controller.window.bounds, { x: -540, y: 10, width: 540, height: 600 });
+  controller.destroy();
+});
+
+test("native header dragging preserves the custom position and clamps it to the work area", () => {
+  const { controller, timers } = controllerFixture();
+  controller.open();
+  const win = controller.window;
+  win.emit("moved");
+  win.bounds = { x: 320, y: 50, width: 540, height: 800 };
+  win.emit("moved");
+  assert.deepEqual(controller.customBounds, win.bounds);
+  controller.close(true);
+  [...timers.values()].find(timer => timer.delay === 220).callback();
+  controller.open();
+  assert.deepEqual(win.bounds, { x: 320, y: 50, width: 540, height: 800 });
+  win.emit("moved");
+  win.bounds = { x: -1000, y: -1000, width: 540, height: 800 };
+  win.emit("moved");
+  assert.deepEqual(win.bounds, { x: 100, y: 50, width: 540, height: 800 });
   controller.destroy();
 });
 

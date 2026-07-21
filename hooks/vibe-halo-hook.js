@@ -88,6 +88,16 @@ function cleanText(value, max = 2000) {
     : "";
 }
 
+function cleanMultilineText(value, max = 6000) {
+  return typeof value === "string"
+    ? value
+      .replace(/\r\n?/g, "\n")
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, " ")
+      .trim()
+      .slice(0, max)
+    : "";
+}
+
 function stableStringify(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
@@ -204,7 +214,7 @@ function normalizeSessionId(payload, agentId = "codex") {
 function textFromContent(content) {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
-  return content.map(block => typeof block === "string" ? block : cleanText(block?.text, 6000)).filter(Boolean).join("\n\n");
+  return content.map(block => typeof block === "string" ? block : cleanMultilineText(block?.text, 6000)).filter(Boolean).join("\n\n");
 }
 
 function extractAssistantOutput(transcriptPath) {
@@ -222,10 +232,10 @@ function extractAssistantOutput(transcriptPath) {
       try { item = JSON.parse(lines[i]); } catch { continue; }
       const payload = item?.payload;
       if (item?.type === "event_msg" && payload?.type === "agent_message") {
-        return cleanText(payload.message || payload.text || textFromContent(payload.content), 6000);
+        return cleanMultilineText(payload.message || payload.text || textFromContent(payload.content), 6000);
       }
       if (item?.type === "response_item" && payload?.role === "assistant") {
-        return cleanText(payload.text || payload.output_text || textFromContent(payload.content), 6000);
+        return cleanMultilineText(payload.text || payload.output_text || textFromContent(payload.content), 6000);
       }
     }
   } catch {}
@@ -287,7 +297,13 @@ function buildBody(payload, agentId = "codex") {
     if (payload?.always === true || payload?.allow_always === true) body.always = true;
     body.tool_input_fingerprint = crypto.createHash("sha256").update(stableStringify(input)).digest("hex");
   } else if (event === "Stop") {
-    body.assistant_last_output = extractAssistantOutput(payload?.transcript_path);
+    body.assistant_last_output = cleanMultilineText(
+      payload?.assistant_last_output
+        || payload?.last_assistant_message
+        || payload?.lastAssistantMessage
+        || payload?.assistant_output,
+      6000,
+    ) || extractAssistantOutput(payload?.transcript_path);
     body.session_title = cleanText(meta?.thread_name || meta?.title, 240);
   }
   return body;

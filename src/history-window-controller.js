@@ -6,7 +6,14 @@ const { formatApprovalInput } = require("./approval-presenter");
 const { truncateUtf8 } = require("./history-store");
 const { translateReason } = require("./i18n");
 
-const HISTORY_WINDOW = Object.freeze({ width: 460, height: 720, minWidth: 360, margin: 16 });
+const HISTORY_GUTTER = Object.freeze({ left: 40, right: 40, top: 28, bottom: 52 });
+const HISTORY_WINDOW = Object.freeze({
+  contentWidth: 460,
+  contentHeight: 720,
+  minContentWidth: 360,
+  width: 460 + HISTORY_GUTTER.left + HISTORY_GUTTER.right,
+  height: 720 + HISTORY_GUTTER.top + HISTORY_GUTTER.bottom,
+});
 const HISTORY_LEAVE_DELAY_MS = 5000;
 const HISTORY_FADE_MS = 220;
 const COPY_SECTIONS = new Set(["primary", "parameters", "answers", "content", "cwd"]);
@@ -16,18 +23,35 @@ const HISTORY_MAX_LIST_IPC_BYTES = 1024 * 1024;
 function calculateHistoryBounds(display) {
   const area = display?.workArea || display?.bounds;
   if (!area || !Number.isFinite(area.width) || !Number.isFinite(area.height) || area.width <= 0 || area.height <= 0) return null;
-  const margin = Math.min(HISTORY_WINDOW.margin, Math.floor(Math.min(area.width, area.height) / 4));
-  const usableWidth = Math.max(1, Math.floor(area.width) - margin * 2);
-  const usableHeight = Math.max(1, Math.floor(area.height) - margin * 2);
-  const minimum = Math.min(HISTORY_WINDOW.minWidth, usableWidth);
-  const width = Math.max(minimum, Math.min(HISTORY_WINDOW.width, usableWidth));
+  const usableWidth = Math.max(1, Math.floor(area.width));
+  const usableHeight = Math.max(1, Math.floor(area.height));
+  const width = Math.min(HISTORY_WINDOW.width, usableWidth);
   const height = Math.min(HISTORY_WINDOW.height, usableHeight);
   return {
-    x: Math.round(area.x + area.width - margin - width),
-    y: Math.round(area.y + margin),
+    x: Math.round(area.x + area.width - width),
+    y: Math.round(area.y),
     width,
     height,
   };
+}
+
+function constrainHistoryBounds(bounds, display) {
+  const area = display?.workArea || display?.bounds;
+  if (!bounds || !area) return null;
+  const width = Math.max(1, Math.min(Math.floor(bounds.width || HISTORY_WINDOW.width), Math.floor(area.width)));
+  const height = Math.max(1, Math.min(Math.floor(bounds.height || HISTORY_WINDOW.height), Math.floor(area.height)));
+  const maximumX = Math.floor(area.x + area.width - width);
+  const maximumY = Math.floor(area.y + area.height - height);
+  return {
+    x: Math.max(Math.floor(area.x), Math.min(Math.round(bounds.x), maximumX)),
+    y: Math.max(Math.floor(area.y), Math.min(Math.round(bounds.y), maximumY)),
+    width,
+    height,
+  };
+}
+
+function boundsKey(bounds) {
+  return bounds ? `${bounds.x}:${bounds.y}:${bounds.width}:${bounds.height}` : "";
 }
 
 function validId(value) {
@@ -156,6 +180,8 @@ class HistoryWindowController {
     this.leaveTimer = null;
     this.hideTimer = null;
     this.manualClosing = false;
+    this.customBounds = null;
+    this.lastProgrammaticBounds = "";
     this.disposers = [];
     this.bound = false;
   }
@@ -170,7 +196,7 @@ class HistoryWindowController {
       transparent: true,
       backgroundColor: "#00000000",
       resizable: false,
-      movable: false,
+      movable: true,
       minimizable: false,
       maximizable: false,
       fullscreenable: false,
@@ -196,6 +222,7 @@ class HistoryWindowController {
         this.close(true);
       }
     });
+    win.on("moved", () => this.captureMovedBounds());
     win.loadFile(this.htmlPath);
     if (!this.bound) this.bind();
     return win;
@@ -289,10 +316,15 @@ class HistoryWindowController {
     const win = this.create();
     this.manualClosing = false;
     this.cancelClose();
-    const display = this.screen.getDisplayNearestPoint(this.screen.getCursorScreenPoint()) || this.screen.getPrimaryDisplay();
+    const referencePoint = this.customBounds
+      ? { x: this.customBounds.x + this.customBounds.width / 2, y: this.customBounds.y + this.customBounds.height / 2 }
+      : this.screen.getCursorScreenPoint();
+    const display = this.screen.getDisplayNearestPoint(referencePoint) || this.screen.getPrimaryDisplay();
     this.currentDisplayId = display?.id ?? null;
-    const bounds = calculateHistoryBounds(display);
-    if (bounds) win.setBounds(bounds, false);
+    const bounds = this.customBounds
+      ? constrainHistoryBounds(this.customBounds, display)
+      : calculateHistoryBounds(display);
+    if (bounds) this.setWindowBounds(bounds);
     win.webContents.send("history:reset");
     win.show();
     win.focus();
@@ -305,8 +337,36 @@ class HistoryWindowController {
     const displays = this.screen.getAllDisplays?.() || [];
     const display = displays.find(item => item.id === this.currentDisplayId) || this.screen.getPrimaryDisplay();
     this.currentDisplayId = display?.id ?? null;
-    const bounds = calculateHistoryBounds(display);
-    if (bounds) win.setBounds(bounds, false);
+    const bounds = this.customBounds
+      ? constrainHistoryBounds(win.getBounds(), display)
+      : calculateHistoryBounds(display);
+    if (bounds) {
+      if (this.customBounds) this.customBounds = bounds;
+      this.setWindowBounds(bounds);
+    }
+  }
+
+  setWindowBounds(bounds) {
+    if (!this.window || this.window.isDestroyed() || !bounds) return;
+    this.lastProgrammaticBounds = boundsKey(bounds);
+    this.window.setBounds(bounds, false);
+  }
+
+  captureMovedBounds() {
+    const win = this.window;
+    if (!win || win.isDestroyed() || !win.isVisible() || typeof win.getBounds !== "function") return;
+    const current = win.getBounds();
+    if (boundsKey(current) === this.lastProgrammaticBounds) {
+      this.lastProgrammaticBounds = "";
+      return;
+    }
+    const center = { x: current.x + current.width / 2, y: current.y + current.height / 2 };
+    const display = this.screen.getDisplayNearestPoint(center) || this.screen.getPrimaryDisplay();
+    const constrained = constrainHistoryBounds(current, display);
+    if (!constrained) return;
+    this.currentDisplayId = display?.id ?? null;
+    this.customBounds = constrained;
+    if (boundsKey(current) !== boundsKey(constrained)) this.setWindowBounds(constrained);
   }
 
   scheduleClose() {
@@ -376,9 +436,11 @@ module.exports = {
   HISTORY_LEAVE_DELAY_MS,
   HISTORY_MAX_DETAIL_IPC_BYTES,
   HISTORY_MAX_LIST_IPC_BYTES,
+  HISTORY_GUTTER,
   HISTORY_WINDOW,
   HistoryWindowController,
   calculateHistoryBounds,
+  constrainHistoryBounds,
   copyValue,
   historyDetail,
   historyListState,

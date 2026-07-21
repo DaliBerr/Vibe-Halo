@@ -123,19 +123,21 @@ test("plan-ready completions retranslate without changing their semantic kind", 
   const completions = new CompletionStore();
   const controller = controllerFixture(localization, new ApprovalStore(), new InputRequestStore(), completions);
   completions.show({
-    agentId: "codex",
-    agentName: "Codex",
+    agentId: "zcode",
+    agentName: "ZCode",
     completionKind: "plan",
-    titleKey: "fallback.planReadyTitle",
-    outputKey: "fallback.planReadyContent",
+    titleKey: "fallback.agentPlanReadyTitle",
+    titleParams: { agentName: "ZCode" },
+    outputKey: "fallback.agentPlanReadyContent",
+    outputParams: { agentName: "ZCode" },
   });
   let state = controller.state();
   assert.equal(state.current.completionKind, "plan");
-  assert.equal(state.current.title, "Codex plan is ready");
-  assert.equal(state.current.output, "Review the completed plan in Codex.");
+  assert.equal(state.current.title, "ZCode plan is ready");
+  assert.equal(state.current.output, "Review the completed plan in ZCode.");
   localization.setPreference("zh-CN");
   state = controller.state();
   assert.equal(state.current.completionKind, "plan");
-  assert.equal(state.current.title, "Codex 计划已就绪");
-  assert.equal(state.current.output, "请回到 Codex 查看已完成的计划。");
+  assert.equal(state.current.title, "ZCode 计划已就绪");
+  assert.equal(state.current.output, "请回到 ZCode 查看已完成的计划。");
 });

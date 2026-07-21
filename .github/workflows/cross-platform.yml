@@ -257,9 +257,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
-          Cross-platform preview of Vibe Halo 0.5.6.
+          Cross-platform preview of Vibe Halo 0.5.7.
 
-          - Tray-only recent-event history in an independent right-side panel
+          - Tray-only recent-event history in an independent, freely draggable side panel
+          - Expanded transparent shadow gutters so every edge fades naturally without clipping
+          - ZCode Plan-mode completion notifications and retained plan output
           - Encrypted-at-rest history when Electron secure storage is available, with an explicit plaintext warning otherwise
           - Approval, question, Codex native-answer, and plan details retained for 30 days or 200 events; ordinary completion notifications are excluded
           - Stable, distinct accent colors and compact/expanded badges for all 19 registered clients
@@ -278,5 +280,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" release-assets/* \
             --verify-tag \
             --prerelease \
-            --title "Vibe Halo 0.5.6 — Cross-platform Preview" \
+            --title "Vibe Halo 0.5.7 — Cross-platform Preview" \
             --notes-file "$RUNNER_TEMP/release-notes.md"
