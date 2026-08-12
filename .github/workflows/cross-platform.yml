@@ -256,9 +256,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
-          Cross-platform preview of Vibe Halo 0.5.7.
+          version="$(node -p "require('./package.json').version")"
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          Cross-platform preview of Vibe Halo $version.
 
+          - Codex Approve for me requests stay with the native Auto-review guardian when exact current-turn context is available
+          - Conservative fallback keeps human approvals in Vibe Halo when Codex session context is missing or unrecognized
           - Tray-only recent-event history in an independent, freely draggable side panel
           - Expanded transparent shadow gutters so every edge fades naturally without clipping
           - ZCode Plan-mode completion notifications and retained plan output
@@ -280,5 +283,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" release-assets/* \
             --verify-tag \
             --prerelease \
-            --title "Vibe Halo 0.5.7 — Cross-platform Preview" \
+            --title "Vibe Halo $version — Cross-platform Preview" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

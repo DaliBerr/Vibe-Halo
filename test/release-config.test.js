@@ -80,6 +80,9 @@ test("cross-platform preview workflow tests and packages every promised architec
   assert.match(workflow, /VIBE_HALO_HISTORY_SCREENSHOT/);
   assert.match(workflow, /VIBE_HALO_HISTORY_DETAIL_SCREENSHOT/);
   assert.match(workflow, /--demo-history/);
+  assert.match(workflow, /Cross-platform preview of Vibe Halo \$version\./);
+  assert.match(workflow, /--title "Vibe Halo \$version — Cross-platform Preview"/);
+  assert.doesNotMatch(workflow, /Cross-platform preview of Vibe Halo \d/);
   assert.doesNotMatch(workflow, /latest(?:-mac)?\.(?:yml|yaml)/);
 });
 
