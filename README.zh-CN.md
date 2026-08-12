@@ -10,7 +10,7 @@
 
 集中处理客户端明确支持的权限请求与交互问题，并在任务完成时提醒你，减少来回切换 Agent 终端。
 
-![Version](https://img.shields.io/badge/version-0.5.7-6d7cff)
+![Version](https://img.shields.io/badge/version-0.5.8-6d7cff)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)
 ![Electron](https://img.shields.io/badge/Electron-41-47848f)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
@@ -97,6 +97,7 @@ AI 编程客户端经常在后台等待权限、询问补充信息或悄悄完�
 - 允许一次、拒绝、交回客户端等选项只按客户端真实协议映射，不推导不存在的长期规则。
 - OpenCode 只有在原请求明确支持时才显示 `Always`。
 - 同一客户端的重复请求会去重，并把最终结果返回所有等待连接。
+- 当 Vibe Halo 能精确匹配当前回合的审批者上下文时，Codex“帮我审批”请求会直接交给 Codex Auto-review，不进入灵动岛。如果这份版本相关的上下文缺失或无法读取，Vibe Halo 会保留现有岛内审批流程，避免漏掉真正需要人工处理的请求。
 - Codex 或 ZCode 在计划模式下结束一轮任务时，Vibe Halo 会显示专门的“计划已就绪”通知，并在可用时展示完整计划内容。
 - 完成通知默认显示 8 秒；新的提示或审批会优先展示并清理旧通知。
 - UI 优先级固定为：**审批/精确交互 > 等待输入 > 完成通知**。
@@ -535,6 +536,7 @@ Vibe Halo 在 Windows、macOS 与常见 x64 Linux 上提供类似的顶部审批
 - 不支持远程审批，服务不会监听局域网地址。
 - 不是所有客户端都公开稳定的审批或回答协议；不支持的能力只提醒或交回原客户端。
 - Codex `request_user_input` 不能在岛内回答。
+- Codex 当前没有在稳定的 `PermissionRequest` Hook 载荷中提供实际审批者。Auto-review 绕过因此只会有界、只读地查询精确当前回合；无法识别本地会话格式时会保守地继续显示灵动岛。
 - 状态型客户端只显示完成或注意事件，不展示持续工作动画。
 - 最近事件只保存在本机，但仍可能包含敏感内容；结构化可疑字段会清理，共享设备上仍应谨慎启用。普通任务完成通知永远不记录。
 - 当前只有 Windows 上的 Codex 与 ZCode 完成真实客户端端到端验证；macOS/Linux 和其他集成即使 CI 与契约测试通过，也可能存在尚未发现的兼容性 Bug。

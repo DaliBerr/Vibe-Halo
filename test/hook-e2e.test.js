@@ -75,6 +75,19 @@ function installZcodeHooks(root) {
   return readJson(configPath).hooks.events;
 }
 
+function writeTurnTranscript(root, turnId, approvalsReviewer, approvalPolicy = "on-request") {
+  const transcriptPath = path.join(root, `${turnId}.jsonl`);
+  fs.writeFileSync(transcriptPath, `${JSON.stringify({
+    type: "turn_context",
+    payload: {
+      turn_id: turnId,
+      approval_policy: approvalPolicy,
+      approvals_reviewer: approvalsReviewer,
+    },
+  })}\n`);
+  return transcriptPath;
+}
+
 // Process-hook startup can be delayed when Windows CI is concurrently
 // rebuilding and packaging Electron. Keep this comfortably below the hook's
 // protocol timeout while avoiding a machine-load-dependent false failure.
@@ -97,10 +110,13 @@ test("official hook posts a permission and returns the selected decision", async
   const server = new IslandServer({ approvalStore: approvals, runtimePath: path.join(root, "runtime.json") });
   await server.start();
   servers.push(server);
+  const transcriptPath = writeTurnTranscript(root, "turn-user", "user");
 
   const outputPromise = runHook(root, {
     hook_event_name: "PermissionRequest",
     session_id: "e2e",
+    transcript_path: transcriptPath,
+    turn_id: "turn-user",
     tool_name: "Bash",
     tool_use_id: "tool-e2e",
     tool_input: { command: "echo hello" },
@@ -111,6 +127,32 @@ test("official hook posts a permission and returns the selected decision", async
   assert.equal(JSON.parse(output).hookSpecificOutput.decision.behavior, "allow");
 });
 
+test("official hook returns no decision without contacting Vibe Halo for current auto-review", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-halo-hook-auto-review-"));
+  roots.push(root);
+  const approvals = new ApprovalStore({ timeoutMs: 1_000 });
+  const changes = [];
+  approvals.on("changed", (_snapshot, reason) => changes.push(reason));
+  const server = new IslandServer({ approvalStore: approvals, runtimePath: path.join(root, "runtime.json") });
+  await server.start();
+  servers.push(server);
+  const transcriptPath = writeTurnTranscript(root, "turn-auto", "auto_review");
+
+  const output = await runHook(root, {
+    hook_event_name: "PermissionRequest",
+    session_id: "auto-review",
+    transcript_path: transcriptPath,
+    turn_id: "turn-auto",
+    tool_name: "Bash",
+    tool_use_id: "tool-auto",
+    tool_input: { command: "echo reviewed natively" },
+  });
+
+  assert.equal(output, "{}");
+  assert.equal(approvals.size, 0);
+  assert.deepEqual(changes, []);
+});
+
 test("generic command hook handles ZCode and Copilot wire formats", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-halo-hook-multi-"));
   roots.push(root);
@@ -118,9 +160,11 @@ test("generic command hook handles ZCode and Copilot wire formats", async () => 
   const server = new IslandServer({ approvalStore: approvals, runtimePath: path.join(root, "runtime.json") });
   await server.start();
   servers.push(server);
+  const zcodeTranscript = writeTurnTranscript(root, "turn-zcode", "auto_review");
 
   const zcodeOutput = runHook(root, {
     hook_event_name: "PermissionRequest", session_id: "z", requestId: "z1",
+    transcript_path: zcodeTranscript, turn_id: "turn-zcode",
     tool_name: "Shell", tool_input: { command: "dir" },
   }, "zcode");
   await waitFor(() => approvals.size === 1);

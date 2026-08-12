@@ -15,6 +15,7 @@ const RUNTIME_PATH = path.join(process.env.VIBE_HALO_RUNTIME_DIR || path.join(os
 const PERMISSION_TIMEOUT_MS = 130_000;
 const EVENT_TIMEOUT_MS = 2_000;
 const STDIN_LIMIT = 1024 * 1024;
+const CODEX_TURN_CONTEXT_LIMIT = 2 * 1024 * 1024;
 const AGENT_IDS = new Set([
   "codex", "zcode", "qwen-code", "copilot-cli", "claude-code", "codebuddy",
   "gemini-cli", "antigravity", "cursor-agent", "kiro", "kimi-code", "codewhale",
@@ -257,6 +258,54 @@ function normalizePermissionMode(value) {
   return ["default", "acceptEdits", "plan", "dontAsk", "bypassPermissions"].includes(mode) ? mode : "";
 }
 
+function isCodexAutoReviewPolicy(value) {
+  if (value === "on-request") return true;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Boolean(value.granular && typeof value.granular === "object" && !Array.isArray(value.granular));
+}
+
+function readCodexTurnApprovalContext(transcriptPath, turnId) {
+  const safePath = cleanText(transcriptPath, 4000);
+  const safeTurnId = cleanText(turnId, 240);
+  if (!safePath || !safeTurnId) return null;
+
+  let fd;
+  try {
+    const stat = fs.statSync(safePath);
+    if (!stat.isFile() || stat.size <= 0) return null;
+    const size = Math.min(stat.size, CODEX_TURN_CONTEXT_LIMIT);
+    const buffer = Buffer.alloc(size);
+    fd = fs.openSync(safePath, "r");
+    const count = fs.readSync(fd, buffer, 0, size, stat.size - size);
+    const lines = buffer.subarray(0, count).toString("utf8").split(/\r?\n/);
+    if (stat.size > size) lines.shift();
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      let item;
+      try { item = JSON.parse(lines[index]); } catch { continue; }
+      const payload = item?.payload;
+      if (item?.type !== "turn_context" || payload?.turn_id !== safeTurnId) continue;
+      return {
+        approvalPolicy: payload.approval_policy,
+        approvalsReviewer: cleanText(payload.approvals_reviewer, 40),
+      };
+    }
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
+  }
+  return null;
+}
+
+function shouldDeferCodexAutoReview(payload, agentId = "codex") {
+  if (agentId !== "codex" || normalizeEvent(payload) !== "PermissionRequest") return false;
+  const context = readCodexTurnApprovalContext(payload?.transcript_path, payload?.turn_id ?? payload?.turnId);
+  if (!context || !["auto_review", "guardian_subagent"].includes(context.approvalsReviewer)) return false;
+  return isCodexAutoReviewPolicy(context.approvalPolicy);
+}
+
 function buildBody(payload, agentId = "codex") {
   let event = normalizeEvent(payload);
   const rawToolName = cleanText(payload?.tool_name || payload?.toolName || payload?.tool?.name, 160);
@@ -384,6 +433,7 @@ async function run(payload, options = {}) {
   const agentId = options.agentId || "codex";
   const event = normalizeEvent(payload);
   if (!["PermissionRequest", "Elicitation", "Stop", "UserPromptSubmit"].includes(event)) return "";
+  if (shouldDeferCodexAutoReview(payload, agentId)) return noDecisionOutput(agentId);
   const runtime = readRuntime();
   const permissionLike = (event === "PermissionRequest" || event === "Elicitation") && !PASSIVE_PERMISSION_AGENTS.has(agentId);
   if (!runtime) return permissionLike ? noDecisionOutput(agentId) : "";
@@ -427,6 +477,8 @@ module.exports = {
   normalizeToolInput,
   parseAgentId,
   parseEventArg,
+  readCodexTurnApprovalContext,
   sanitizePermissionResponse,
+  shouldDeferCodexAutoReview,
   run,
 };

@@ -1,5 +1,8 @@
 "use strict";
 
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
@@ -9,8 +12,44 @@ const {
   parseAgentId,
   parseEventArg,
   normalizePermissionMode,
+  readCodexTurnApprovalContext,
   sanitizePermissionResponse,
+  shouldDeferCodexAutoReview,
 } = require("../hooks/vibe-halo-hook");
+
+const roots = [];
+test.afterEach(() => {
+  for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
+});
+
+function turnContext(turnId, approvalsReviewer, approvalPolicy = "on-request") {
+  return JSON.stringify({
+    type: "turn_context",
+    payload: {
+      turn_id: turnId,
+      approval_policy: approvalPolicy,
+      approvals_reviewer: approvalsReviewer,
+    },
+  });
+}
+
+function writeTranscript(content) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-halo-codex-turn-"));
+  roots.push(root);
+  const transcriptPath = path.join(root, "rollout.jsonl");
+  fs.writeFileSync(transcriptPath, content, "utf8");
+  return transcriptPath;
+}
+
+function permissionPayload(transcriptPath, turnId) {
+  return {
+    hook_event_name: "PermissionRequest",
+    transcript_path: transcriptPath,
+    turn_id: turnId,
+    tool_name: "Bash",
+    tool_input: { command: "echo test" },
+  };
+}
 
 test("builds a bounded PermissionRequest body", () => {
   const body = buildBody({
@@ -57,6 +96,75 @@ test("forwards documented permission modes and bounded plan output", () => {
   assert.equal(normalizePermissionMode("unknown"), "");
   const invalid = buildBody({ hook_event_name: "Stop", session_id: "bad", permission_mode: "unknown" });
   assert.equal(Object.hasOwn(invalid, "permission_mode"), false);
+});
+
+test("defers only the matching Codex auto-review approval policies", () => {
+  const transcriptPath = writeTranscript([
+    turnContext("turn-auto", "auto_review"),
+    turnContext("turn-granular", "auto_review", { granular: {
+      sandbox_approval: true,
+      rules: true,
+      mcp_elicitations: true,
+    } }),
+    turnContext("turn-legacy", "guardian_subagent"),
+  ].join("\n"));
+
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(transcriptPath, "turn-auto")), true);
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(transcriptPath, "turn-granular")), true);
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(transcriptPath, "turn-legacy")), true);
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(transcriptPath, "turn-auto"), "zcode"), false);
+  assert.equal(shouldDeferCodexAutoReview({
+    ...permissionPayload(transcriptPath, "turn-auto"),
+    hook_event_name: "Stop",
+  }), false);
+});
+
+test("never reuses stale auto-review state for a user-reviewed turn", () => {
+  const transcriptPath = writeTranscript([
+    turnContext("old-turn", "auto_review"),
+    turnContext("current-turn", "auto_review"),
+    turnContext("current-turn", "user"),
+    turnContext("later-turn", "auto_review"),
+  ].join("\n"));
+
+  assert.deepEqual(readCodexTurnApprovalContext(transcriptPath, "current-turn"), {
+    approvalPolicy: "on-request",
+    approvalsReviewer: "user",
+  });
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(transcriptPath, "current-turn")), false);
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(transcriptPath, "missing-turn")), false);
+});
+
+test("finds a matching turn after a partial tail line and ignores malformed JSON", () => {
+  const transcriptPath = writeTranscript([
+    "x".repeat(2 * 1024 * 1024),
+    "{malformed",
+    turnContext("tail-turn", "auto_review"),
+    "",
+  ].join("\n"));
+
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(transcriptPath, "tail-turn")), true);
+});
+
+test("unknown or out-of-window turn context keeps the existing island flow", () => {
+  const outsidePath = writeTranscript([
+    turnContext("outside-turn", "auto_review"),
+    "x".repeat((2 * 1024 * 1024) + 1024),
+  ].join("\n"));
+  const partialContext = turnContext("partial-turn", "auto_review");
+  const partialPath = writeTranscript(`prefix-without-newline${partialContext}\n${
+    "x".repeat((2 * 1024 * 1024) - partialContext.length - 1)
+  }`);
+  const unknownPolicyPath = writeTranscript(turnContext("unknown-policy", "auto_review", "untrusted"));
+  const directoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-halo-codex-directory-"));
+  roots.push(directoryPath);
+
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(outsidePath, "outside-turn")), false);
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(partialPath, "partial-turn")), false);
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(unknownPolicyPath, "unknown-policy")), false);
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(directoryPath, "directory-turn")), false);
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload("missing.jsonl", "missing-turn")), false);
+  assert.equal(shouldDeferCodexAutoReview(permissionPayload(unknownPolicyPath, "")), false);
 });
 
 test("keeps bounded ZCode AskUserQuestion fields for native-like rendering", () => {
