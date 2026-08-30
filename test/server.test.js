@@ -27,11 +27,36 @@ async function fixture(options = {}) {
     approvalStore: approvals,
     runtimePath: path.join(root, "runtime.json"),
     isApprovalEnabled: options.isApprovalEnabled || (() => true),
+    onPermission: options.onPermission,
     onEvent: value => events.push(value),
   });
   await server.start();
   servers.push(server);
   return { approvals, events, server, root };
+}
+
+function abortableRequest(server, route, body) {
+  const raw = JSON.stringify(body);
+  let settle;
+  const done = new Promise(resolve => { settle = resolve; });
+  const req = http.request({
+    hostname: "127.0.0.1",
+    port: server.port,
+    path: route,
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "content-length": Buffer.byteLength(raw),
+      [TOKEN_HEADER]: server.token,
+    },
+  }, res => {
+    res.resume();
+    res.once("end", settle);
+  });
+  req.once("error", settle);
+  req.once("close", settle);
+  req.end(raw);
+  return { req, done };
 }
 
 function request(server, route, body, options = {}) {
@@ -174,6 +199,42 @@ test("routes ZCode, Copilot and OpenCode through their exact codecs", async () =
   assert.deepEqual(approvals.snapshot().current.options.map(value => value.id), ["once", "always", "reject", "native"]);
   approvals.resolve(approvals.current.id, "always");
   assert.deepEqual(JSON.parse((await openCodePending).body), { decision: "always" });
+});
+
+test("ZCode native-side cancellation disconnects the hook waiter without a second decision", async () => {
+  const observed = [];
+  const { approvals, server } = await fixture({ onPermission: value => observed.push(value) });
+  const finalized = [];
+  approvals.on("finalized", value => finalized.push(value));
+  const pending = abortableRequest(server, "/permission", permission({
+    agent_id: "zcode",
+    session_id: "zcode:native-race",
+    tool_use_id: "z-native-1",
+    source_pid: 123,
+    pid_chain: [123, 45],
+  }));
+  await waitFor(() => approvals.size === 1);
+  const approvalId = approvals.current.id;
+  assert.equal(observed.length, 1);
+  assert.equal(observed[0].agentId, "zcode");
+  assert.equal(observed[0].sourcePid, 123);
+
+  pending.req.destroy();
+  await pending.done;
+  await waitFor(() => approvals.size === 0);
+  assert.equal(finalized.length, 1);
+  assert.equal(finalized[0].state, "disconnected");
+  assert.equal(finalized[0].reason, "all-waiters-disconnected");
+  assert.equal(finalized[0].decision, null);
+  assert.equal(approvals.resolve(approvalId, "allow"), false);
+
+  const islandWins = request(server, "/permission", permission({
+    agent_id: "zcode", session_id: "zcode:native-race", tool_use_id: "z-island-2",
+  }));
+  await waitFor(() => approvals.size === 1);
+  assert.equal(approvals.resolve(approvals.current.id, "deny"), true);
+  assert.equal(JSON.parse((await islandWins).body).hookSpecificOutput.decision.behavior, "deny");
+  assert.equal(approvals.size, 0);
 });
 
 test("routes ZCode AskUserQuestion through the interactive form codec", async () => {

@@ -34,6 +34,14 @@ function parseArguments(value) {
   }
 }
 
+function normalizeCollaborationMode(value) {
+  const raw = typeof value === "string"
+    ? value
+    : (value && typeof value === "object" && !Array.isArray(value) ? value.mode : "");
+  const mode = safeText(raw, 40).toLowerCase();
+  return mode === "default" || mode === "plan" ? mode : "unknown";
+}
+
 function normalizeQuestions(argumentsValue) {
   const data = parseArguments(argumentsValue);
   if (!Array.isArray(data.questions)) return [];
@@ -85,9 +93,15 @@ function normalizeOutputAnswers(value) {
   return output;
 }
 
+function normalizeCodexSessionId(value) {
+  const raw = safeText(value, 240);
+  if (!raw) return "codex:unknown";
+  return raw.startsWith("codex:") ? raw : `codex:${raw}`;
+}
+
 function sessionIdFromFile(filePath) {
   const match = path.basename(filePath).match(/([0-9a-f]{8}-[0-9a-f-]{27,})\.jsonl$/i);
-  return match ? match[1] : "codex:unknown";
+  return normalizeCodexSessionId(match?.[1]);
 }
 
 function requestKeyFor(filePath, callId) {
@@ -114,6 +128,7 @@ class CodexInputMonitor {
     this.lastRescanAt = 0;
     this.lastError = null;
     this.lastEventAt = null;
+    this.lastCollaborationMode = "unknown";
   }
 
   start() {
@@ -149,6 +164,7 @@ class CodexInputMonitor {
       pendingCount: this.pending.size,
       visiblePendingCount: [...this.pending.values()].filter(item => item.notified).length,
       lastEventAt: this.lastEventAt,
+      lastCollaborationMode: this.lastCollaborationMode,
       lastError: this.lastError,
     };
   }
@@ -223,6 +239,7 @@ class CodexInputMonitor {
             dropFirstPartial: stat.size > MAX_INITIAL_READ_BYTES,
             sessionId: sessionIdFromFile(fullPath),
             cwd: "",
+            collaborationMode: "unknown",
             mtimeMs: stat.mtimeMs,
           });
         }
@@ -273,8 +290,13 @@ class CodexInputMonitor {
     let record;
     try { record = JSON.parse(line); } catch { return; }
     if (record?.type === "session_meta" && record.payload && typeof record.payload === "object") {
-      tracked.sessionId = safeText(record.payload.session_id || record.payload.id, 240) || tracked.sessionId;
+      tracked.sessionId = normalizeCodexSessionId(record.payload.session_id || record.payload.id || tracked.sessionId);
       tracked.cwd = safeText(record.payload.cwd, 2000);
+      return;
+    }
+    if (record?.type === "turn_context" && record.payload && typeof record.payload === "object") {
+      tracked.collaborationMode = normalizeCollaborationMode(record.payload.collaboration_mode);
+      this.lastCollaborationMode = tracked.collaborationMode;
       return;
     }
     if (record?.type !== "response_item" || !record.payload || typeof record.payload !== "object") return;
@@ -300,6 +322,7 @@ class CodexInputMonitor {
         contentKey: content ? "" : "fallback.returnToCodex",
         questions,
         questionCount: questions.length,
+        collaborationMode: tracked.collaborationMode,
         createdAt,
         notified: false,
       });
@@ -331,6 +354,7 @@ class CodexInputMonitor {
       this.logger.info("Codex input request detected", {
         sessionId: pending.sessionId,
         questionCount: pending.questionCount,
+        collaborationMode: pending.collaborationMode,
       });
     }
   }
@@ -347,6 +371,8 @@ class CodexInputMonitor {
 module.exports = {
   CodexInputMonitor,
   formatQuestions,
+  normalizeCollaborationMode,
+  normalizeCodexSessionId,
   normalizeQuestions,
   normalizeOutputAnswers,
   requestKeyFor,

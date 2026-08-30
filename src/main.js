@@ -46,6 +46,7 @@ const { IntegrationManager } = require("./integration-manager");
 const { IslandController } = require("./island-controller");
 const { InputRequestStore } = require("./input-request-store");
 const { createLogger } = require("./logger");
+const { SessionOriginStore } = require("./session-origin-store");
 const { IslandServer } = require("./server");
 const { SettingsStore } = require("./settings-store");
 const { ShutdownCoordinator } = require("./shutdown-coordinator");
@@ -132,6 +133,7 @@ function startApplication() {
   const approvals = new ApprovalStore();
   const completions = new CompletionStore();
   const inputRequests = new InputRequestStore();
+  const sessionOrigins = new SessionOriginStore();
 
   function shutdownServices(reason = "quit") {
     if (!shutdownCoordinator) {
@@ -323,6 +325,7 @@ function startApplication() {
         files: input.trackedFiles,
         pending: input.pendingCount,
       }),
+      t("diagnostics.sessionMonitorMode", { mode: input.lastCollaborationMode || "unknown" }),
       t("diagnostics.sessionDirectory", { path: input.sessionsDir }),
       t("diagnostics.sessionMonitorError", { error: input.lastError || t("diagnostics.none") }),
       t("diagnostics.logs", { path: logger.filePath }),
@@ -603,6 +606,20 @@ function startApplication() {
     tray.setToolTip(`${APP_NAME} — ${statusLabel}`);
   }
 
+  function rememberAgentOrigin(data) {
+    const descriptor = agent(data?.agentId || data?.agent_id);
+    if (!descriptor) return false;
+    const sessionId = typeof data.sessionId === "string" ? data.sessionId
+      : (typeof data.session_id === "string" ? data.session_id : "");
+    return sessionOrigins.remember({
+      agentId: descriptor.id,
+      sessionId,
+      sourcePid: data.sourcePid ?? data.source_pid,
+      pidChain: data.pidChain ?? data.pid_chain,
+      cwd: data.cwd,
+    });
+  }
+
   function handleAgentEvent(data) {
     if (data.codex_session_role === "subagent") return;
     const descriptor = agent(data.agentId || data.agent_id) || agent("codex");
@@ -610,6 +627,7 @@ function startApplication() {
     const agentName = descriptor.name;
     const sessionId = typeof data.sessionId === "string" ? data.sessionId
       : (typeof data.session_id === "string" ? data.session_id : `${agentId}:unknown`);
+    rememberAgentOrigin({ ...data, agentId, sessionId });
     if (data.event === "UserPromptSubmit") {
       completions.clear("new-prompt", sessionId, agentId);
       inputRequests.clearSession(sessionId, "new-prompt", agentId);
@@ -707,7 +725,15 @@ function startApplication() {
       logger,
       onRequested: request => {
         if (!settings.get("inputReminderEnabled")) return false;
-        return !!inputRequests.enqueue({ ...request, agentId: "codex", agentName: "Codex" }).entry;
+        const origin = sessionOrigins.get("codex", request.sessionId);
+        return !!inputRequests.enqueue({
+          ...request,
+          agentId: "codex",
+          agentName: "Codex",
+          cwd: request.cwd || origin?.cwd || "",
+          sourcePid: origin?.sourcePid ?? null,
+          pidChain: origin?.pidChain || [],
+        }).entry;
       },
       onResolved: request => inputRequests.resolve(request.requestKey, {
         answers: request.answers,
@@ -720,6 +746,7 @@ function startApplication() {
       approvalStore: approvals,
       isApprovalEnabled: () => settings.get("approvalEnabled"),
       logger,
+      onPermission: rememberAgentOrigin,
       onEvent: handleAgentEvent,
     });
     await server.start();

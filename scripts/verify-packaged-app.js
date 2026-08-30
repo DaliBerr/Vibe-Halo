@@ -25,6 +25,7 @@ for (const required of [
   "/assets/icons/16x16.png",
   "/assets/icons/32x32.png",
   "/src/platform-adapter.js",
+  "/src/session-origin-store.js",
   "/src/history-store.js",
   "/src/history-window-controller.js",
   "/src/history-preload.js",

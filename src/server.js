@@ -78,6 +78,7 @@ class IslandServer {
     if (!options?.approvalStore) throw new TypeError("approvalStore is required");
     this.approvalStore = options.approvalStore;
     this.onEvent = options.onEvent || (() => {});
+    this.onPermission = options.onPermission || (() => {});
     this.isApprovalEnabled = options.isApprovalEnabled || (() => true);
     this.logger = options.logger || { info() {}, warn() {}, error() {} };
     this.runtimePath = options.runtimePath || RUNTIME_PATH;
@@ -157,6 +158,16 @@ class IslandServer {
     if ((normalized.kind !== "approval" && normalized.kind !== "elicitation") || !adapter.capabilities.approval) {
       return sendAdapterDecision(res, 400, agentId, noDecisionOutput(agentId));
     }
+    try {
+      this.onPermission({
+        agentId,
+        sessionId: normalized.sessionId,
+        sourcePid: normalized.sourcePid,
+        pidChain: normalized.pidChain,
+        cwd: normalized.cwd,
+      });
+    }
+    catch (error) { this.logger.warn("Permission origin handler failed", { agentId, message: error.message }); }
     if (!this.isApprovalEnabled(agentId) || data.codex_session_role === "subagent" || data.headless === true) {
       this.logger.info("Permission fell back to native client", {
         agentId,

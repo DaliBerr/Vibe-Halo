@@ -130,6 +130,7 @@ class IslandController {
     this.completions = options.completionStore;
     this.localization = options.localization || createLocalizer({ preference: "system", systemLocale: "en-US" });
     this.platformAdapter = options.platformAdapter || null;
+    this.locateDisplay = options.locateDisplay || locateDisplay;
     this.logger = options.logger || { info() {}, warn() {}, error() {} };
     this.preloadPath = options.preloadPath || path.join(__dirname, "preload.js");
     this.htmlPath = options.htmlPath || path.join(__dirname, "renderer", "index.html");
@@ -347,9 +348,13 @@ class IslandController {
     if (!win || win.isDestroyed()) return;
     const state = this.state();
     const currentId = state.current?.id || null;
-    if (currentId !== this.measuredCurrentId) {
+    const isNewCurrent = currentId !== this.measuredCurrentId;
+    if (isNewCurrent) {
       this.measuredCurrentId = currentId;
       this.measurement = null;
+      this.currentDisplay = null;
+      this.positionVersion += 1;
+      this.cancelBoundsAnimation();
     }
     this.onChanged(state);
     if (state.mode === "hidden") {
@@ -361,6 +366,10 @@ class IslandController {
     this.refreshPosition(this.activeEntry());
     this.applyBounds();
     if (!win.isVisible()) win.showInactive();
+    if (isNewCurrent) {
+      try { win.setAlwaysOnTop(true, "pop-up-menu"); } catch {}
+      try { win.moveTop(); } catch {}
+    }
     this.logger.info("Island state", { mode: state.mode, reason });
   }
 
@@ -372,7 +381,7 @@ class IslandController {
     if (!this.window || this.window.isDestroyed()) return;
     const version = ++this.positionVersion;
     try {
-      const display = await locateDisplay(this.screen, entry, { timeoutMs: 400 });
+      const display = await this.locateDisplay(this.screen, entry, { timeoutMs: 400 });
       if (version !== this.positionVersion || !display) return;
       this.currentDisplay = display;
       this.applyBounds();

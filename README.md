@@ -10,7 +10,7 @@
 
 Handle supported permission requests and interactive questions, and receive completion notifications without constantly switching back to agent terminals.
 
-![Version](https://img.shields.io/badge/version-0.5.8-6d7cff)
+![Version](https://img.shields.io/badge/version-0.5.9-6d7cff)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)
 ![Electron](https://img.shields.io/badge/Electron-41-47848f)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
@@ -95,6 +95,7 @@ AI coding clients often wait in the background for a permission decision, a foll
 - Allow once, deny, hand back to the client, and similar actions are mapped only when the source protocol actually provides them.
 - OpenCode displays `Always` only when the original request explicitly advertises that capability.
 - Duplicate requests from the same client are coalesced, and the final result is fanned out to every waiting connection.
+- On ZCode 3.10.1 for Windows, the native approval UI and Vibe Halo wait concurrently. The first explicit decision wins, the other pending surface is cancelled, and the tool is not executed twice. Older ZCode versions may continue to prioritize the Hook path.
 - Codex **Approve for me** requests are left to Codex Auto-review when Vibe Halo can match the exact current-turn reviewer context. If that version-sensitive context is missing or unreadable, Vibe Halo preserves the existing island flow so a real human approval is not missed.
 - When a Codex or ZCode turn stops in Plan mode, Vibe Halo shows a dedicated plan-ready notification with the completed plan output when available.
 - Completion notifications normally remain visible for 8 seconds; a new prompt or approval preempts an older completion.
@@ -139,7 +140,7 @@ Vibe Halo currently registers 19 clients. “Supported” means that the reposit
 | Completion/status notification | Gemini CLI, Antigravity, Cursor Agent, Kiro, CodeWhale, Pi, OpenClaw, Reasonix, plus the clients above | Shows completion after `Stop` or an equivalent event; a new prompt clears the old notification for that session |
 
 > [!NOTE]
-> Codex `request_user_input` is currently reminder-only. Vibe Halo reads Codex session JSONL to detect when the request is resolved, but it never writes answers to the session file or bypasses the native Codex answer UI.
+> Codex `request_user_input` is detected in ordinary/default, Plan, and unknown modes and remains reminder-only. Vibe Halo uses short-lived in-memory Hook origin data to place and raise the reminder on the relevant display when available, then reads Codex session JSONL to detect resolution. It never writes answers to the session file or bypasses the native Codex answer UI.
 
 ## How it works
 
@@ -488,7 +489,7 @@ Vibe Halo provides a similar top-center approval and notification workflow on Wi
 
 ### Can I approve Codex permissions without returning to the terminal?
 
-Yes. Supported Codex `PermissionRequest` events can be allowed or denied directly from the approval popup. If Vibe Halo cannot safely return a decision—or if you close or time out the request—it returns no decision so Codex can resume its native approval flow. Codex `request_user_input` remains reminder-only and must still be answered in Codex.
+Yes. Supported Codex `PermissionRequest` events can be allowed or denied directly from the approval popup. If Vibe Halo cannot safely return a decision—or if you close or time out the request—it returns no decision so Codex can resume its native approval flow. Codex `request_user_input` in ordinary/default and Plan modes raises a reminder on the relevant display when its source can be identified, but it must still be answered in Codex.
 
 ### Does Vibe Halo support Claude Code and OpenCode?
 
@@ -535,6 +536,7 @@ Source runs, local packages, and preview builds deliberately disable automatic u
 - Remote approval is not supported, and the service never listens on a LAN interface.
 - Not every client exposes a stable approval or answer protocol. Unsupported capabilities remain reminders or are handed back to the native client.
 - Codex `request_user_input` cannot be answered inside the island.
+- ZCode dual-entry approval depends on ZCode 3.10.1's concurrent native/Hook behavior. Vibe Halo does not call the private ZCode app-server API; older versions can remain Hook-first.
 - Codex does not currently expose its effective approval reviewer in the stable `PermissionRequest` Hook payload. Auto-review bypass therefore uses a bounded, read-only lookup of the exact current turn and conservatively keeps the island when the local session format cannot be recognized.
 - Status-only clients produce completion/attention events, not continuous working animations.
 - Recent events are local and can contain sensitive content. Structured secret-looking keys are redacted, but users should still review commands before enabling history on shared machines; ordinary completion notifications are never recorded.

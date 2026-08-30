@@ -5,7 +5,13 @@ const os = require("os");
 const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { CodexInputMonitor, normalizeOutputAnswers, normalizeQuestions } = require("../src/codex-input-monitor");
+const {
+  CodexInputMonitor,
+  normalizeCollaborationMode,
+  normalizeCodexSessionId,
+  normalizeOutputAnswers,
+  normalizeQuestions,
+} = require("../src/codex-input-monitor");
 
 function record(type, payload, timestamp = new Date().toISOString()) {
   return `${JSON.stringify({ timestamp, type, payload })}\n`;
@@ -46,7 +52,7 @@ test("detects exact request_user_input and clears it on matching output", () => 
 
     monitor.scanNow(true);
     assert.equal(requested.length, 1);
-    assert.equal(requested[0].sessionId, "thread-1");
+    assert.equal(requested[0].sessionId, "codex:thread-1");
     assert.equal(requested[0].cwd, "C:\\Work\\Demo");
     assert.equal(requested[0].title, "界面测试");
     assert.match(requested[0].content, /Codex 原生界面/);
@@ -72,6 +78,62 @@ test("bounds native Codex answers and safely ignores unknown output shapes", () 
   assert.deepEqual(normalizeOutputAnswers(JSON.stringify({ answers: { q1: { answers: ["A", "B"] } } })), { q1: ["A", "B"] });
   assert.deepEqual(normalizeOutputAnswers(JSON.stringify({ result: "unknown" })), {});
   assert.deepEqual(normalizeOutputAnswers("not-json"), {});
+});
+
+test("reminds in default, plan, and unknown collaboration modes without retaining settings", () => {
+  const { root, filePath, monitor, requested } = fixture();
+  try {
+    fs.writeFileSync(filePath,
+      record("session_meta", { session_id: "thread-modes", cwd: "C:\\Work" })
+      + record("turn_context", { collaboration_mode: { mode: "default", settings: { developer_instructions: "private" } } })
+      + record("response_item", {
+        type: "function_call", name: "request_user_input", call_id: "call-default",
+        arguments: JSON.stringify({ questions: [{ question: "Default?" }] }),
+      }), "utf8");
+    monitor.scanNow(true);
+    assert.equal(requested.length, 1);
+    assert.equal(requested[0].collaborationMode, "default");
+    assert.equal(Object.hasOwn(requested[0], "settings"), false);
+
+    fs.appendFileSync(filePath,
+      record("response_item", { type: "function_call_output", call_id: "call-default", output: "{}" })
+      + record("turn_context", { collaboration_mode: { mode: "plan", settings: { developer_instructions: "private" } } })
+      + record("response_item", {
+        type: "function_call", name: "request_user_input", call_id: "call-plan",
+        arguments: JSON.stringify({ questions: [{ question: "Plan?" }] }),
+      }), "utf8");
+    monitor.scanNow();
+    assert.equal(requested.length, 2);
+    assert.equal(requested[1].collaborationMode, "plan");
+
+    fs.appendFileSync(filePath,
+      record("response_item", { type: "function_call_output", call_id: "call-plan", output: "{}" })
+      + record("turn_context", { collaboration_mode: { mode: "future-mode" } })
+      + record("response_item", {
+        type: "function_call", name: "request_user_input", call_id: "call-unknown",
+        arguments: JSON.stringify({ questions: [{ question: "Unknown?" }] }),
+      }), "utf8");
+    monitor.scanNow();
+    assert.equal(requested.length, 3);
+    assert.equal(requested[2].collaborationMode, "unknown");
+    assert.equal(monitor.status().lastCollaborationMode, "unknown");
+  } finally {
+    monitor.stop();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("normalizes only supported collaboration mode names", () => {
+  assert.equal(normalizeCollaborationMode("DEFAULT"), "default");
+  assert.equal(normalizeCollaborationMode({ mode: "plan", settings: { ignored: true } }), "plan");
+  assert.equal(normalizeCollaborationMode({ mode: "future" }), "unknown");
+  assert.equal(normalizeCollaborationMode(null), "unknown");
+});
+
+test("uses the same Codex session namespace as command hooks", () => {
+  assert.equal(normalizeCodexSessionId("thread-1"), "codex:thread-1");
+  assert.equal(normalizeCodexSessionId("codex:thread-1"), "codex:thread-1");
+  assert.equal(normalizeCodexSessionId(""), "codex:unknown");
 });
 
 test("does not flash for resolved history or text that merely mentions the tool", () => {

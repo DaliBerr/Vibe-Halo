@@ -10,7 +10,7 @@
 
 集中处理客户端明确支持的权限请求与交互问题，并在任务完成时提醒你，减少来回切换 Agent 终端。
 
-![Version](https://img.shields.io/badge/version-0.5.8-6d7cff)
+![Version](https://img.shields.io/badge/version-0.5.9-6d7cff)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)
 ![Electron](https://img.shields.io/badge/Electron-41-47848f)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
@@ -97,6 +97,7 @@ AI 编程客户端经常在后台等待权限、询问补充信息或悄悄完�
 - 允许一次、拒绝、交回客户端等选项只按客户端真实协议映射，不推导不存在的长期规则。
 - OpenCode 只有在原请求明确支持时才显示 `Always`。
 - 同一客户端的重复请求会去重，并把最终结果返回所有等待连接。
+- Windows 版 ZCode 3.10.1 会让原生审批界面与 Vibe Halo 同时等待；任一侧先作出明确决定后，另一侧立即取消，同一工具不会执行两次。旧版 ZCode 可能仍然优先等待 Hook。
 - 当 Vibe Halo 能精确匹配当前回合的审批者上下文时，Codex“帮我审批”请求会直接交给 Codex Auto-review，不进入灵动岛。如果这份版本相关的上下文缺失或无法读取，Vibe Halo 会保留现有岛内审批流程，避免漏掉真正需要人工处理的请求。
 - Codex 或 ZCode 在计划模式下结束一轮任务时，Vibe Halo 会显示专门的“计划已就绪”通知，并在可用时展示完整计划内容。
 - 完成通知默认显示 8 秒；新的提示或审批会优先展示并清理旧通知。
@@ -141,7 +142,7 @@ Vibe Halo 当前注册 19 个客户端。这里的“支持”表示仓库包含
 | 完成/状态通知 | Gemini CLI、Antigravity、Cursor Agent、Kiro、CodeWhale、Pi、OpenClaw、Reasonix，以及上述客户端 | 在 `Stop` 或等价事件后显示完成通知；新提示清除同会话旧通知 |
 
 > [!NOTE]
-> Codex `request_user_input` 目前只有只读提醒。Vibe Halo 会监控 Codex session JSONL 来判断请求是否结束，但不会向 session 文件写入答案，也不会绕过 Codex 原生回答界面。
+> Codex `request_user_input` 在普通/default、计划和未知模式下都会被识别，但仍然只有只读提醒。Vibe Halo 会使用短期内存中的 Hook 来源信息，尽量把提醒放到对应显示器并重新置顶，再监控 Codex session JSONL 判断请求是否结束；它不会向 session 文件写入答案，也不会绕过 Codex 原生回答界面。
 
 ## 工作方式
 
@@ -489,7 +490,7 @@ Vibe Halo 在 Windows、macOS 与常见 x64 Linux 上提供类似的顶部审批
 
 ### 不切回终端也能批准 Codex 权限吗？
 
-可以。受支持的 Codex `PermissionRequest` 事件可直接在权限审批弹窗中允许或拒绝。如果 Vibe Halo 无法安全返回决定，或者你关闭审批、等待超时，它会返回“无决定”，让 Codex 恢复原生审批流程。Codex `request_user_input` 目前仍然只能提醒，必须回到 Codex 作答。
+可以。受支持的 Codex `PermissionRequest` 事件可直接在权限审批弹窗中允许或拒绝。如果 Vibe Halo 无法安全返回决定，或者你关闭审批、等待超时，它会返回“无决定”，让 Codex 恢复原生审批流程。普通/default 与计划模式下的 Codex `request_user_input` 会尽量在对应显示器重新置顶提醒，但仍必须回到 Codex 作答。
 
 ### Vibe Halo 支持 Claude Code 和 OpenCode 吗？
 
@@ -536,6 +537,7 @@ Vibe Halo 在 Windows、macOS 与常见 x64 Linux 上提供类似的顶部审批
 - 不支持远程审批，服务不会监听局域网地址。
 - 不是所有客户端都公开稳定的审批或回答协议；不支持的能力只提醒或交回原客户端。
 - Codex `request_user_input` 不能在岛内回答。
+- ZCode 双入口审批依赖 ZCode 3.10.1 的原生界面与 Hook 并发等待行为。Vibe Halo 不调用 ZCode 私有 app-server API；旧版本可能仍然以 Hook 为优先入口。
 - Codex 当前没有在稳定的 `PermissionRequest` Hook 载荷中提供实际审批者。Auto-review 绕过因此只会有界、只读地查询精确当前回合；无法识别本地会话格式时会保守地继续显示灵动岛。
 - 状态型客户端只显示完成或注意事件，不展示持续工作动画。
 - 最近事件只保存在本机，但仍可能包含敏感内容；结构化可疑字段会清理，共享设备上仍应谨慎启用。普通任务完成通知永远不记录。
