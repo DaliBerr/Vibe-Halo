@@ -99,8 +99,9 @@ jobs:
       - name: Smoke packaged macOS app
         shell: bash
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           root="$RUNNER_TEMP/vibe-smoke"
+          trap 'find "$root" -name main.log -type f -print -exec cat {} \;' EXIT
           executable="$(find dist -path '*/Vibe Halo.app/Contents/MacOS/Vibe Halo' -type f -print -quit)"
           test -n "$executable"
           CODEX_HOME="$root/codex" \
@@ -118,6 +119,14 @@ jobs:
           test -f "$root/runtime/hooks/vibe-halo-hook.js"
           test "$(stat -f '%Lp' "$root/runtime/bin/vibe-halo-hook-runner")" = "700"
           test "$(stat -f '%Lp' "$root/runtime/hooks/vibe-halo-hook.js")" = "600"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: macos-${{ matrix.arch }}-smoke-diagnostics
+          path: |
+            ${{ runner.temp }}/vibe-smoke/*.png
+            ${{ runner.temp }}/vibe-smoke/**/logs/main.log
+          retention-days: 7
       - run: npm run build:mac:${{ matrix.arch }}
       - uses: actions/upload-artifact@v7
         with:

@@ -812,6 +812,8 @@ function startApplication() {
     const demoApproval = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-approval");
     const demoPlanReady = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-plan-ready");
     const demoHistory = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-history");
+    const { createSmokeTasks, captureSmokeWindow } = require("./smoke-test");
+    const smokeTasks = createSmokeTasks();
     if (demoApproval || demoPlanReady) {
       let demo;
       if (demoApproval) {
@@ -864,7 +866,7 @@ function startApplication() {
             fs.writeFileSync(actionFile, approvals.size === 0 ? "resolved\n" : "pending\n");
           } catch {}
         };
-        setTimeout(async () => {
+        smokeTasks.schedule(250, async () => {
           try {
             let clicked = false;
             for (let attempt = 0; attempt < 20 && !clicked; attempt += 1) {
@@ -880,22 +882,23 @@ function startApplication() {
               await wait(50);
             }
             reportActionResult();
+            if (approvals.size > 0) throw new Error("Demo approval remained pending");
           } catch (error) {
             logger.warn("Demo approval click failed", { message: error.message });
             reportActionResult();
+            throw error;
           }
-        }, 250);
+        });
       }
       if (process.env.VIBE_HALO_SCREENSHOT) {
-        setTimeout(async () => {
+        smokeTasks.schedule(1400, async () => {
           try {
-            const image = await island.window.webContents.capturePage();
-            fs.mkdirSync(path.dirname(process.env.VIBE_HALO_SCREENSHOT), { recursive: true });
-            fs.writeFileSync(process.env.VIBE_HALO_SCREENSHOT, image.toPNG());
+            await captureSmokeWindow(island.window, process.env.VIBE_HALO_SCREENSHOT, "Boolean(document.querySelector('#compact-summary')?.textContent)");
           } catch (error) {
             logger.warn("Demo screenshot failed", { message: error.message });
+            throw error;
           }
-        }, 1400);
+        });
       }
     }
     if (demoHistory) {
@@ -953,28 +956,28 @@ function startApplication() {
       });
       historyWindow.open();
       if (process.env.VIBE_HALO_HISTORY_SCREENSHOT) {
-        setTimeout(async () => {
+        smokeTasks.schedule(1000, async () => {
           try {
-            const image = await historyWindow.window.webContents.capturePage();
-            fs.mkdirSync(path.dirname(process.env.VIBE_HALO_HISTORY_SCREENSHOT), { recursive: true });
-            fs.writeFileSync(process.env.VIBE_HALO_HISTORY_SCREENSHOT, image.toPNG());
+            await captureSmokeWindow(historyWindow.window, process.env.VIBE_HALO_HISTORY_SCREENSHOT, "Boolean(document.querySelector('.event-card'))");
             if (process.env.VIBE_HALO_HISTORY_DETAIL_SCREENSHOT) {
               await historyWindow.window.webContents.executeJavaScript(`document.querySelector('.event-card:last-child')?.click()`, true);
               await new Promise(resolve => setTimeout(resolve, 180));
-              const detail = await historyWindow.window.webContents.capturePage();
-              fs.writeFileSync(process.env.VIBE_HALO_HISTORY_DETAIL_SCREENSHOT, detail.toPNG());
+              await captureSmokeWindow(historyWindow.window, process.env.VIBE_HALO_HISTORY_DETAIL_SCREENSHOT, "document.querySelector('#detail-view')?.hidden === false && Boolean(document.querySelector('#detail-sections')?.children.length)");
             }
           } catch (error) {
             logger.warn("Demo history screenshot failed", { message: error.message });
+            throw error;
           }
-        }, 1000);
+        });
       }
     }
     if (process.argv.includes("--smoke-test")) {
-      const smokeDelay = process.env.VIBE_HALO_SMOKE_ACTION_FILE
-        ? 4200
-        : (process.env.VIBE_HALO_HISTORY_DETAIL_SCREENSHOT ? 3400 : (process.env.VIBE_HALO_SCREENSHOT ? 2600 : 1500));
-      setTimeout(() => requestQuit(), smokeDelay);
+      smokeTasks.schedule(1500, async () => {});
+      smokeTasks.finish().then(() => shutdownServices("smoke-test").then(() => app.exit(0)), async error => {
+        logger.warn("Smoke checks failed", { message: error.message });
+        await shutdownServices("smoke-test-failed");
+        app.exit(1);
+      });
     }
   }).catch(error => {
     try { logger?.error("Startup failed", { message: error.message }); } catch {}

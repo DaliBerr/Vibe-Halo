@@ -18,3 +18,4 @@ apps/android/.idea/
 **/*.jks
 **/*.keystore
 **/service-account*.json
+services/relay/wrangler.production.jsonc

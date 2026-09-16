@@ -8,14 +8,16 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2), action = args[0];
 const local = args.includes("--local"), remote = args.includes("--remote");
 if (local === remote || !["enrollment-code", "revoke-pc"].includes(action)) {
-  throw new Error("Usage: node scripts/admin.mjs enrollment-code --local|--remote --out <private-file>; or revoke-pc --local|--remote --pc <pc-id>");
+  throw new Error("Usage: node scripts/admin.mjs enrollment-code --local|--remote --out <private-file> [--config <wrangler-file>]; or revoke-pc --local|--remote --pc <pc-id> [--config <wrangler-file>]");
 }
 function argument(name) { const at = args.indexOf(name); return at < 0 ? undefined : args[at + 1]; }
+const configFile = argument("--config");
+if (args.includes("--config") && (!configFile || configFile.startsWith("--"))) throw new Error("--config requires a Wrangler configuration file.");
 function execute(sql) {
   const directory = fs.mkdtempSync(path.join(root, ".wrangler", "admin-"));
   try {
     const file = path.join(directory, "operation.sql"); fs.writeFileSync(file, sql, { mode: 0o600 });
-    execFileSync(process.execPath, [path.join(root, "node_modules/wrangler/bin/wrangler.js"), "d1", "execute", "DB", local ? "--local" : "--remote", "--file", file], { cwd: root, stdio: "pipe", timeout: 60000 });
+    execFileSync(process.execPath, [path.join(root, "node_modules/wrangler/bin/wrangler.js"), "d1", "execute", "DB", local ? "--local" : "--remote", "--file", file, ...(configFile ? ["--config", path.resolve(configFile)] : [])], { cwd: root, stdio: "pipe", timeout: 60000 });
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }
 fs.mkdirSync(path.join(root, ".wrangler"), { recursive: true });

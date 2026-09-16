@@ -27,7 +27,7 @@ files. New independent CI builds/lints Android and checks the relay/shared proto
 Verified locally on Windows with Node 24.14.0, Electron 41.10.2, Studio 2025.2.1,
 JBR 21.0.8 and the API 34 Small_Phone emulator:
 
-- Root `npm test`: 214 tests, 213 passed, one existing POSIX-only Windows skip.
+- Root `npm test`: 218 tests, 217 passed, one existing POSIX-only Windows skip.
 - `npm run test:protocol`: 6 passed, generated validators current.
 - Relay TypeScript check and Vitest: 8 passed in local workerd/D1/DO. Dry-run
   deploy bundle succeeds. Test workerd compatibility is capped at 2026-08-22 by
@@ -61,12 +61,56 @@ JBR 21.0.8 and the API 34 Small_Phone emulator:
 M0/M1 local foundations are verified. M2–M5 are implemented with local protocol /
 emulator evidence. Public M3 push/CPU/hibernation, real-client M4 and physical
 M5/M6 acceptance remain open. M7 builds/docs/local regressions are prepared;
-**the whole mobile feature is not declared production accepted**. No public relay,
-Firebase project, paid plan, store upload or production APK signing was created.
-Cloudflare's existing login was expired and could not refresh noninteractively;
-no Firebase service credential/app configuration was available. A public push
-claim therefore cannot be made. Restore deployment authentication and configure
-matching Firebase Android/Worker values locally before physical acceptance.
+**the whole mobile feature is not declared production accepted**. No Firebase
+project, paid plan, store upload or production APK signing was created. The user
+restored Cloudflare login and explicitly asked to proceed with public foreground
+testing while deferring Firebase configuration. A public push claim therefore
+cannot be made; matching Firebase Android/Worker values and physical acceptance
+remain required.
+
+Public relay: `https://vibe-halo-relay.z1593316231.workers.dev`, deployed version
+`f84afd72-05c8-4e6b-98f9-b5af8094c04e`. New isolated D1 database
+`912b3b29-35b1-46f8-93df-64b013315e22` has migration `0001_identity.sql`; existing
+account projects were not changed. Production config is the ignored sibling
+`services/relay/wrangler.production.jsonc`, while the committed template remains
+unconfigured. Three independent secrets were provisioned; their local recovery
+copy is Windows-user-DPAPI encrypted in ignored
+`.smoke/relay-production-secrets.dpapi.json`. FCM remains disabled; no service
+private key or public Android Firebase configuration is present.
+
+The API 34 emulator passed `CompanionFlowTest` against this real HTTPS Worker:
+controlled PC enrollment, fingerprint pairing, cloud approval and encrypted
+receipt, followed by forwarded pinned LAN decisions/forms after PC cloud
+disconnect, and revocation. `/healthz` returned 200. The public test PC was then
+root-revoked with the admin script; remote D1 reports zero active PCs and zero
+active bindings. The synthetic host and its current ADB forwarding were removed.
+This is real public foreground transport, but still a synthetic client waiter,
+not FCM, a cellular phone, real multicast discovery or long-run free-tier metrics.
+
+Local test deliverables are collected in ignored `dist/companion-preview/`: the
+installable debug APK, minified unsigned release APK, Windows x64 NSIS companion
+preview and SHA-256 checksums. Android business source is `40097ce`; subsequent CI
+fixes add explicit Android SDK initialization and avoid the removed legacy
+`tools` SDK package. The API 34 emulator repeated the full flow against these
+final binaries successfully; the synthetic host was shut down afterwards.
+
+Cross-platform packaging at `40097ce` passed Windows, macOS ARM64/x64 and Linux,
+including each platform's packaged startup smoke. The first Ubuntu XWayland UI
+smoke exited without enough diagnostics; rerun `35108422568` passed all compact,
+expanded, plan/history screenshots and the approval-click flow. PNGs and log
+artifacts are now retained, and the expanded island/history detail PNGs were
+visually inspected. The initial failure remains unexplained rather than being
+represented as a proven production rendering fix. A later Intel macOS run
+`35108605727` demonstrated that fixed-delay smoke exit can destroy the history
+IPC before a slow renderer loads. Smoke jobs now await all capture/action work,
+retry empty/unloaded frames and fail after a bounded timeout. Four regression
+tests cover delayed completion, task failure, timeout and empty-frame retries.
+Production approval deadlines and ordinary quit behavior are unchanged.
+
+Android CI `35108605713` passes relay/protocol checks plus debug, instrumentation
+APK and R8 release builds and both lint variants on Ubuntu. The cloud CI builds
+the instrumentation APK; actual instrumentation execution is the local emulator
+evidence above.
 
 ### T01–T68 classification (2026-09-16)
 
@@ -108,7 +152,7 @@ response is never counted as FCM/watch delivery. No item is silently omitted.
 | T30 | Pass | Role-checked PC WSS publishing and phone signature trust; unsupported stream operations reject. |
 | T31 | Unverified | Emulator forwarded pinned HTTPS/WSS succeeds; actual Wi-Fi multicast discovery not a forwarded-loopback test. |
 | T32 | Unverified | Requires configured public FCM and physical/background delivery. |
-| T33 | Unverified | Requires configured public relay/FCM and cellular phone. |
+| T33 | Unverified | Public relay foreground path passes; still requires configured FCM and cellular phone. |
 | T34 | Unverified | Cloud fallback and wrong TLS rejection exercised; AP isolation/mDNS blocking/OS LAN denial need real network tests. |
 | T35 | Unverified | Endpoint-bound sessions and monotonic cache implemented; physical IP/IPv6/network-switch matrix pending. |
 | T36 | Pass | Actual TLS client rejects a wrong PC SPKI; LAN uses separate signed session, never cloud bearer. |
@@ -131,9 +175,9 @@ response is never counted as FCM/watch delivery. No item is silently omitted.
 | T53 | Pass | Bounded encrypted journal/cache and receipt capacity/expiry fixtures; old pending records do not revive. |
 | T54 | Pass | 2 PCs × 3 phones in D1/DO fixtures with selected-binding revocation and separate PC authority. |
 | T55 | Pass | Desktop, shared protocol, Worker Vitest and Android instrumentation run independently. |
-| T56 | Unverified | Windows package verified; fresh macOS/Linux package runs remain CI/platform acceptance. |
-| T57 | Unverified | Public Worker CPU, actual FCM service-auth cold start and DO billing require deployment credentials. |
-| T58 | Unverified | Local D1 migration/build passes; staging redeploy/rollback with live records not performed. |
+| T56 | Pass | Windows/macOS ARM64/x64/Linux packaging and isolated startup passed CI; local Windows NSIS and Android debug/release builds pass. Physical desktop/client acceptance is separate. |
+| T57 | Unverified | Real Worker foreground requests pass; sustained CPU/DO billing measurement and FCM service-auth cold start remain pending. |
+| T58 | Unverified | Local and public D1 migrations/deployments pass; rollback with live records not performed. |
 | T59 | Pass | Controlled enrollment idempotency/reused code/active-PC cap and malformed-body rejection. |
 | T60 | Pass | Device/session role and signed challenge device/origin/purpose tampering rejected. |
 | T61 | Unverified | 15-minute auth renewal and separate FCM identity implemented; real background expiry plus delivery pending. |

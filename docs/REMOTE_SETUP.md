@@ -52,6 +52,9 @@ HTTPS; never expose the debug Worker or synthetic bridge to a public interface.
    not app-user accounts and must not be put in Git, chat or screenshots.
 2. Run `npx wrangler d1 create vibe-halo-relay`. Put the returned database ID into
    `services/relay/wrangler.jsonc`, replacing its deliberately invalid placeholder.
+   To keep the portable template unchanged, copy it to the ignored sibling
+   `wrangler.production.jsonc` and pass `--config wrangler.production.jsonc` to
+   all production Wrangler commands and `scripts/admin.mjs` commands instead.
 3. Set `RELAY_ORIGIN` to the exact HTTPS origin, with no path/query/fragment. Add
    your custom-domain route, or intentionally enable `workers_dev` and use its
    exact HTTPS origin. All devices and signed handshakes must use that origin.
@@ -82,6 +85,19 @@ application does not change plans or buy capacity. API and WebSocket rate limits
 24-hour journals, bounded retry queues and hourly cleanup bound common abuse, but
 are not a promise that every workload fits a free allowance. Public production
 CPU and hibernation billing require deployment measurement.
+
+For a synthetic public-relay emulator run, issue a fresh enrollment code to a
+private file, then run `scripts/mobile-smoke-host.cjs` from the repository root
+with `VIBE_HALO_TEST=1`, `VIBE_HALO_SMOKE_RELAY_ORIGIN` set to the exact deployed
+HTTPS origin and `VIBE_HALO_SMOKE_ENROLLMENT_FILE` pointing to that file. This
+harness does not discover production credentials or generate public codes. It
+uses an isolated synthetic PC with ephemeral test encryption and binds its
+authenticated test bridge only to loopback. Forward bridge port 8788 and the
+fixture's LAN port to the emulator; run `CompanionFlowTest` with the private
+fixture copied to the debug app. The cloud leg now traverses the real Worker,
+while the LAN leg still uses emulator forwarding. Revoke the synthetic PC with
+`scripts/admin.mjs revoke-pc --remote --config wrangler.production.jsonc --pc ID`
+afterwards. This does not test background FCM or physical multicast discovery.
 
 ## Configure FCM
 
