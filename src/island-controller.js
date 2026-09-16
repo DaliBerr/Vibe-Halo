@@ -2,6 +2,7 @@
 
 const path = require("path");
 const { agent } = require("./agent-registry");
+const { DecisionService, validateDecision } = require("./decision-service");
 const { formatApprovalInput } = require("./approval-presenter");
 const { createLocalizer } = require("./i18n");
 const { locateDisplay } = require("./window-locator");
@@ -37,6 +38,7 @@ function validAnswersPayload(value) {
 }
 
 function validDecisionPayload(payload, current) {
+  if (typeof current !== "string") return validateDecision(payload, current) === null;
   const currentId = typeof current === "string" ? current : current?.id;
   const optionId = payload?.optionId || payload?.behavior;
   if (!payload || typeof payload !== "object"
@@ -126,6 +128,7 @@ class IslandController {
     this.ipcMain = options.ipcMain;
     this.clipboard = options.clipboard;
     this.approvals = options.approvalStore;
+    this.decisions = options.decisionService || new DecisionService({ approvalStore: this.approvals });
     this.inputRequests = options.inputRequestStore;
     this.completions = options.completionStore;
     this.localization = options.localization || createLocalizer({ preference: "system", systemLocale: "en-US" });
@@ -231,7 +234,7 @@ class IslandController {
         this.logger.warn("Rejected renderer decision", { reason: "invalid-payload", currentId: current?.id || null });
         return;
       }
-      const accepted = this.approvals.resolve(payload.approvalId, payload.optionId, { answers: payload.answers });
+      const { accepted } = this.decisions.decideLocal(payload);
       this.logger.info("Renderer decision received", {
         accepted,
         agentId: current.agentId,
@@ -243,7 +246,7 @@ class IslandController {
     });
     this.handleIpc("island:close", (event, payload) => {
       if (!this.validSender(event) || !payload || typeof payload.id !== "string") return;
-      if (this.approvals.current?.id === payload.id) this.approvals.resolve(payload.id, "no-decision");
+      if (this.approvals.current?.id === payload.id) this.decisions.returnToNative(payload.id);
       else if (this.inputRequests.current?.id === payload.id) this.inputRequests.dismiss(payload.id);
       else if (this.completions.current?.id === payload.id) this.completions.clear("user-closed");
     });
@@ -496,7 +499,7 @@ class IslandController {
   closeCurrent() {
     const state = this.state();
     if (!state.current) return;
-    if (state.current.type === "approval" || state.current.type === "elicitation") this.approvals.resolve(state.current.id, "native");
+    if (state.current.type === "approval" || state.current.type === "elicitation") this.decisions.returnToNative(state.current.id);
     else if (state.current.type === "input-request") this.inputRequests.dismiss(state.current.id);
     else this.completions.clear("window-close");
   }

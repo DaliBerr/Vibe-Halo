@@ -49,6 +49,31 @@ The application does not contain desktop pets, remote approvals, a user-configur
 
 ## Verification Status
 
+### Mobile implementation started — 2026-09-16
+
+- Brief: user-provided mobile implementation plan v1.0; accepted product choices
+  and conservative Q5 scope are in `docs/REMOTE_DECISIONS.md`.
+- Baseline HEAD: `ee3338dee7e0e15711cae55eb6a49ced84a6567d`; clean worktree,
+  fetched origin and fast-forward check found main current. Compared with the
+  plan's `fd3e48f` baseline, only AGENTS/HANDOFF documentation differs. Work is
+  isolated on `codex/mobile-foundation`.
+- Environment: Windows, Node `24.14.0`, npm `11.9.0`, Java `25.0.3`; Android SDK
+  platform `android-36`, build tools `35.0.0`/`36.1.0` found. Gradle, Kotlin CLI
+  and adb were not on PATH. No Android device, Firebase, Cloudflare or Keystore
+  round trip was verified. Do not treat these as completed M0 gates.
+- Baseline `npm test`: 181 tests, 180 pass, 1 POSIX-only skip, 0 failures.
+- First safety change: desktop decision/close handlers use DecisionService;
+  user decisions check FIFO, exact option and the absolute deadline before
+  resolving. Strict forms reject extra questions, closed-option violations,
+  single-select multiple values, duplicates, oversize values and dangerous keys
+  before finalize. Store timeout/disconnect/shutdown fallback stays separate.
+- After safety change `npm test`: 188 tests, 187 pass, 1 POSIX-only skip,
+  0 failures. New service and real IPC tests cover stale requests, timer delay,
+  native-first cancellation and invalid answers without waiter completion.
+- This is staged implementation, not a working mobile feature. No remote
+  listener, cloud connection, device enrollment, Android APK or FCM notification
+  has been enabled. M0 external verification and M2–M7 remain outstanding.
+
 - Recorded live acceptance on 2026-08-30: the installed 0.5.8 discovered and downloaded 0.5.9, then explicitly restarted through the built-in updater. The application-ready log and installed executable confirmed 0.5.9; the installed Hook matched the repository SHA-256. The user confirmed an ordinary-mode Codex question appeared, and logs confirmed expansion and resolution after answering. ZCode native-first and island-first clicks after this upgrade remain pending manual acceptance; automated cancellation tests and installed 3.10.1 source/config inspection do not establish that final UI result.
 - Automated suite: 181 tests on Windows (180 passed, one POSIX-only process test skipped), including ordinary/Plan/unknown Codex input reminders, Codex Hook/JSONL Session namespace matching, bounded Session origin isolation and expiry, source-display correction without focus, ZCode native-winner connection cancellation, exact-turn Codex Auto-review routing, history persistence/redaction, localization, package contents, and every existing 19-adapter/platform/update regression. The POSIX process-runner test executes on macOS/Linux CI.
 - Automatic-update suite: independent release/update and signing gates, unsigned/signed public update configs, scheduler state, download/install transitions, sanitized errors, ordered fail-open shutdown, retained external signing staging/injection, and final-byte metadata regeneration.

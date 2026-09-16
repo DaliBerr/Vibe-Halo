@@ -321,16 +321,22 @@ function normalizeRequest(agentId, data) {
 }
 
 function validateAnswers(questions, answers) {
-  if (!answers || typeof answers !== "object" || Array.isArray(answers)) return null;
-  const allowed = new Map((questions || []).map(question => [question.id, question]));
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)
+    || ![Object.prototype, null].includes(Object.getPrototypeOf(answers))
+    || !Array.isArray(questions) || questions.length > 10) return null;
+  const forbidden = new Set(["__proto__", "prototype", "constructor"]);
+  const allowed = new Map(questions.map(question => [question.id, question]));
+  if (allowed.size !== questions.length || Object.keys(answers).length !== allowed.size) return null;
   const output = {};
-  for (const [key, raw] of Object.entries(answers).slice(0, 10)) {
+  for (const [key, raw] of Object.entries(answers)) {
     const question = allowed.get(key);
-    if (!question) return null;
+    if (!question || forbidden.has(key) || !key || key.length > 120) return null;
     const values = Array.isArray(raw) ? raw : [raw];
-    if (values.length > 20) return null;
-    const cleaned = values.map(value => cleanText(value, 2000)).filter(Boolean);
-    if (!cleaned.length) return null;
+    if (!values.length || values.length > 20 || (!question.multiSelect && values.length !== 1)
+      || values.some(value => typeof value !== "string" || !value.length || value.length > 2000)) return null;
+    if (question.allowText === false && values.some(value => !question.options?.some(option => option.id === value))) return null;
+    const cleaned = values.map(value => cleanText(value, 2000));
+    if (cleaned.some(value => !value) || new Set(cleaned).size !== cleaned.length) return null;
     output[key] = question.multiSelect ? cleaned : cleaned[0];
   }
   return Object.keys(output).length === allowed.size ? output : null;
