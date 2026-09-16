@@ -312,6 +312,19 @@ function normalizeRequest(agentId, data) {
   const elicitation = (event === "Elicitation" || zcodeQuestion) && descriptorValue.capabilities.elicitation;
   const approval = event === "PermissionRequest" && descriptorValue.capabilities.approval && !zcodeQuestion;
   const passive = event === "PermissionRequest" && descriptorValue.capabilities.passiveApproval;
+  const persistentPreviews = {};
+  if (["claude-code", "codebuddy"].includes(descriptorValue.id)
+    && sameJson(data.permission_suggestions || data.permissionSuggestions || [], permissionSuggestions)) {
+    permissionSuggestions.slice(0, 9).forEach((suggestion, index) => {
+      const preview = JSON.stringify(suggestion, null, 2);
+      if (preview.length <= 16000) persistentPreviews[`suggestion:${index}`] = preview;
+    });
+  }
+  if (descriptorValue.id === "opencode" && Array.isArray(data.always_patterns) && data.always_patterns.length > 0
+    && data.always_patterns.length <= 100 && data.always_patterns.every(pattern => typeof pattern === "string" && pattern.length > 0 && pattern.length <= 2000)) {
+    const preview = JSON.stringify({ permission: toolName, patterns: data.always_patterns }, null, 2);
+    if (preview.length <= 16000) persistentPreviews.always = preview;
+  }
   return {
     agentId: descriptorValue.id,
     agentName: descriptorValue.name,
@@ -323,6 +336,7 @@ function normalizeRequest(agentId, data) {
     fingerprint: cleanText(data.tool_input_fingerprint || data.fingerprint, 128),
     toolName,
     toolInput,
+    persistentPreviews,
     // Conservative remote review gate: normalization must not hide context.
     // Persistent permission previews are a separate gate in DecisionService.
     remoteContextComplete: sameJson(rawInput ?? {}, toolInput)

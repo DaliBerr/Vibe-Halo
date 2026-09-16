@@ -21,6 +21,7 @@ module.exports = {
     "src/**/*",
     "packages/protocol/package.json",
     "packages/protocol/src/index.js",
+    "packages/protocol/src/crypto.mjs",
     "packages/protocol/generated/validators.js",
     "assets/icons/16x16.png",
     "assets/icons/32x32.png",

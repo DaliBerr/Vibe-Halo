@@ -35,6 +35,8 @@ const { APP_ID, APP_NAME } = require("./constants");
 const { agent, listAgents } = require("./agent-registry");
 const { ApprovalStore } = require("./approval-store");
 const { DecisionService } = require("./decision-service");
+const { RemoteService } = require("./remote/remote-service");
+const { RemoteSettingsWindow } = require("./remote/settings-window");
 const { CodexInputMonitor } = require("./codex-input-monitor");
 const { completionFromStop } = require("./completion-event");
 const { CompletionStore } = require("./completion-store");
@@ -129,6 +131,8 @@ function startApplication() {
   let logger = null;
   let updateManager = null;
   let shutdownCoordinator = null;
+  let remote = null;
+  let remoteWindow = null;
   let localization = createLocalizer({ preference: "system", systemLocale: "en-US" });
   const t = (key, params) => localization.t(key, params);
   const approvals = new ApprovalStore();
@@ -152,6 +156,7 @@ function startApplication() {
               else approvals.shutdown();
             },
           },
+          { name: "remote-companion", run: async () => { remoteWindow?.destroy(); await remote?.stop(); } },
           { name: "updater", run: () => updateManager?.stop() },
           {
             name: "input-monitor",
@@ -605,6 +610,7 @@ function startApplication() {
       { type: "separator" },
       { label: t("tray.quit"), click: () => requestQuit() },
     );
+    items.splice(Math.max(0, items.length - 1), 0, { label: localization.locale === "zh-CN" ? "手机伴侣…" : "Mobile companion…", click: () => remoteWindow?.show() });
     tray.setContextMenu(Menu.buildFromTemplate(items));
     tray.setToolTip(`${APP_NAME} — ${statusLabel}`);
   }
@@ -632,11 +638,13 @@ function startApplication() {
       : (typeof data.session_id === "string" ? data.session_id : `${agentId}:unknown`);
     rememberAgentOrigin({ ...data, agentId, sessionId });
     if (data.event === "UserPromptSubmit") {
+      remote?.resolveSessionReminders(agentId, sessionId);
       completions.clear("new-prompt", sessionId, agentId);
       inputRequests.clearSession(sessionId, "new-prompt", agentId);
       return;
     }
     if (data.event === "PermissionRequest" && descriptor.capabilities.passiveApproval) {
+      remote?.recordReminder({ agentId, sessionId, requestKey: `${agentId}:${sessionId}:permission:${data.requestId || data.request_id || data.toolUseId || "pending"}` }, "input");
       if (!settings.get("inputReminderEnabled")) return;
       const requestId = typeof data.requestId === "string" ? data.requestId : (typeof data.request_id === "string" ? data.request_id : data.toolUseId || Date.now());
       inputRequests.enqueue({
@@ -650,6 +658,9 @@ function startApplication() {
       return;
     }
     if (data.event !== "Stop") return;
+    remote?.resolveSessionReminders(agentId, sessionId);
+    const remoteCompletion = completionFromStop(data, descriptor, sessionId);
+    if (remoteCompletion) remote?.recordReminder(remoteCompletion, remoteCompletion.completionKind === "plan" ? "plan" : "completion");
     inputRequests.clearSession(sessionId, "session-stopped", agentId);
     if (approvals.size > 0 || inputRequests.size > 0) return;
     const completion = completionFromStop(data, descriptor, sessionId);
@@ -666,7 +677,12 @@ function startApplication() {
     platformAdapter.configureReady(app);
     logger = createLogger(path.join(app.getPath("userData"), "logs"));
     settings = new SettingsStore(path.join(app.getPath("userData"), "settings.json"));
+    remote = new RemoteService({ userData: app.getPath("userData"), safeStorage, approvals, decisions,
+      allowLocal: !app.isPackaged && process.env.VIBE_HALO_TEST === "1" });
+    await remote.initialize();
+    remoteWindow = new RemoteSettingsWindow({ BrowserWindow, ipcMain, remote });
     localization = createLocalizer({ preference: settings.get("language"), systemLocale: app.getLocale() });
+    remote.getLocale = () => localization.locale;
     integrationManager = createIntegrationManager(logger, settings);
     hookManager = integrationManager.codexManager;
     if (!settings.get("initialized")) {
@@ -688,6 +704,8 @@ function startApplication() {
       logger,
     });
     history.load();
+    remote.historyStore = history;
+    remote.inputRequests = inputRequests;
     const appendHistory = record => {
       if (record && settings.get("historyEnabled")) history.append(record);
     };
@@ -728,6 +746,7 @@ function startApplication() {
     inputMonitor = new CodexInputMonitor({
       logger,
       onRequested: request => {
+        remote?.recordReminder({ ...request, agentId: "codex" }, "input");
         if (!settings.get("inputReminderEnabled")) return false;
         const origin = sessionOrigins.get("codex", request.sessionId);
         return !!inputRequests.enqueue({
@@ -739,10 +758,10 @@ function startApplication() {
           pidChain: origin?.pidChain || [],
         }).entry;
       },
-      onResolved: request => inputRequests.resolve(request.requestKey, {
-        answers: request.answers,
-        answerAvailable: request.answerAvailable,
-      }),
+      onResolved: request => {
+        remote?.resolveReminder(request.requestKey);
+        return inputRequests.resolve(request.requestKey, { answers: request.answers, answerAvailable: request.answerAvailable });
+      },
     });
     inputMonitor.start();
 

@@ -19,6 +19,7 @@
     "pcTime"
   ],
   "properties": {
+    "persistentPreviews": { "type": "object", "maxProperties": 12, "propertyNames": { "type": "string", "pattern": "^(always|suggestion:[0-9]+)$" }, "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 16000 } },
     "protocolVersion": {
       "const": 1
     },

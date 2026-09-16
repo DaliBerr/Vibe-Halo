@@ -92,6 +92,7 @@ export default async function vibeHaloOpenCode(ctx) {
           tool_name: properties.permission || "Unknown",
           tool_input: properties.metadata || {},
           always: Array.isArray(properties.always) && properties.always.length > 0,
+          always_patterns: Array.isArray(properties.always) ? properties.always : [],
           cwd: ctx?.directory || "",
           source_pid: process.pid,
         }, 135000);

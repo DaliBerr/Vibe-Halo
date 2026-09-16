@@ -14,7 +14,9 @@ function safeTree(value, depth = 0, state = { nodes: 0, seen: new Set() }) {
   if (++state.nodes > LIMITS.nodes || depth > LIMITS.depth) return false;
   if (value === null || typeof value === "boolean") return true;
   if (typeof value === "number") return Number.isFinite(value);
-  if (typeof value === "string") return value.length <= LIMITS.detailBytes && value.isWellFormed();
+  // Transport objects contain compact JWE strings larger than their plaintext.
+  // validate()/parse() still apply the smaller limit to each plaintext schema.
+  if (typeof value === "string") return value.length <= LIMITS.envelopeBytes && value.isWellFormed();
   if (!Array.isArray(value) && !isRecord(value)) return false;
   if (state.seen.has(value) || Reflect.ownKeys(value).some(key => typeof key !== "string" || FORBIDDEN.has(key))) return false;
   state.seen.add(value);

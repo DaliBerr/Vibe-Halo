@@ -71,7 +71,8 @@ class DecisionService {
   // Internal gateway contract, NOT an authenticated network endpoint. M2 must
   // verify JWS/JWE and supply an opaque principal. The injected synchronous
   // authorizer must reread current PC-local trust and return matching scopes.
-  // There is deliberately no production authorizer or transport in M1.
+  // Only the authenticated, decrypting gateway supplies a verified principal;
+  // current PC-local grants are checked again immediately before finalizing.
   decideVerifiedRemote(intent, principal) {
     const fail = status => ({ accepted: false, status });
     if (this.quiescing || this.remoteControlEnabled() !== true) return fail("forbidden");
@@ -82,7 +83,9 @@ class DecisionService {
     if (!authorization || authorization.pcId !== this.pcId || authorization.mobileId !== intent.mobileId
       || authorization.bindingId !== intent.bindingId || authorization.bindingRevision !== intent.bindingRevision
       || !Array.isArray(authorization.scopes)) return fail("forbidden");
-    if (persistent(intent.optionId)) return fail("forbidden");
+    const persistentDecision = persistent(intent.optionId);
+    if (persistentDecision && (authorization.persistentEnabled !== true || !authorization.scopes.includes("approvals.persistent") || intent.persistentConfirmed !== true)) return fail("forbidden");
+    if (!persistentDecision && intent.persistentConfirmed !== undefined) return fail("invalid_action");
     const scope = intent.optionId === "submit" ? "questions.answer" : "approvals.decide";
     if (!authorization.scopes.includes(scope)) return fail("forbidden");
     if (intent.pcSessionEpoch !== this.approvals.pcSessionEpoch) return fail("stale_epoch");
@@ -109,9 +112,10 @@ class DecisionService {
     if (contextDigest(current) !== intent.approvalContextDigest) return finish(fail("stale_context"));
     const view = detail(current, {
       pcId: this.pcId, pcSessionEpoch: this.approvals.pcSessionEpoch, currentId: current.id,
-      pendingCount: this.approvals.size, now,
+      pendingCount: this.approvals.size, now, persistentEnabled: persistentDecision,
     });
     if (!view?.remoteActionable) return finish(fail("detail_incomplete"));
+    if (persistentDecision && !view.persistentPreviews?.[intent.optionId]) return finish(fail("detail_incomplete"));
     // All current state, trust, scope, revision, expiry and schema checks above
     // are synchronous. Local validation and finalize occur in the same turn.
     return finish(this.decideLocal({

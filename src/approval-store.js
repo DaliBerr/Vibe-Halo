@@ -97,7 +97,7 @@ class ApprovalStore extends EventEmitter {
       pcSessionEpoch: this.pcSessionEpoch, streamSeq: this.streamSeq,
       pendingCount: this.size, offset,
       entries: this.entries.slice(offset, offset + limit).map(entry => structuredClone({
-        ...publicEntry(entry), state: entry.state, remoteContextComplete: entry.remoteContextComplete,
+        ...publicEntry(entry), state: entry.state, remoteContextComplete: entry.remoteContextComplete, persistentPreviews: entry.persistentPreviews,
       })),
     };
   }
@@ -133,6 +133,7 @@ class ApprovalStore extends EventEmitter {
       toolName: safeText(request.toolName, 160) || "Unknown",
       toolInput: request.toolInput && typeof request.toolInput === "object" ? structuredClone(request.toolInput) : {},
       remoteContextComplete: request.remoteContextComplete === true,
+      persistentPreviews: structuredClone(request.persistentPreviews || {}),
       description: safeText(request.description, 1000),
       cwd: safeText(request.cwd, 2000),
       sourcePid: Number.isInteger(request.sourcePid) ? request.sourcePid : null,
@@ -172,6 +173,9 @@ class ApprovalStore extends EventEmitter {
     entry.expiresAt = entry.createdAt + this.timeoutMs;
     entry.timer = this.setTimer(() => this.expire(entry.id), this.timeoutMs);
     if (entry.timer && typeof entry.timer.unref === "function") entry.timer.unref();
+    // Queue length is part of every remote summary. Invalidate earlier views
+    // whenever it changes, without extending any approval's deadline.
+    for (const queued of this.entries) { queued.eventRevision += 1; queued.streamSeq = ++this.streamSeq; }
     this.entries.push(entry);
     this.byKey.set(key, entry);
     this.emit("changed", this.snapshot(), "enqueued");
@@ -219,10 +223,7 @@ class ApprovalStore extends EventEmitter {
     entry.eventRevision += 1;
     entry.streamSeq = ++this.streamSeq;
     // Becoming the head changes actionability, never the original deadline.
-    if (index === 0 && this.current) {
-      this.current.eventRevision += 1;
-      this.current.streamSeq = ++this.streamSeq;
-    }
+    for (const queued of this.entries) { queued.eventRevision += 1; queued.streamSeq = ++this.streamSeq; }
     this.byKey.delete(entry.key);
     entry.state = finalState;
     const finalizedEntry = publicEntry(entry);

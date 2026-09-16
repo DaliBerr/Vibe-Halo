@@ -18,6 +18,7 @@ export interface DecisionIntent {
   issuedAt: string;
   expiresAt: string;
   answers?: Answers;
+  persistentConfirmed?: true;
 }
 export interface EventSummary {
   protocolVersion: 1;
@@ -50,6 +51,7 @@ export interface EventDetail {
   redacted: boolean;
   remoteActionable: boolean;
   pcTime: string;
+  persistentPreviews?: Record<string, string>;
 }
 export const LIMITS: Readonly<{ controlBytes: number; detailBytes: number; envelopeBytes: number; depth: number; nodes: number }>;
 export function validate(kind: Kind, value: unknown): Validation;

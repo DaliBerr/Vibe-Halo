@@ -20,6 +20,7 @@
     "expiresAt"
   ],
   "properties": {
+    "persistentConfirmed": { "const": true },
     "protocolVersion": {
       "const": 1
     },

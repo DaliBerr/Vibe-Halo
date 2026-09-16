@@ -10,6 +10,7 @@ function contextDigest(entry) {
     agentId: entry.agentId, kind: entry.kind || entry.type, toolName: entry.toolName,
     toolInput: entry.toolInput, description: entry.description, cwd: entry.cwd,
     options: entry.options, questions: entry.questions,
+    persistentPreviews: entry.persistentPreviews || {},
   })}`;
 }
 
@@ -32,7 +33,7 @@ function summary(entry, { pcId, pcSessionEpoch, currentId, pendingCount, now }) 
   return validate("eventSummary", value).ok ? value : null;
 }
 
-// Detail is plaintext for the future authenticated sign-then-encrypt gateway.
+// Detail is plaintext for the authenticated sign-then-encrypt gateway.
 // Never send this object as a push payload or directly to a transport.
 function detail(entry, context) {
   const eventSummary = summary(entry, context);
@@ -54,18 +55,27 @@ function detail(entry, context) {
     })),
     truncated: entry.remoteContextComplete !== true, redacted,
     remoteActionable: false, pcTime: new Date(context.now).toISOString(),
+    persistentPreviews: {},
   };
   const capabilities = agent(entry.agentId)?.capabilities;
   value.remoteActionable = eventSummary.actionable && !value.truncated && !redacted
     && (eventSummary.kind === "question" ? capabilities?.elicitation === true : capabilities?.approval === true);
-  // No complete persistent preview exists yet. Do not expose these options as
-  // phone actions; the service independently rejects forged persistent intents.
-  value.options = value.options.filter(option => !persistent(option.id));
-  if (Buffer.byteLength(JSON.stringify(value), "utf8") > LIMITS.detailBytes) {
+  // Persistent actions need a complete, unredacted scope and PC-local opt-in.
+  // The decision service independently checks the final current preview.
+  value.options = value.options.filter(option => {
+    if (!persistent(option.id)) return true;
+    const preview = entry.persistentPreviews?.[option.id];
+    if (!context.persistentEnabled || typeof preview !== "string" || !preview.length || preview.length > 16000) return false;
+    try { if (JSON.stringify(sanitizeValue(JSON.parse(preview), "permissionScope")) !== JSON.stringify(JSON.parse(preview))) return false; }
+    catch { return false; }
+    value.persistentPreviews[option.id] = preview; return true;
+  });
+  if (Buffer.byteLength(JSON.stringify(value), "utf8") > LIMITS.detailBytes - 1500) {
     value.toolInputText = "";
     value.description = "";
     value.questions = [];
     value.options = [];
+    value.persistentPreviews = {};
     value.truncated = true;
     value.remoteActionable = false;
   }

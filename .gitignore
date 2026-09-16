@@ -6,3 +6,15 @@ coverage/
 .DS_Store
 build/generated-icons/
 build/icon.png
+**/.wrangler/
+**/.dev.vars
+**/.dev.vars.*
+!**/.dev.vars.example
+**/.gradle/
+apps/android/**/build/
+apps/android/local.properties
+apps/android/.idea/
+**/google-services.json
+**/*.jks
+**/*.keystore
+**/service-account*.json

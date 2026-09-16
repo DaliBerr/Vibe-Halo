@@ -1,0 +1,7 @@
+# Copy to .dev.vars for LOCAL tests only. Generate independent random values.
+ENROLLMENT_PEPPER=replace-with-at-least-32-random-bytes
+PAIRING_PEPPER=replace-with-another-32-random-bytes
+PUSH_TOKEN_KEY=replace-with-32-byte-base64-key
+FCM_PROJECT_ID=
+FCM_CLIENT_EMAIL=
+FCM_PRIVATE_KEY=
