@@ -359,6 +359,13 @@ Windows NSIS 卸载程序也会调用相同清理流程。macOS 将应用拖入�
 
 ## 开发
 
+Android 手机伴侣正在分阶段开发，尚未成为发行版功能。当前基础代码增加了统一审批
+校验和协议测试，没有开启远程访问、配对或推送，也还没有可用的手机应用。
+产品选择见[决策记录](docs/REMOTE_DECISIONS.md)，协议边界见[协议说明](docs/REMOTE_PROTOCOL.md)，
+本次实际测试与剩余工作见[交接记录](HANDOFF.md)。桌面测试运行 `npm test`，独立协议测试
+运行 `npm run test:protocol`；修改 schema 后运行 `npm run build:protocol`，将生成的校验器
+与 schema 一起提交。
+
 ### 可用命令
 
 | 命令 | 说明 |

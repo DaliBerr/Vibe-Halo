@@ -358,6 +358,15 @@ The project has no database, web backend, frontend framework, Docker deployment,
 
 ## Development
 
+The Android companion is under staged development and is not available in the
+released desktop feature set. The current foundation adds shared decision
+validation and protocol fixtures; it does not enable remote access, pairing,
+push notifications or a phone app. See [decisions](docs/REMOTE_DECISIONS.md),
+[protocol boundaries](docs/REMOTE_PROTOCOL.md) and [dated verification](HANDOFF.md).
+Run `npm test` for desktop tests and `npm run test:protocol` for the separate
+protocol suite. After changing schemas, run `npm run build:protocol` and commit
+the generated validators with the schemas.
+
 ### Available commands
 
 | Command | Description |

@@ -8,7 +8,7 @@ Use `HANDOFF.md` for dated implementation and verification context, and `README.
 
 Vibe Halo is a Windows, macOS, and Linux dynamic-island interface for AI coding clients. It provides fail-open approvals, exact protocol-backed interactive answers where supported, native-flow reminders, and completion notifications.
 
-The project defines 19 integrations through a shared adapter registry, with different capabilities and verification levels, while preserving one global approval FIFO. Its desktop UI consists of one live top-center island plus one optional, tray-opened recent-event history window. Official Windows stable builds use an explicit-restart, fail-open updater backed by GitHub Releases; local and preview builds disable updates. SignPath is an optional, default-disabled enhancement. It does not include desktop pets, remote approvals, or a user-configurable theme system; existing system light/dark appearance is supported. Do not reintroduce the Clawd on Desk pet, remote-approval, or multi-agent state-machine features unless explicitly requested.
+The project defines 19 integrations through a shared adapter registry, with different capabilities and verification levels, while preserving one global approval FIFO. Its desktop UI consists of one live top-center island plus one optional, tray-opened recent-event history window. Official Windows stable builds use an explicit-restart, fail-open updater backed by GitHub Releases; local and preview builds disable updates. SignPath is an optional, default-disabled enhancement. An Android notification/remote-approval companion is now explicitly authorized and under staged development; see `docs/REMOTE_DECISIONS.md` and dated HANDOFF evidence. Remote access/control must stay disabled until the relevant authentication, encryption and end-to-end gates pass. Existing system light/dark appearance is supported. Do not reintroduce the Clawd on Desk pet, user-configurable themes or old multi-agent state machine unless explicitly requested.
 
 ## Repository Entry Points
 
@@ -22,6 +22,8 @@ The project defines 19 integrations through a shared adapter registry, with diff
 - `hooks/integrations/`: managed OpenCode, Hermes, Pi, and OpenClaw plugin assets.
 - `src/server.js`: loopback-only authenticated hook server.
 - `src/approval-store.js`: global approval FIFO, deduplication, timeout, disconnect, and idempotent decisions.
+- `src/decision-service.js`: shared current-request validation and default-disabled internal remote decision boundary; network authentication is a separate prerequisite.
+- `packages/protocol/` and `src/remote/event-projector.js`: bounded versioned schemas, standalone validators, synthetic fixtures, and explicit network DTO projection.
 - `src/codex-input-monitor.js`: read-only incremental monitor for Codex session JSONL files.
 - `src/session-origin-store.js`: bounded, expiring in-memory client/Session source information for display placement; never persisted or exposed to renderers.
 - `src/completion-event.js`: completion and plan-ready event classification.

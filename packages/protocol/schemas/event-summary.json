@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://vibe-halo.invalid/protocol/v1/event-summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocolVersion",
+    "eventId",
+    "pcId",
+    "pcSessionEpoch",
+    "streamSeq",
+    "eventRevision",
+    "kind",
+    "agentId",
+    "createdAt",
+    "expiresAt",
+    "state",
+    "actionable",
+    "pendingCount",
+    "summaryKey"
+  ],
+  "properties": {
+    "protocolVersion": {
+      "const": 1
+    },
+    "eventId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+    },
+    "pcId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+    },
+    "pcSessionEpoch": {
+      "type": "string",
+      "minLength": 36,
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "streamSeq": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "eventRevision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "kind": {
+      "enum": [
+        "approval",
+        "question",
+        "input",
+        "plan",
+        "completion"
+      ]
+    },
+    "agentId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "createdAt": {
+      "type": "string",
+      "minLength": 24,
+      "maxLength": 24,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "expiresAt": {
+      "type": "string",
+      "minLength": 24,
+      "maxLength": 24,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "state": {
+      "enum": [
+        "pending",
+        "resolved",
+        "expired",
+        "disconnected"
+      ]
+    },
+    "actionable": {
+      "type": "boolean"
+    },
+    "pendingCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "summaryKey": {
+      "enum": [
+        "remote.approvalRequested",
+        "remote.questionRequested",
+        "remote.inputRequested",
+        "remote.planReady",
+        "remote.completed"
+      ]
+    }
+  }
+}

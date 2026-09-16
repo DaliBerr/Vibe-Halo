@@ -273,6 +273,27 @@ function permissionOptions(agentId, data = {}, permissionSuggestions = []) {
   return options;
 }
 
+function textFits(value, limit) {
+  return value === undefined || value === null || (typeof value === "string" && value.length <= limit);
+}
+
+function sameJson(left, right) {
+  try { return JSON.stringify(left) === JSON.stringify(right); } catch { return false; }
+}
+
+function questionsFit(questions) {
+  if (questions === undefined) return true;
+  if (!Array.isArray(questions) || questions.length > 10) return false;
+  return questions.every(question => {
+    if (!question || !textFits(question.id, 120) || !textFits(question.header, 120)
+      || !textFits(question.question ?? question.prompt ?? question.text, 1000)) return false;
+    if (question.options === undefined) return true;
+    if (!Array.isArray(question.options) || question.options.length > 20) return false;
+    return question.options.every(option => textFits(option?.id ?? option?.value, 120)
+      && textFits(option?.label ?? option?.name ?? option, 240) && textFits(option?.description, 600));
+  });
+}
+
 function normalizeRequest(agentId, data) {
   const descriptorValue = agent(agentId);
   if (!descriptorValue || !data || typeof data !== "object" || Array.isArray(data)) return null;
@@ -280,7 +301,8 @@ function normalizeRequest(agentId, data) {
   const rawInput = data.tool_input ?? data.toolInput ?? data.input ?? data.arguments;
   const toolInput = boundedValue(rawInput) || {};
   const requestId = cleanText(data.request_id || data.requestId || data.tool_use_id || data.toolUseId, 240);
-  const questions = normalizeQuestions(data.questions || toolInput.questions);
+  const rawQuestions = data.questions || toolInput.questions;
+  const questions = normalizeQuestions(rawQuestions);
   const permissionSuggestions = normalizePermissionSuggestions(data.permission_suggestions || data.permissionSuggestions);
   const toolName = cleanText(data.tool_name || data.toolName, 160) || (event === "Elicitation" ? "Elicitation" : "Unknown");
   const zcodeQuestion = descriptorValue.id === "zcode"
@@ -301,6 +323,13 @@ function normalizeRequest(agentId, data) {
     fingerprint: cleanText(data.tool_input_fingerprint || data.fingerprint, 128),
     toolName,
     toolInput,
+    // Conservative remote review gate: normalization must not hide context.
+    // Persistent permission previews are a separate gate in DecisionService.
+    remoteContextComplete: sameJson(rawInput ?? {}, toolInput)
+      && sameJson(data.questions ?? [], boundedValue(data.questions ?? []))
+      && questionsFit(rawQuestions)
+      && textFits(data.tool_name || data.toolName, 160)
+      && textFits(data.tool_input_description || data.description || toolInput.description, 1000),
     description: cleanText(data.tool_input_description || data.description || toolInput.description, 1000),
     cwd: cleanText(data.cwd || data.working_directory || data.workingDirectory, 2000),
     sourcePid: positiveInteger(data.source_pid || data.sourcePid),

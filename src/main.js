@@ -34,6 +34,7 @@ const {
 const { APP_ID, APP_NAME } = require("./constants");
 const { agent, listAgents } = require("./agent-registry");
 const { ApprovalStore } = require("./approval-store");
+const { DecisionService } = require("./decision-service");
 const { CodexInputMonitor } = require("./codex-input-monitor");
 const { completionFromStop } = require("./completion-event");
 const { CompletionStore } = require("./completion-store");
@@ -131,6 +132,7 @@ function startApplication() {
   let localization = createLocalizer({ preference: "system", systemLocale: "en-US" });
   const t = (key, params) => localization.t(key, params);
   const approvals = new ApprovalStore();
+  const decisions = new DecisionService({ approvalStore: approvals });
   const completions = new CompletionStore();
   const inputRequests = new InputRequestStore();
   const sessionOrigins = new SessionOriginStore();
@@ -140,6 +142,7 @@ function startApplication() {
       shutdownCoordinator = new ShutdownCoordinator({
         logger: logger || { warn() {} },
         steps: [
+          { name: "remote-decisions", run: () => decisions.quiesceRemote() },
           {
             name: "server",
             run: async () => {
@@ -714,6 +717,7 @@ function startApplication() {
       logger,
       nativeTheme,
       approvalStore: approvals,
+      decisionService: decisions,
       screen,
       localization,
       platformAdapter,

@@ -74,6 +74,71 @@ The application does not contain desktop pets, remote approvals, a user-configur
   listener, cloud connection, device enrollment, Android APK or FCM notification
   has been enabled. M0 external verification and M2–M7 remain outstanding.
 
+#### M1 foundation checkpoint
+
+- Safety checkpoint commit: `a844c84`. The next checkpoint adds the protocol and
+  simulated remote decision boundary; it remains on the development branch
+  because the mobile feature and its security gates are incomplete. No push,
+  main merge, version bump, release tag or external deployment was performed.
+- Added three versioned JSON schemas, TypeScript declarations, a synthetic
+  Chinese/emoji/newline fixture, and committed standalone validators generated
+  with Ajv `8.20.0`. Ajv was already resolved at this version in the lockfile;
+  the change makes it an explicit pinned development dependency without changing
+  any resolved dependency versions. The installed packaging tools are Electron
+  `41.10.2` and electron-builder `26.15.3`, not the lower package.json ranges.
+- Added queue event IDs, process epoch, absolute expiry, business revision and
+  sequence watermark. Detached internal pages and whitelisted, byte-bounded
+  network summaries remain separate. The initial projector supports approvals
+  and exact questions; input/Stop/plan projection and the unified journal await M3.
+- Default-disabled internal remote gate checks verified-principal authorization
+  callbacks, PC/binding/mobile/revision, FIFO/epoch/context/deadline, scopes,
+  details and answers. Bounded receipts handle duplicate/conflicting IDs and
+  uncertain post-finalize errors. This callback is simulated in tests; it does
+  not implement device authentication, JWS/JWE, LAN or Cloudflare.
+- Final local `npm test`: **204 tests, 203 passed, 1 POSIX-only skip, 0 failed**.
+  `npm run test:protocol`: **6 passed**, including generated-source freshness.
+  Earlier intermediate syntax-check failure during refactoring was fixed before
+  these final runs. Logs: `.smoke/mobile-foundation-tests.log` (untracked).
+- `npm run build:dir` and `npm run verify:package --
+  dist/win-unpacked/resources 0.5.9` passed on Windows x64. The asar contains the
+  service, projector and protocol runtime; relay/Android sources, schema/test
+  tooling and known credential filenames are excluded. The local package keeps
+  auto-update disabled. Build log: `.smoke/mobile-foundation-build.log`.
+- Packaged isolated action smoke returned `resolved`, captured the history list
+  and detail, and exited with code 0. The action intentionally resolves before
+  the island capture timer; a separate non-action smoke captured the expanded
+  island and exited with code 0. Visual inspection confirmed readable history
+  detail and visible approval controls. Seven packaged runtime files also match
+  current source bytes. Test directories are `.smoke/mobile-foundation` and
+  `.smoke/mobile-foundation-ui`; real user settings and Hook configuration were
+  not used. This is synthetic desktop validation, not a real mobile/client round trip.
+- Dependency audit reports 7 existing high-severity package findings (Electron,
+  xmldom, brace-expansion, fast-uri, js-yaml, tar and undici). No resolved versions
+  changed in this checkpoint; a dependency/security update remains separate work.
+  Audit output stays in `.smoke/mobile-audit.json`, not source control.
+
+Plan matrix coverage at this checkpoint:
+
+| IDs | Evidence and remaining boundary |
+| --- | --- |
+| T01–T02 | Original desktop regressions and 19-adapter contracts pass; Windows packaged synthetic actions/UI pass. Other platforms and new real-client runs not performed here. |
+| T03–T10 | Local/simulated FIFO, duplicate, winner, disconnect, timeout, epoch and strict-answer tests pass. Physical LAN/cloud and multi-phone races still await transports. |
+| T11–T15 | Existing codecs/reminder contracts and shutdown regression pass; incomplete/persistent remote actions are rejected and uncertain results tested. Persistent opt-in, mobile lifecycle and Hook-write receipt tracking remain unimplemented. |
+| T19–T23, T29 | Internal authorization/context/replay and malformed-message simulations pass. Actual device authentication, signatures, encryption and cross-space HTTP/WSS authorization remain unverified. |
+| T24–T28, T30–T50 | Not verified end to end; require M2 identity, remote infrastructure, Android and physical devices. Synthetic local revocation tests do not establish cloud revocation. |
+| T51–T54 | Journal, complete business stream, snapshot/delta replay and multi-device caches still pending; current queue pages are bounded and expose a watermark. |
+| T55–T56 | Isolated test discovery and Windows package contents verified; macOS/Linux builds not executed in this run. |
+| T16–T18, T57–T68 | Pairing/enrollment, deployment/load, Android/Keystore/JOSE and watch acceptance remain pending. T68 only verifies default rejection; no persistent opt-in is enabled. |
+
+Next implementation work: complete M0 Node↔Kotlin JOSE/Keystore feasibility and
+version freezing; then M2 secure credentials, local binding confirmation,
+challenge/session authentication and revocation. Build the authenticated cloud
+vertical slice with synthetic data before transmitting real details, then M3
+notification/journal and M4–M7. Missing physical/service acceptance must be
+reported explicitly, not replaced with these simulated tests.
+
+### Prior desktop verification
+
 - Recorded live acceptance on 2026-08-30: the installed 0.5.8 discovered and downloaded 0.5.9, then explicitly restarted through the built-in updater. The application-ready log and installed executable confirmed 0.5.9; the installed Hook matched the repository SHA-256. The user confirmed an ordinary-mode Codex question appeared, and logs confirmed expansion and resolution after answering. ZCode native-first and island-first clicks after this upgrade remain pending manual acceptance; automated cancellation tests and installed 3.10.1 source/config inspection do not establish that final UI result.
 - Automated suite: 181 tests on Windows (180 passed, one POSIX-only process test skipped), including ordinary/Plan/unknown Codex input reminders, Codex Hook/JSONL Session namespace matching, bounded Session origin isolation and expiry, source-display correction without focus, ZCode native-winner connection cancellation, exact-turn Codex Auto-review routing, history persistence/redaction, localization, package contents, and every existing 19-adapter/platform/update regression. The POSIX process-runner test executes on macOS/Linux CI.
 - Automatic-update suite: independent release/update and signing gates, unsigned/signed public update configs, scheduler state, download/install transitions, sanitized errors, ordered fail-open shutdown, retained external signing staging/injection, and final-byte metadata regeneration.

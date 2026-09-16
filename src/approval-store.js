@@ -55,6 +55,10 @@ function publicEntry(entry) {
       options: question.options.map(option => ({ ...option })),
     })),
     createdAt: entry.createdAt,
+    expiresAt: entry.expiresAt,
+    eventId: entry.eventId,
+    eventRevision: entry.eventRevision,
+    streamSeq: entry.streamSeq,
   };
 }
 
@@ -68,6 +72,8 @@ class ApprovalStore extends EventEmitter {
     this.clearTimer = options.clearTimeout || clearTimeout;
     this.entries = [];
     this.byKey = new Map();
+    this.pcSessionEpoch = options.pcSessionEpoch || crypto.randomUUID();
+    this.streamSeq = 0;
   }
 
   get size() {
@@ -80,6 +86,20 @@ class ApprovalStore extends EventEmitter {
 
   snapshot() {
     return { current: publicEntry(this.current), pendingCount: this.size };
+  }
+
+  // Internal, detached queue view. Network code must use its own whitelist DTO.
+  listPending({ offset = 0, limit = 100 } = {}) {
+    if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 500) {
+      throw new RangeError("Invalid queue page");
+    }
+    return {
+      pcSessionEpoch: this.pcSessionEpoch, streamSeq: this.streamSeq,
+      pendingCount: this.size, offset,
+      entries: this.entries.slice(offset, offset + limit).map(entry => structuredClone({
+        ...publicEntry(entry), state: entry.state, remoteContextComplete: entry.remoteContextComplete,
+      })),
+    };
   }
 
   buildKey(request) {
@@ -111,7 +131,8 @@ class ApprovalStore extends EventEmitter {
       requestId: safeText(request.requestId, 240),
       toolUseId: safeText(request.toolUseId, 240),
       toolName: safeText(request.toolName, 160) || "Unknown",
-      toolInput: request.toolInput && typeof request.toolInput === "object" ? request.toolInput : {},
+      toolInput: request.toolInput && typeof request.toolInput === "object" ? structuredClone(request.toolInput) : {},
+      remoteContextComplete: request.remoteContextComplete === true,
       description: safeText(request.description, 1000),
       cwd: safeText(request.cwd, 2000),
       sourcePid: Number.isInteger(request.sourcePid) ? request.sourcePid : null,
@@ -142,9 +163,13 @@ class ApprovalStore extends EventEmitter {
         })).filter(option => option.id && option.label) : [],
       })).filter(question => question.id && (question.question || question.questionKey)) : [],
       createdAt: this.now(),
+      eventId: `evt_${crypto.randomUUID()}`,
+      eventRevision: 1,
+      streamSeq: ++this.streamSeq,
       waiters: new Set([waiter]),
       timer: null,
     };
+    entry.expiresAt = entry.createdAt + this.timeoutMs;
     entry.timer = this.setTimer(() => this.expire(entry.id), this.timeoutMs);
     if (entry.timer && typeof entry.timer.unref === "function") entry.timer.unref();
     this.entries.push(entry);
@@ -191,6 +216,13 @@ class ApprovalStore extends EventEmitter {
     if (entry.timer) this.clearTimer(entry.timer);
     const index = this.entries.indexOf(entry);
     if (index >= 0) this.entries.splice(index, 1);
+    entry.eventRevision += 1;
+    entry.streamSeq = ++this.streamSeq;
+    // Becoming the head changes actionability, never the original deadline.
+    if (index === 0 && this.current) {
+      this.current.eventRevision += 1;
+      this.current.streamSeq = ++this.streamSeq;
+    }
     this.byKey.delete(entry.key);
     entry.state = finalState;
     const finalizedEntry = publicEntry(entry);

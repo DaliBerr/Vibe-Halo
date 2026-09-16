@@ -1,0 +1,19 @@
+{
+  "protocolVersion": 1,
+  "decisionId": "85dbd541-0c71-4ba6-a6d0-fb20f334d1a4",
+  "bindingId": "bind_fixture",
+  "bindingRevision": 1,
+  "mobileId": "mobile_fixture",
+  "pcId": "pc_fixture",
+  "pcSessionEpoch": "a2b51682-379d-44f4-a6fa-0d38c098d24a",
+  "eventId": "evt_fixture",
+  "approvalId": "approval_fixture",
+  "expectedRevision": 1,
+  "approvalContextDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "optionId": "submit",
+  "issuedAt": "2026-09-16T09:00:35.000Z",
+  "expiresAt": "2026-09-16T09:01:05.000Z",
+  "answers": {
+    "q1": "中文🚀\n下一行"
+  }
+}

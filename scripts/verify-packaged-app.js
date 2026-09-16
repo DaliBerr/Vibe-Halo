@@ -25,6 +25,11 @@ for (const required of [
   "/assets/icons/16x16.png",
   "/assets/icons/32x32.png",
   "/src/platform-adapter.js",
+  "/src/decision-service.js",
+  "/src/remote/event-projector.js",
+  "/packages/protocol/package.json",
+  "/packages/protocol/src/index.js",
+  "/packages/protocol/generated/validators.js",
   "/src/session-origin-store.js",
   "/src/history-store.js",
   "/src/history-window-controller.js",
@@ -35,6 +40,13 @@ for (const required of [
   "/hooks/vibe-halo-hook.js",
 ]) {
   if (!entries.has(required)) throw new Error(`packaged file missing: ${required}`);
+}
+
+for (const entry of entries) {
+  if (/^\/(?:services\/relay|apps\/android|packages\/protocol\/(?:test|fixtures|scripts|schemas))\//.test(entry)
+    || /\/(?:\.dev\.vars(?:\..*)?|google-services\.json|service-account[^/]*\.json)$/.test(entry)) {
+    throw new Error(`development or credential file packaged: ${entry}`);
+  }
 }
 
 const metadata = JSON.parse(asar.extractFile(asarPath, "package.json").toString("utf8"));
