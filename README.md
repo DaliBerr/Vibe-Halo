@@ -29,7 +29,7 @@ Handle supported permission requests and interactive questions, and receive comp
 > **Runtime validation:** Codex and ZCode on Windows have completed real client round-trip testing in the maintainer's environment. macOS and Linux currently have CI, protocol, packaging, and startup smoke coverage only. All other client/platform combinations may still contain compatibility bugs; keep their native approval UI available while evaluating them.
 
 > [!IMPORTANT]
-> Vibe Halo is a derivative development of [Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk), maintained independently and not an official upstream edition. It retains and adapts parts of the upstream hook, plugin, approval transport, process-discovery, and lifecycle design, while removing the desktop pet, themes, animated session state, remote approval, and mobile features. See [NOTICE.md](NOTICE.md) for upstream copyright and attribution.
+> Vibe Halo is a derivative development of [Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk), maintained independently and not an official upstream edition. It retains and adapts parts of the upstream hook, plugin, approval transport, process-discovery, and lifecycle design, while removing the desktop pet, themes and animated session state. The optional native Android companion is an independently implemented extension. See [NOTICE.md](NOTICE.md) for upstream copyright and attribution.
 
 Vibe Halo appears at the top of the active display when you need to intervene. Supported approval requests can be allowed or denied in place, questions with a stable answer protocol can be completed inside the island, and finished tasks produce short notifications. If no explicit decision is made—or if the app, transport, or protocol fails—the request is returned to the native client flow instead of being automatically allowed or denied.
 
@@ -74,7 +74,7 @@ AI coding clients often wait in the background for a permission decision, a foll
 - **One queue** — all clients share a global FIFO, so approvals cannot cover or reorder one another.
 - **Clear provenance** — the title always identifies the client that produced the event.
 - **Fail-open to the native UI** — close, disconnect, timeout, malformed response, and unknown option paths never invent a decision.
-- **Local by design** — agent events use a token-authenticated loopback service; there is no remote approval endpoint.
+- **Local by default** — agent Hooks use a token-authenticated loopback service. An optional Android companion adds encrypted LAN/cloud access only after explicit setup and pairing.
 - **Optional local history** — a tray-opened, freely draggable side panel keeps bounded approval, question, and Codex/ZCode plan details without occupying the desktop permanently.
 
 ## Key features
@@ -279,12 +279,12 @@ The Windows NSIS uninstaller invokes the same cleanup path. On macOS, dragging t
 - The renderer cannot access raw client protocol payloads, configuration rules, bridge tokens, or the updater.
 - IPC validates the current request ID, option ID, types, answer counts, and answer lengths.
 - Logs omit process tokens and full command content and rotate by size.
-- The app has no telemetry, account system, cloud synchronization, or remote approval service.
+- The app has no telemetry or user-account system. Optional remote access is disabled by default and requires your own relay, device pairing and an explicit local control switch.
 - An official Windows stable build contacts public GitHub Releases only for update checks. Source, local, and preview builds keep the updater disabled.
 - Client configuration uses atomic writes, first-state backups, and ownership markers. Explicit hook disables are preserved.
 - Recent-event records contain locally visible commands, parameters, paths, questions, and answers. Obvious structured secret fields are replaced with `[REDACTED]`, but command strings can still contain secrets typed by the user.
 - The history file uses Electron `safeStorage` encryption when a secure backend is available. If encryption is unavailable—or Linux reports `basic_text`—Vibe Halo stores history as plaintext, displays a persistent warning in the panel, and shows a one-time warning before first opening it.
-- History is never synchronized or sent to a remote service. Corrupt or undecryptable history does not block startup or approvals and is left untouched while the current run falls back to empty in-memory history.
+- Without the optional companion, history stays local. A paired phone with history.read may request read-only history through an end-to-end encrypted channel. Corrupt or undecryptable history does not block startup or approvals and is left untouched while the current run falls back to empty in-memory history.
 
 The runtime identity is stored by default at:
 
@@ -358,11 +358,14 @@ The project has no database, web backend, frontend framework, Docker deployment,
 
 ## Development
 
-The Android companion is under staged development and is not available in the
-released desktop feature set. The current foundation adds shared decision
-validation and protocol fixtures; it does not enable remote access, pairing,
-push notifications or a phone app. See [decisions](docs/REMOTE_DECISIONS.md),
-[protocol boundaries](docs/REMOTE_PROTOCOL.md) and [dated verification](HANDOFF.md).
+The optional Android companion now has native phone UI, device pairing, pinned LAN
+HTTPS/WSS, a self-hosted Cloudflare relay, encrypted approvals/forms/history and
+FCM reminder support. It is disabled by default, requires your own service
+configuration, and does not ship a hosted relay. Notifications have no approval or
+reply buttons. See [build and setup](docs/REMOTE_SETUP.md),
+[decisions](docs/REMOTE_DECISIONS.md), [protocol](docs/REMOTE_PROTOCOL.md) and
+[dated acceptance evidence](HANDOFF.md). Source availability does not imply that
+public FCM, physical phones/watches or every desktop platform have been verified.
 Run `npm test` for desktop tests and `npm run test:protocol` for the separate
 protocol suite. After changing schemas, run `npm run build:protocol` and commit
 the generated validators with the schemas.
@@ -541,7 +544,7 @@ Source runs, local packages, and preview builds deliberately disable automatic u
 - Release targets are Windows x64, macOS 12+ arm64/x64, and Ubuntu 22.04/24.04 or Debian 12 x64. Other Linux distributions are best-effort through AppImage; Linux arm64, RPM, Snap, Flatpak, and Mac App Store packages are not provided.
 - Native Wayland does not provide the same programmable placement, resize, and focus guarantees. XWayland is preferred; the native backend is explicitly diagnosed as degraded.
 - The application UI and Windows installer support English and Simplified Chinese; unsupported system locales fall back to English unless Simplified Chinese is selected manually.
-- Vibe Halo does not include the upstream desktop pet, animated themes, session dashboard, terminal focus, remote SSH, PWA, or mobile features.
+- Vibe Halo does not include the upstream desktop pet, animated themes, session dashboard, terminal focus, remote SSH, or PWA. Its optional Android companion uses the separate documented protocol.
 - Remote approval is not supported, and the service never listens on a LAN interface.
 - Not every client exposes a stable approval or answer protocol. Unsupported capabilities remain reminders or are handed back to the native client.
 - Codex `request_user_input` cannot be answered inside the island.
@@ -570,7 +573,7 @@ Vibe Halo is derived from [rullerzhou-afk/clawd-on-desk](https://github.com/rull
 Compared with upstream, this repository is a deliberate secondary development with a different product direction:
 
 - It narrows a cross-platform desktop pet into a focused three-platform top-center dynamic island.
-- It removes pet artwork, themes, the animated state machine, remote features, and mobile features.
+- It removes pet artwork, themes and the animated state machine. The optional Android companion is implemented independently of upstream remote/mobile code.
 - It keeps and restructures the protocol pieces needed for local approvals, structured answers, and completion notifications.
 - It strengthens the global FIFO, renderer isolation, configuration ownership, native fallback, and signed update pipeline.
 

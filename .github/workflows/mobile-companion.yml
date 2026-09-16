@@ -1,0 +1,52 @@
+name: Mobile companion checks
+on:
+  push:
+    branches: [main, "codex/**"]
+    paths: ["apps/android/**", "services/relay/**", "packages/protocol/**", "src/remote/**", ".github/workflows/mobile-companion.yml"]
+  pull_request:
+    paths: ["apps/android/**", "services/relay/**", "packages/protocol/**", "src/remote/**", ".github/workflows/mobile-companion.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: companion-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  relay:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run test:protocol
+      - run: npm ci
+        working-directory: services/relay
+      - run: npm run check && npm test && npm run build
+        working-directory: services/relay
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Install compile SDK
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+      - name: Build and lint unsigned/test variants
+        working-directory: apps/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease :app:lintDebug :app:lintRelease --no-daemon
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Android-companion-builds
+          path: |
+            apps/android/app/build/outputs/apk/debug/*.apk
+            apps/android/app/build/outputs/apk/release/*.apk
+            apps/android/app/build/reports/lint-results-*.html
+          retention-days: 7

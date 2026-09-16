@@ -1,126 +1,200 @@
-# Remote protocol foundation
+# Remote protocol v1
 
-This is the M1 internal contract for the accepted [mobile plan](REMOTE_DECISIONS.md).
-It does not expose a network endpoint or establish device trust. Dated test and
-implementation status is recorded in [HANDOFF.md](../HANDOFF.md).
+This is the implemented contract for the optional Android companion. See
+[setup](REMOTE_SETUP.md), [decisions](REMOTE_DECISIONS.md) and dated acceptance
+in [HANDOFF.md](../HANDOFF.md). PC-local authorization is authoritative; the relay
+only carries authenticated, recipient-bound messages.
 
-## Layout and build
+## Components and identities
 
-- `packages/protocol/schemas/`: JSON Schema draft-07 for EventSummary,
-  EventDetail and DecisionIntent. Objects reject unknown fields.
-- `packages/protocol/src/index.js`: bounded JSON parsing, tree/UTF-8/date checks
-  and schema validation. No Electron, Node built-ins, I/O or client codecs.
-- `packages/protocol/generated/validators.js`: committed CommonJS validators,
-  generated with development-only Ajv `8.20.0`. No runtime compilation, eval or
-  dependency on Ajv is shipped. Worker bundlers can consume this CommonJS module;
-  a deployed Worker build is still a separate verification gate.
-- `packages/protocol/src/index.d.ts`: TypeScript-facing DTO types. Android must
-  implement Kotlin DTOs and test the same fixtures, not execute this JS package.
-- `packages/protocol/fixtures/`: public synthetic protocol vectors only. The
-  initial Chinese/emoji/newline vector is not a cryptographic interoperability
-  vector and contains no keys, tokens or pairing codes.
+`src/remote/remote-service.js` owns the PC identity, local grants, encrypted event
+journal and transports. `device-credential-store.js` requires Electron safeStorage
+and refuses Linux basic_text or corrupt storage. `lan-service.js` owns an independent
+HTTPS/WSS listener. It never exposes the original loopback Hook API.
 
-`npm run build:protocol` regenerates validators. `npm run test:protocol` first
-checks generated-source freshness and then runs the isolated protocol suite.
-`npm test` deliberately selects only `test/*.test.js` so later Android/relay test
-frameworks cannot be accidentally picked up by the desktop runner.
+`services/relay` contains the Worker, D1 migrations and SQLite-backed `Relay`
+Durable Object. Each PC has a separate DO and security domain (`space_<pcId>`).
+`apps/android` stores a distinct phone identity and its grants for each relay
+origin in Keystore-encrypted, no-backup storage. A phone can bind multiple PCs;
+a PC can bind multiple phones. Device names never establish identity.
 
-Ajv's [official guide](https://ajv.js.org/guide/getting-started.html) describes
-schema compilation and reuse. The package is pinned in the root lockfile and
-used only at development/build time. Max string lengths deliberately count
-UTF-16 code units, matching existing desktop and Kotlin bounds. UTF-8 byte
-budgets are enforced separately, including Chinese and emoji.
+Each device has independent P-256 signing and ECDH keys. The PC has a third TLS
+key. Key IDs are `sig:<RFC7638-thumbprint>` and `enc:<thumbprint>`. Public keys are
+strict public P-256 JWKs. Cloud TLS validates normally; LAN uses the SHA-256 SPKI
+pin in the explicitly confirmed grant. No network key URL, plaintext fallback,
+key alias, name-only trust, or automatic key replacement is accepted.
 
-## Validation contract
+## Enrollment, sessions and pairing
 
-`parse(kind, jsonText)` returns `{ ok: true, value }` or a bounded error code:
-`invalid_json`, `invalid_structure`, `too_large`, `upgrade_required`.
-`validate(kind, value)` checks already parsed internal DTOs without coercion,
-mutation, filling defaults or trimming values into acceptance.
+A root PC needs an administrator-created one-time enrollment code. D1 stores its
+HMAC, expiry, consumed device ID and registration transaction ID. Proof covers the
+exact PC public device, relay origin, code SHA-256 and fresh issuedAt. Repeating
+the same registration is idempotent; another device cannot reuse the code.
 
-Control messages are at most 16 KiB, detail plaintext at most 64 KiB; the future
-encrypted envelope budget is 256 KiB. Tree depth is at most 12, with at most
-4,096 nodes and 500 properties/items at any node. Reject cyclic/non-record
-objects, getters, malformed UTF-16, unsafe integers and dangerous object keys
-(`__proto__`, `prototype`, `constructor`). Times use canonical UTC ISO strings
-with milliseconds. Issue time must precede expiry. Device clock skew up to five
-seconds in the future is tolerated by the internal decision service; the PC
-request deadline is never extended.
+Device authentication uses a 60-second, one-consumption challenge containing
+nonce, device ID, signing key ID, origin and `device-session` purpose. The ES256
+proof signs the original challenge. Sessions last 15 minutes; 256-bit opaque
+bearers live only in client memory and only their SHA-256 hashes live in D1.
+At most five active challenges and sessions are allowed per device. Re-authentication
+uses a fresh challenge after a lost session response. Foreground clients renew;
+Android has no permanent background authentication heartbeat.
 
-Schema validation alone does not authorize anything. Exact current question
-IDs, closed-option membership, text permission, single/multi-select semantics
-and duplicate answers are validated against the actual PC request. Errors leave
-the pending request and its waiter untouched. Existing adapter codecs retain
-their historical text normalization when producing the final client response.
+Pairing uses a random 60-bit one-time code with a five-minute TTL. The PC signs an
+offer binding its identity, origin, TLS pin, requested scopes and pairing ID. The
+phone signs its identity and code digest. The relay atomically claims the code;
+a claim is not an active binding. Both sides compute the same canonical transcript
+and compare a 60-bit hexadecimal fingerprint. The PC persists its explicitly
+confirmed grant before cloud activation; retries send the identical signed grant.
+The phone verifies the complete original transcript and requires a final human
+confirmation. Expiry/cancellation does not activate trust. Scopes are immutable
+for a grant; change them by revoking and pairing again.
 
-## PC queue and event projection
+Grants contain PC/mobile public devices, origin, TLS pin, space/binding ID, revision,
+pairing ID, issuedAt and scopes. Only the PC can create/expand local authority.
+Cloud synchronization may reduce authority or confirm an already persisted grant,
+never introduce a new local grant. Revocation is persisted before further decisions.
+A cloud-disconnected PC may retain its last local LAN trust until it learns remote
+revocation; the UI and setup documentation explicitly state this boundary.
 
-ApprovalStore owns a random process epoch, an event ID per newly enqueued
-request, absolute expiry, event revision and sequence watermark. Duplicate
-waiters reuse the same event. Head promotion and finalization increase the
-relevant event revision/sequence; animation, refresh and duplicate connections
-do not. Promotion never changes expiry. Timers still expire non-head entries.
-The stored business state advances on finalization; if its timer is delayed,
-projection already makes an elapsed request non-actionable without inventing a
-new stored revision.
+## Wire formats and limits
 
-`listPending({ offset, limit })` is a detached, bounded **internal** page. It may
-contain desktop context and is not a network DTO. `queueView()` projects explicit
-summary fields, limits each page to 64 KiB and returns `nextOffset`. Consumers
-must compare epoch/watermark across pages and restart if it changes. M3 must add
-the journal, stable snapshot/delta handover, finalized-event replay and the
-unified stream for input/Stop/plan events; this approval-only watermark is not
-yet the complete product event stream.
+`packages/protocol/schemas` defines EventSummary, EventDetail and DecisionIntent.
+The committed standalone Ajv validators contain no runtime eval/compilation.
+`npm run test:protocol` checks freshness and synthetic fixtures. Kotlin `Wire`
+validates the same shipped schemas and UTF-8/tree/date constraints. Unknown protocol
+versions, fields and decision aliases are rejected. Schema string limits count
+Unicode code points; desktop semantic answers additionally enforce 2,000 UTF-16
+code units, preserving existing adapter behavior.
 
-Queue summaries never contain commands, working directories, session IDs, PID
-chains, forms or answers. `actionable` means current/unexpired on the PC, not
-that a phone has authorization. `detail()` is plaintext **only for the future
-authenticated sign-then-encrypt gateway**. It must never be passed directly to
-a transport or push provider. Key-based redaction is not proof that command
-strings contain no secrets; encryption remains mandatory.
+| Resource | Bound |
+| --- | --- |
+| Control JSON / encrypted plaintext detail | 16 KiB / 64 KiB |
+| Transport envelope / HTTP page | 256 KiB |
+| Object traversal | depth 12, 4,096 nodes, bounded arrays |
+| Form | 10 questions, 20 choices/question |
+| Persistent scope preview | 16,000 characters; full, unredacted JSON |
+| PC and relay event journal | 24 hours, 500 events, 10 MiB |
+| PC decision receipts / relay receipts | 500, 10 minutes |
+| Relay read queries | 64, 60 seconds |
+| LAN challenges / sessions | 64 each, 30 seconds / 5 minutes |
+| Relay WSS | 24 per PC DO, at most 2 per device |
+| Original PC history reads | 25 summaries/page, 200 total, detail text 48 KiB |
 
-Detail contains exact normalized tool input as JSON text, question/option IDs,
-completeness flags, PC time and `sha256:` context digest. It excludes PC process
-metadata and native protocol internals. Input changed by lossy normalization,
-redaction or an excessive byte budget disables remote decisions. Persistent
-options are withheld until a complete permission preview and local permission
-flow are implemented. Digest calculation remains PC-local; phones echo the
-signed digest and do not reconstruct or replace the approval context.
+UTF-8 byte budgets apply before parsing or during bounded stream reads. Details
+reserve space for the encrypted wrapper. Oversized, truncated, redacted or incomplete
+approval context becomes read-only; data is never truncated into a valid decision.
+Sensitive fields are recursively sanitized. Commands, paths, question text and
+answers are not in relay summaries, push payloads, logs or plaintext caches.
 
-## Shared decision service and future gateway
+Messages use ES256 JWS first, then ECDH-ES/A256GCM compact JWE. JWS protected headers
+are only `alg`, `kid`, `typ=vh1:<purpose>`. JWE headers are only `alg`, `enc`, `kid`,
+`typ=vh1:encrypted`, `cty=JWS`, and a public P-256 `epk`. No compression or remote
+key lookup is allowed. Libraries verify the original signed bytes; canonical JSON
+is only for semantic transcript comparison, not reconstruction before verification.
 
-Desktop IPC keeps its sender validation and calls `decideLocal`. Local explicit
-close calls `returnToNative`. Store timeout/shutdown are independent native
-fallback paths. Only the original PC waiter calls the adapter's codec.
+Purposes separate `enrollment`, `device-session`, `pairing-offer`, `pairing-claim`,
+`pairing-status`, `binding-grant`, `lan-session`, `message` (event detail),
+`decision-intent`, `decision-receipt`, `read-request`, `read-response` and
+`notification-ack`. Encrypted bodies bind protocol version, origin, PC/mobile IDs,
+binding ID/revision and message-specific event/request IDs. Authentication to one
+PC, binding, role or purpose never grants another operation.
 
-`decideVerifiedRemote(intent, principal)` is an **internal post-verification
-method**, not an HTTP authentication implementation. In production wiring it
-is disabled and has no authorizer. Before enabling it, M2 must implement all of:
+## Events and decisions
 
-1. Decrypt recipient-bound JWE and verify the original JWS bytes using pinned,
-   purpose-specific device keys; compare inner/outer routing fields.
-2. Validate device/session identity, PC-local confirmed binding, current revision
-   and scopes. Supply an opaque verified principal, never one reconstructed
-   from attacker-provided intent fields alone.
-3. Inject a synchronous authorizer that checks the verified principal against
-   current local trust on every operation, including duplicate receipt queries.
-4. Keep local remote/control switches and revocation state authoritative. No
-   async work may occur between final trust/current-request checks and resolve.
+An event summary contains IDs, PC process epoch, stream sequence, event revision,
+kind, adapter ID, creation/expiry times, state, queue actionability, pending count
+and a localization key. Details are individually signed/encrypted for each phone.
+The decrypted summary must exactly match its transport summary. Queue actionability
+is independent of a phone's scopes; `remoteActionable` additionally reflects
+complete context, local control and binding permissions.
 
-The service then enforces PC/epoch/event/revision/context, absolute request and
-intent deadlines (intent lifetime at most 30 seconds), FIFO, exact options,
-complete details and semantic answers. `always` and `suggestion:N` remain
-forbidden remotely even with a claimed persistent scope until their separate
-preview/confirmation gate is implemented.
+Every PC restart changes its epoch. Pending journal records restored after restart
+become expired/read-only. Queue changes increment affected revisions without
+extending the original 120-second deadline. `events` pages include a snapshot
+version (sequence and count). Android stages all bounded pages and restarts a
+changed snapshot at most twice; it never treats an inconsistent partial page as
+current actionable state. Missing records stay cached read-only. Foreground resume
+performs full reconciliation; terminal states and newer revisions cannot be
+replaced by old pending data. Repeated cached signed PC time cannot extend a
+phone's countdown. Backgrounding invalidates the local actionable clock until sync.
 
-In-memory receipts are keyed by binding/mobile/decision ID and request digest.
-Identical retries return the prior result; reused IDs with different content
-return `decision_conflict`. Capacity is 500 entries, TTL ten minutes. At capacity
-new work is rejected rather than evicting live deduplication records. Reentrant
-or failed post-finalize observers produce `result_unknown`, never a retry
-against another request. No active approval is restored after process restart.
+A DecisionIntent carries decision ID, PC/mobile/binding identity, binding revision,
+PC epoch, event/approval ID, expected event revision, full context digest, exact
+option ID, optional answers and a bounded issuedAt/expiresAt. Persistent actions
+also require `persistentConfirmed=true` and a complete preview in the current PC
+context. `DecisionService` synchronously rechecks current local grants/scopes,
+control switch, queue head, epoch, revision, digest, absolute deadline, options,
+answers, persistent opt-in and shutdown state immediately before finalizing.
 
-`desktop_accepted` means the PC accepted a decision. It does not establish that
-the Hook response was written, the client consumed it or a command executed.
-Hook-write tracking, encrypted remote receipts and persistent relay receipt
-queries belong to subsequent stages.
+LAN and cloud submit the same encrypted intent and decision ID. The first valid
+PC decision wins. Same-ID/same-content retries return its receipt; changed content
+is a conflict. Cached receipts do not bypass current trust checks. No approval is
+saved offline for automatic later execution. A native/client decision, disconnect,
+expiry or PC click cannot accidentally affect the next queued request.
+
+The relay responds `relay_received`, `desktop_offline`, `waiting` or
+`desktop_result`. Only the verified PC receipt can say `desktop_accepted`.
+That status does not claim the client executed a command. Other results include
+`expired`, `forbidden`, `stale_epoch`, `stale_revision`, `stale_context`,
+`not_current`, `invalid_answers`, conflicts and `result_unknown`. Receipt loss is
+queried/retried with the original ID. Invalid/closed forms leave the waiter intact.
+Only existing adapter codecs write client stdout. Codex request_user_input and
+passive approval notifications never gain fabricated reply/approve protocols.
+
+## Reads, reminders and transports
+
+History requests use `read-request`/`read-response` purposes and fresh request IDs.
+Only `history.list`, `history.detail` and `reminder.dismiss` are accepted. The PC
+checks the appropriate current scope after decryption. History is read-only;
+reminder dismissal also requires the local control switch and the matching input
+event epoch/revision, and only dismisses Vibe Halo's reminder, never answers the
+client or finalizes a Hook approval. Result envelopes retain the bound
+`history.response` type and request ID, including an empty records list for dismiss.
+
+Cloud endpoints cover enrollments, challenge/session, pairing create/claim/status/
+confirm/cancel, devices, binding revoke/PC acknowledgment, push-token/preferences,
+and per-PC stream/events/decisions/queries. Routes are allowlisted in `index.ts`.
+D1 authentication and active bindings are rechecked on every operation and WSS
+business message. DO sockets use `ctx.acceptWebSocket` plus validated attachments;
+there is no always-running polling loop. SQL journals, receipts, read requests and
+push jobs survive hibernation; alarms prune and retry bounded batches.
+
+LAN exposes only challenge/session, events, decisions, queries, notification-ack
+and stream on a separate HTTPS listener. mDNS TXT contains protocol version and
+PC ID only. Private/link-local addresses remain untrusted until pinned TLS and
+signed challenge verification succeed. Cloud bearers are never sent to LAN.
+Foreground Android prefers LAN and subscribes to pinned WSS hints; failed LAN
+uses the normal HTTPS cloud client. Network/endpoint changes renew LAN sessions.
+Backgrounding stops discovery/sockets. A 30-second foreground reconciliation also
+covers missed hints. No router forwarding, shell, Hook configuration, updates or
+remote desktop endpoint exists.
+
+## Notifications and privacy
+
+The Worker sends FCM HTTP v1 `notification + data`. Body/title are short generic
+bilingual reminders. Data is restricted to version, PC/epoch/event IDs, revision
+and kind, with no authorization, token, command or answer. Requests use HIGH
+priority, completions NORMAL; TTL never exceeds event expiry and is capped at
+10 minutes. Stable channels are approvals, questions, completions and
+connection_status. Tagging by PC/event collapses duplicates. Notifications only
+open an explicit immutable app intent with bounded PC/epoch/event IDs; there are
+no decision actions, RemoteInput, full-screen intents or watch receivers.
+
+A foreground notification coordinator checks local preferences, system permission
+and channel importance, records bounded revisions, and clears terminal events.
+A signed LAN acknowledgment means `notification_posted` or `suppressed_by_user`;
+only the owning phone's verified current acknowledgment suppresses its cloud job.
+It is not proof of user/watch delivery. Background FCM auto-display remains managed
+by the Android SDK; local foreground contextual-action settings cannot override
+all system-generated behavior. Late background reminders may still appear, but
+opening them cannot restore old authority.
+
+Push tokens are encrypted in D1 with independent AES-256-GCM and device-ID AAD.
+Token rotation/preferences/revocations retry on foreground sync; token rotation
+also schedules bounded network-constrained WorkManager maintenance (five attempts,
+no approval polling). FCM 429/5xx obey bounded backoff and Retry-After; invalid
+UNREGISTERED responses deactivate only the matching current token revision.
+Before sending, jobs recheck binding, event revision, expiry and acknowledged state.
+No analytics, account login, remote private-key backup or notification-listener
+permission is introduced. No forward-secrecy claim is made against later device
+ECDH private-key compromise, and timing/adapter metadata remains visible to relay.

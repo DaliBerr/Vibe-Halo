@@ -8,7 +8,7 @@ Use `HANDOFF.md` for dated implementation and verification context, and `README.
 
 Vibe Halo is a Windows, macOS, and Linux dynamic-island interface for AI coding clients. It provides fail-open approvals, exact protocol-backed interactive answers where supported, native-flow reminders, and completion notifications.
 
-The project defines 19 integrations through a shared adapter registry, with different capabilities and verification levels, while preserving one global approval FIFO. Its desktop UI consists of one live top-center island plus one optional, tray-opened recent-event history window. Official Windows stable builds use an explicit-restart, fail-open updater backed by GitHub Releases; local and preview builds disable updates. SignPath is an optional, default-disabled enhancement. An Android notification/remote-approval companion is now explicitly authorized and under staged development; see `docs/REMOTE_DECISIONS.md` and dated HANDOFF evidence. Remote access/control must stay disabled until the relevant authentication, encryption and end-to-end gates pass. Existing system light/dark appearance is supported. Do not reintroduce the Clawd on Desk pet, user-configurable themes or old multi-agent state machine unless explicitly requested.
+The project defines 19 integrations through a shared adapter registry, with different capabilities and verification levels, while preserving one global approval FIFO. Its desktop UI consists of one live top-center island plus one optional, tray-opened recent-event history window. Official Windows stable builds use an explicit-restart, fail-open updater backed by GitHub Releases; local and preview builds disable updates. SignPath is an optional, default-disabled enhancement. An optional Android companion adds paired, encrypted LAN/cloud notifications, approvals and read-only history. Remote access and control default off; setup and dated acceptance gates are documented in `docs/REMOTE_SETUP.md` and `HANDOFF.md`. Keep the original Hook listener loopback-only and PC-local grants authoritative. Existing system light/dark appearance is supported. Do not reintroduce the Clawd on Desk pet, user-configurable themes or old multi-agent state machine unless explicitly requested.
 
 ## Repository Entry Points
 
@@ -22,6 +22,9 @@ The project defines 19 integrations through a shared adapter registry, with diff
 - `hooks/integrations/`: managed OpenCode, Hermes, Pi, and OpenClaw plugin assets.
 - `src/server.js`: loopback-only authenticated hook server.
 - `src/approval-store.js`: global approval FIFO, deduplication, timeout, disconnect, and idempotent decisions.
+- `src/remote/remote-service.js`, `lan-service.js`, credential/journal stores and settings window: optional PC companion, local trust, pinned LAN, encrypted cloud transport and explicit local controls.
+- `services/relay/`: isolated Worker/D1/SQLite Durable Object service, enrollment, sessions, bindings and bounded FCM outbox.
+- `apps/android/`: native Kotlin/Compose companion, per-origin Keystore identity, verified details, pinned LAN and notification-only FCM.
 - `src/decision-service.js`: shared current-request validation and default-disabled internal remote decision boundary; network authentication is a separate prerequisite.
 - `packages/protocol/` and `src/remote/event-projector.js`: bounded versioned schemas, standalone validators, synthetic fixtures, and explicit network DTO projection.
 - `src/codex-input-monitor.js`: read-only incremental monitor for Codex session JSONL files.

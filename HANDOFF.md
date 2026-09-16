@@ -1,8 +1,149 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-09-16 (guide audit; runtime evidence below remains dated)
+Updated: 2026-09-16 (Android companion implementation; acceptance scope below)
 Current version: `0.5.9`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-09-16 — Android companion implementation and local acceptance
+
+Baseline: `ee3338dee7e0e15711cae55eb6a49ced84a6567d` on main; implementation branch
+`codex/mobile-foundation`. The accepted v1.0 implementation plan was based on an
+older upstream revision; existing local changes were preserved. Separate M1 fixes
+are `a844c84` and `dcf2776`. Desktop version remains 0.5.9; no release/tag is implied.
+
+Implemented: independent PC settings/identity/grants/journal/LAN service, shared
+strict decision gate and protocol crypto, Worker/D1/hibernating SQLite DO relay,
+controlled enrollment, pairing, scoped revocation, bounded FCM outbox, Android
+Compose UI and Keystore identity, pinned LAN/cloud routing, encrypted approvals,
+forms, receipts, reminders, original read-only history, English/Chinese UI and
+notification-only Android integration. Scope changes require re-pairing. Node
+Hooks keep their original loopback listener and 120/130/150-second relationship.
+
+Operational and security documentation is consolidated in
+[REMOTE_SETUP.md](docs/REMOTE_SETUP.md), [REMOTE_PROTOCOL.md](docs/REMOTE_PROTOCOL.md)
+and [REMOTE_DECISIONS.md](docs/REMOTE_DECISIONS.md), rather than duplicate status
+files. New independent CI builds/lints Android and checks the relay/shared protocol.
+
+Verified locally on Windows with Node 24.14.0, Electron 41.10.2, Studio 2025.2.1,
+JBR 21.0.8 and the API 34 Small_Phone emulator:
+
+- Root `npm test`: 214 tests, 213 passed, one existing POSIX-only Windows skip.
+- `npm run test:protocol`: 6 passed, generated validators current.
+- Relay TypeScript check and Vitest: 8 passed in local workerd/D1/DO. Dry-run
+  deploy bundle succeeds. Test workerd compatibility is capped at 2026-08-22 by
+  its bundled runtime; deployment compatibility remains 2026-09-16.
+- Android debug/instrumentation and minified unsigned release builds plus both
+  lint variants pass. R8 9.1.43 handles Kotlin 2.4 metadata; older AGP's synchronous
+  resource-provider warnings and two compatible deprecated FCM token API warnings
+  do not fail the build. Gradle distribution checksum is pinned.
+- Emulator instrumentation verifies Node-to-Kotlin-to-Node JWS/JWE Unicode round
+  trip, key reuse, tamper rejection and identical canonical pairing transcripts.
+- Full emulator flow verifies PC/phone fingerprint confirmation, cloud allow,
+  wrong LAN certificate rejection, LAN deny after disconnecting PC cloud WSS,
+  LAN WSS event hint, closed-answer rejection, valid single/multi-select/Unicode
+  form delivery through the actual registry codec, receipts and binding revocation.
+  The requests and waiter are synthetic; this is not a real coding-client UI run.
+- NotificationManager instrumentation checks no actions/RemoteInput/full-screen
+  intent, immutable detail navigation, tag/revision deduplication, terminal cleanup
+  and forged action metadata rejection. Tests wait for asynchronous system publish
+  and cancellation instead of assuming notify() is an immediate display receipt.
+- Compose instrumentation checks all 12 action buttons remain scroll-accessible
+  at a short 320×420 layout with 200% text, and unbound context remains disabled.
+- Windows package whitelist verifies all new runtime modules; isolated packaged
+  startup, synthetic local approval and bounded quit pass. Packaged companion
+  imports, real Windows safeStorage encryption, sandbox preload and settings
+  rendering pass with no renderer error or horizontal overflow. Android English
+  home and PC Chinese settings were visually inspected.
+- Maintainer enrollment-code script ran against local D1 without printing its
+  code. A candidate-source scan matched none of the actual local test peppers or
+  token encryption key; ignored runtime/config/signing files remain excluded.
+
+M0/M1 local foundations are verified. M2–M5 are implemented with local protocol /
+emulator evidence. Public M3 push/CPU/hibernation, real-client M4 and physical
+M5/M6 acceptance remain open. M7 builds/docs/local regressions are prepared;
+**the whole mobile feature is not declared production accepted**. No public relay,
+Firebase project, paid plan, store upload or production APK signing was created.
+Cloudflare's existing login was expired and could not refresh noninteractively;
+no Firebase service credential/app configuration was available. A public push
+claim therefore cannot be made. Restore deployment authentication and configure
+matching Firebase Android/Worker values locally before physical acceptance.
+
+### T01–T68 classification (2026-09-16)
+
+“Pass” below is limited to the stated local evidence. “Unverified” explicitly
+retains physical, production-service or real-client portions; a mock provider
+response is never counted as FCM/watch delivery. No item is silently omitted.
+
+| ID | Status | Evidence / remaining boundary |
+| --- | --- | --- |
+| T01 | Pass | Root regressions and isolated packaged Windows local approval/quit. |
+| T02 | Pass | 19-adapter registry/codec fixtures; existing verification levels preserved. |
+| T03 | Pass | Non-head intent rejected without changing either waiter. |
+| T04 | Pass | Encrypted LAN/cloud gateway duplicate executes once; shared receipt cache. |
+| T05 | Unverified | First-winner store/gateway races pass; simultaneous taps on two physical phones not run. |
+| T06 | Pass | Local-first/remote-first fixture cannot resolve the next request. |
+| T07 | Unverified | Native-first disconnect regression passes; no new live ZCode UI session was exercised. |
+| T08 | Pass | Absolute expiry checked before delayed timer callback. |
+| T09 | Pass | Stale epoch rejected; restored journal pending records expire. |
+| T10 | Pass | Strict closed forms/unknown options/duplicate multi-values; emulator valid and invalid form round trip. |
+| T11 | Pass | OpenCode once/reject codecs and full-scope persistent gate; Claude suggestion codec fixtures. |
+| T12 | Pass | Registry and remote fixtures keep Codex input/passive integrations read-only. |
+| T13 | Pass | No close/background decision call; foreground sockets close and local actionable clocks invalidate. |
+| T14 | Unverified | Shutdown tests and packaged normal quit pass; real updater installation during network loss not rerun. |
+| T15 | Pass | Observer/write error and lost receipt tests retain honest unknown/accepted semantics and idempotency. |
+| T16 | Pass | Atomic concurrent claim, consumed code rejection, expired grant and bounded rate checks. |
+| T17 | Pass | Pre-PC-confirmation phone cannot authenticate to business APIs; emulator checks waiting confirmation. |
+| T18 | Pass | Pinned key/signature/transcript checks and tamper tests; names are not authority. |
+| T19 | Pass | Cross-PC domain API denial and per-binding encrypted history authorization. |
+| T20 | Pass | Unbound PC access rejected by relay and final PC decision gate. |
+| T21 | Pass | Role/route allowlists and default-denied persistent grant tests; no remote management endpoint. |
+| T22 | Pass | Wrong keys/purposes/headers/ciphertext plus stale digest/PC/epoch/revision fixtures. |
+| T23 | Pass | Same decision ID with changed plaintext/ciphertext conflicts; stale signed intents rejected. |
+| T24 | Pass | Revoked WSS session rechecked; revoked binding cannot reuse old token/cache. |
+| T25 | Unverified | Local revocation closes emulator LAN access; delayed cloud revocation of a physically offline PC still needs field testing. |
+| T26 | Pass | Concurrent nonce consumes once; fresh challenge/session and same persisted PC grant retry paths. |
+| T27 | Pass | Refuses unavailable/basic_text storage; damaged credentials are not overwritten. Windows DPAPI exercised. |
+| T28 | Pass | Candidate-source secret scan, package whitelist and APK asset/manifest review; only synthetic test traffic. |
+| T29 | Pass | Shared schema/tree/UTF-8 limits and oversized Worker enrollment body rejection. |
+| T30 | Pass | Role-checked PC WSS publishing and phone signature trust; unsupported stream operations reject. |
+| T31 | Unverified | Emulator forwarded pinned HTTPS/WSS succeeds; actual Wi-Fi multicast discovery not a forwarded-loopback test. |
+| T32 | Unverified | Requires configured public FCM and physical/background delivery. |
+| T33 | Unverified | Requires configured public relay/FCM and cellular phone. |
+| T34 | Unverified | Cloud fallback and wrong TLS rejection exercised; AP isolation/mDNS blocking/OS LAN denial need real network tests. |
+| T35 | Unverified | Endpoint-bound sessions and monotonic cache implemented; physical IP/IPv6/network-switch matrix pending. |
+| T36 | Pass | Actual TLS client rejects a wrong PC SPKI; LAN uses separate signed session, never cloud bearer. |
+| T37 | Pass | Emulator LAN read/decision/form works after the PC cloud stream is deliberately disconnected; no offline wake claim. |
+| T38 | Unverified | SQLite persistence/hibernation APIs compile and local DO tests pass; public cold reconstruction/hibernation measurement pending. |
+| T39 | Unverified | Bounded retries/capacity failures tested locally; actual free-plan quota exhaustion not induced. |
+| T40 | Pass | Mock HTTP v1 429/503/UNREGISTERED, encrypted token revision handling and bounded maintenance paths; delivery unverified. |
+| T41 | Unverified | Local notification dedup/ACK code verified; delayed real FCM versus LAN notification race needs provider testing. |
+| T42 | Pass | Terminal revision suppresses old foreground reminder; stale detail cannot regain authority. Background SDK display remains best effort. |
+| T43 | Unverified | Doze, system reclamation and force-stop require configured real push; kept as distinct cases. |
+| T44 | Unverified | Cold cache is read-only and intent carries bounded PC/epoch/event; physical background old-notification lifecycle pending. |
+| T45 | Unverified | Permission/channel checks implemented; actual DND, denied permission and unreachable provider matrix pending. |
+| T46 | Unverified | No-GMS physical environment unavailable; UI distinguishes unconfigured Firebase from foreground capability. |
+| T47 | Unverified | No physical target watch/companion forwarding settings available. |
+| T48 | Unverified | Short generic Chinese/English templates and Unicode crypto pass; actual watch truncation/emoji pending. |
+| T49 | Pass | NotificationManager inspection plus manifest/intent code checks: no decision/reply action or unprotected decision receiver. |
+| T50 | Unverified | No Firebase project configured, so project/application-ID mismatch diagnostics cannot be validated against FCM. |
+| T51 | Pass | Main projects Stop/input events before local busy/UI gates; original desktop priority tests pass. |
+| T52 | Pass | Queue watermark/revision fixtures and bounded staged snapshot reconciliation; emulator reconnect succeeds. |
+| T53 | Pass | Bounded encrypted journal/cache and receipt capacity/expiry fixtures; old pending records do not revive. |
+| T54 | Pass | 2 PCs × 3 phones in D1/DO fixtures with selected-binding revocation and separate PC authority. |
+| T55 | Pass | Desktop, shared protocol, Worker Vitest and Android instrumentation run independently. |
+| T56 | Unverified | Windows package verified; fresh macOS/Linux package runs remain CI/platform acceptance. |
+| T57 | Unverified | Public Worker CPU, actual FCM service-auth cold start and DO billing require deployment credentials. |
+| T58 | Unverified | Local D1 migration/build passes; staging redeploy/rollback with live records not performed. |
+| T59 | Pass | Controlled enrollment idempotency/reused code/active-PC cap and malformed-body rejection. |
+| T60 | Pass | Device/session role and signed challenge device/origin/purpose tampering rejected. |
+| T61 | Unverified | 15-minute auth renewal and separate FCM identity implemented; real background expiry plus delivery pending. |
+| T62 | Unverified | Same-install Keystore reopen tested and backups excluded; real reinstall/key-loss/other-device migration pending. |
+| T63 | Pass | Relay 2-PC test removes one binding without invalidating the other; Android cache removal is per computer. |
+| T64 | Pass | Actual Node ↔ Android Keystore/Nimbus JWS/JWE with Chinese/emoji/newline and tamper rejection. |
+| T65 | Pass | Full transcript fingerprint, grant equality, key-purpose/header checks and changed-scope rejection. |
+| T66 | Pass | 2-PC × 3-phone fixtures; configured active-PC cap and bounded request/rate limits reject excess work. |
+| T67 | Pass | Debug/release build and manifest/asset review: no iOS/APNs, user OAuth, accessibility or notification listener; no service private key. |
+| T68 | Pass | PC-local persistent opt-in, full unredacted preview, explicit phone confirmation and original action ID required. |
 
 ## Current Scope
 
@@ -17,7 +158,7 @@ Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for A
 - Codex `request_user_input` remains a read-only reminder because Codex does not expose a stable command-hook answer protocol; default, Plan, and unknown modes all remain eligible for the reminder.
 - ZCode 3.10.1 on Windows presents native and Hook approval concurrently; the first explicit decision wins, while older versions can remain Hook-first.
 
-The application does not contain desktop pets, remote approvals, a user-configurable theme system, or the old Clawd on Desk multi-agent state machine. Existing system light/dark appearance is supported.
+The application now includes an optional, default-disabled Android companion with encrypted remote approvals. It does not contain desktop pets, a user-configurable theme system, or the old Clawd on Desk multi-agent state machine. Existing system light/dark appearance is supported.
 
 ## Architecture
 

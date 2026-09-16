@@ -1,8 +1,8 @@
 # Mobile companion decisions
 
 Accepted implementation brief: `Vibe-Halo-Mobile-Implementation-Plan-v1.0.md`,
-2026-09-16. The user requested implementation on 2026-09-16. This records product
-decisions, not a declaration that remote access is available. Dated progress and
+2026-09-16. The user requested implementation on 2026-09-16. This records the implemented product contract; deployment and device acceptance
+are separate from source availability. Dated progress and
 verification belong in [HANDOFF.md](../HANDOFF.md).
 
 | Decision | Implementation boundary |
@@ -23,13 +23,13 @@ produce a decision; Codex `request_user_input` stays read-only.
 Remote access and remote control default off. Per-binding scopes separate
 `events.read`, `history.read`, `approvals.decide`, `questions.answer`, and
 `reminders.dismiss`. `approvals.persistent` requires explicit local opt-in and a
-complete permission preview with a second confirmation on the phone. Until that
-preview and permission flow exist, the remote decision service rejects persistent
-options even if the local adapter supports them.
+complete permission preview with a second confirmation on the phone. The PC supplies the full original OpenCode pattern set or Claude permission
+suggestion. Missing, truncated or redacted scopes cannot be authorized remotely.
+Changing a binding’s granted scopes requires revocation and a new pairing.
 
-Cloudflare Worker/SQLite Durable Objects/D1 and Android FCM are the planned
-services. Public deployment, application-store publication and paid upgrades are
-not authorized by the implementation brief. Credentials stay in local secure
+Cloudflare Worker/SQLite Durable Objects/D1 and Android FCM are implemented.
+Self-hosted setup is documented in [REMOTE_SETUP.md](REMOTE_SETUP.md).
+No hosted service, paid upgrade, store publication or desktop release is implied. Credentials stay in local secure
 storage or service secrets, never in Git, chat, ordinary settings or fixtures.
 
 Protocol v1 budgets: 16 KiB control, 64 KiB detail, 256 KiB encrypted envelope,
@@ -38,7 +38,36 @@ the existing desktop and Kotlin string bounds). Reject duplicate multi-select
 answers, unknown fields, dangerous object keys, invalid option IDs and oversized
 messages instead of truncating them into a valid decision.
 
-Desktop stays CommonJS/Electron with native HTML/CSS/JS. Android `minSdk=26` is a
-candidate only; Kotlin/Compose/Gradle/Firebase/JOSE/HTTP dependencies and final
-SDK targets remain to be frozen after compatibility checks. Installed SDKs alone
-do not establish Android build, Keystore, background-push or watch support.
+Desktop stays CommonJS/Electron with native HTML/CSS/JS. Android uses minSdk 26,
+compile/target SDK 36, AGP 8.13.2, Gradle 8.13, Kotlin 2.4.20 and JDK 21 for builds
+(Java 17 bytecode). `apps/android/gradle/libs.versions.toml` freezes runtime versions.
+Compose BOM 2025.10.01, Activity 1.11.0 and Lifecycle 2.9.4 were selected to support
+the installed Studio 2025.2.1/SDK 36 toolchain. R8 9.1.43 overrides AGP’s bundled
+shrinker to handle Kotlin 2.4 metadata, following the [official compatibility table](https://developer.android.com/build/kotlin-support)
+and [R8 override instructions](https://r8.googlesource.com/r8/+/refs/heads/main/README.md).
+The optional Nimbus XC20P provider is not bundled; strict wire checks only permit
+A256GCM. Node `jose` 6.2.12 and Android Nimbus 10.9.1 use standard JOSE primitives.
+
+Android signing keys are non-exportable P-256 Android Keystore keys. For API 26
+compatibility, the independent ECDH private key is encrypted by a Keystore AES-GCM
+key in no-backup storage. This fallback is not described as hardware ECDH. Keys
+are separate per relay origin. Linux `basic_text` safeStorage is refused.
+
+Pairing fingerprints encode 60 SHA-256 bits in three groups of five hexadecimal
+characters. This keeps the plan’s 60-bit comparison strength without introducing
+a second Base32 encoder. Pairing codes use 60 random bits and a five-minute TTL;
+controlled PC enrollment uses 128 random bits and a thirty-minute TTL.
+
+Protocol JSON Schema string bounds count Unicode code points; semantic answer
+bounds additionally preserve the existing desktop limit of 2,000 UTF-16 code units.
+UTF-8 byte budgets are independent. Phone recent events use the same 24-hour /
+500-event / 10-MiB bound as the remote journal; original PC history is fetched
+only on demand, read-only, with at most 200 summaries and 4 MiB of detail in memory.
+
+The remote and control switches remain off on a fresh installation. Enabling
+remote access starts an independent pinned LAN listener; the original Hook
+listener remains loopback-only. No firewall exception or router port forwarding
+is installed automatically. Offline LAN trusts the last PC-local grant; cloud
+revocation cannot reach a disconnected PC. Once learned, revocation is persisted
+before further local authorization. A lost identity requires revoking old grants
+and a new enrollment/pairing, never silent key replacement.
