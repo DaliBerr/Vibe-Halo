@@ -1,6 +1,6 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-08-30
+Updated: 2026-09-16 (guide audit; runtime evidence below remains dated)
 Current version: `0.5.9`
 Source directory: `C:\Tools\Clawd-island`
 
@@ -17,7 +17,7 @@ Vibe Halo is a Windows, macOS, and Linux Electron dynamic-island interface for A
 - Codex `request_user_input` remains a read-only reminder because Codex does not expose a stable command-hook answer protocol; default, Plan, and unknown modes all remain eligible for the reminder.
 - ZCode 3.10.1 on Windows presents native and Hook approval concurrently; the first explicit decision wins, while older versions can remain Hook-first.
 
-The application does not contain desktop pets, remote approvals, a theme system, or the old Clawd on Desk multi-agent state machine.
+The application does not contain desktop pets, remote approvals, a user-configurable theme system, or the old Clawd on Desk multi-agent state machine. Existing system light/dark appearance is supported.
 
 ## Architecture
 
@@ -49,6 +49,7 @@ The application does not contain desktop pets, remote approvals, a theme system,
 
 ## Verification Status
 
+- Recorded live acceptance on 2026-08-30: the installed 0.5.8 discovered and downloaded 0.5.9, then explicitly restarted through the built-in updater. The application-ready log and installed executable confirmed 0.5.9; the installed Hook matched the repository SHA-256. The user confirmed an ordinary-mode Codex question appeared, and logs confirmed expansion and resolution after answering. ZCode native-first and island-first clicks after this upgrade remain pending manual acceptance; automated cancellation tests and installed 3.10.1 source/config inspection do not establish that final UI result.
 - Automated suite: 181 tests on Windows (180 passed, one POSIX-only process test skipped), including ordinary/Plan/unknown Codex input reminders, Codex Hook/JSONL Session namespace matching, bounded Session origin isolation and expiry, source-display correction without focus, ZCode native-winner connection cancellation, exact-turn Codex Auto-review routing, history persistence/redaction, localization, package contents, and every existing 19-adapter/platform/update regression. The POSIX process-runner test executes on macOS/Linux CI.
 - Automatic-update suite: independent release/update and signing gates, unsigned/signed public update configs, scheduler state, download/install transitions, sanitized errors, ordered fail-open shutdown, retained external signing staging/injection, and final-byte metadata regeneration.
 - Windows: Codex/ZCode retain existing real-client validation. Normal packages remain update-disabled; the update-enabled unsigned `Vibe-Halo-Setup-0.5.5-x64.exe` passed package verification plus silent install/uninstall. The local artifact is 102,840,149 bytes with SHA-256 `20388D5D2B655B35554B71FD7F1C3F0C98C829FD7F53C58096AF1B56CF9DFED2`; 0.5.5 also corrects the CI-only PowerShell parser failure found by the unpublished `v0.5.4` run.
@@ -78,7 +79,7 @@ npm run build
 - Linux prefers X11/XWayland; `VIBE_HALO_NATIVE_WAYLAND=1` forces a diagnosed degraded native-Wayland mode.
 - macOS runs as an accessory application without Dock presence or Accessibility/Screen Recording permissions.
 - The stable POSIX launcher lives at `~/.vibe-halo/bin/vibe-halo-hook-runner`; remove all integrations before deleting the app on macOS/Linux.
-- `preview-0.5.9` is the intended GitHub Pre-release built by `.github/workflows/cross-platform.yml`; it includes all platform packages and `SHA256SUMS.txt` but no stable update metadata. macOS packages are ad-hoc signed only, without Developer ID signing or notarization, and macOS/Linux auto-update stays disabled.
+- `preview-0.5.9` and `v0.5.9` were published on 2026-08-30 from commit `fd3e48f`, after cross-platform CI passed. The preview includes all platform packages and `SHA256SUMS.txt` but no stable update metadata. The Windows stable release includes the installer, blockmap, `latest.yml`, checksums, LICENSE and NOTICE. Its installer SHA-256 is `B88E4B8B141474FE8BE8FDF0FAFCFA7D8783F6D816A0C7442EAA00F3E53CBD51`. macOS packages are ad-hoc signed only, without Developer ID signing or notarization, and macOS/Linux auto-update stays disabled.
 - Windows local and preview artifacts remain update-disabled. The stable `v*` workflow defaults to an unsigned, update-enabled NSIS release and regenerates `latest.yml` and the blockmap from final bytes. Setting repository variable `VIBE_HALO_SIGNPATH_ENABLED=1` restores the retained three-stage SignPath path.
 - Version 0.5.5 is the manually installed updater bootstrap. The live 0.5.5 → 0.5.6 update check, download, explicit restart installation, and encrypted-history persistence acceptance passed on Windows.
 - Keep `LICENSE`, `NOTICE.md`, and upstream attribution in every release.
