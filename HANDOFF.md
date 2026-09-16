@@ -97,6 +97,22 @@ no approval/reply action; tapping opened the correct encrypted event detail.
 Evidence includes ignored `.smoke/fcm-background.png` and the target-app system
 notification record. This is actual Google delivery, not the mock provider test.
 
+The dedicated signed/R8 release APK was also installed as `com.vibe.halo.mobile`
+and paired through its actual UI, comparing the displayed fingerprint before PC
+confirmation. Release FCM delivery was observed while the display was Dozing,
+and again with `cmd deviceidle force-idle deep` reporting IDLE. An approximately
+one-minute-old notification opened with about 64 seconds remaining instead of
+restarting at 120; tapping Deny produced exactly one PC `deny` result. A later
+20-minute-old notification opened read-only with disabled decision buttons and
+the original PC timeout/native fallback. After explicit package force-stop,
+no notification appeared for a new event during a 50-second observation window;
+no phone decision was submitted. The app was reopened and forced idle removed.
+The earlier `am kill` was combined with Doze, so independent OS reclamation is
+still not claimed. Final cleanup again reports zero active PC domains and
+bindings; the synthetic server and known test forwards are stopped. Target
+phone/watch/cellular behavior and sustained production budget measurements remain
+open.
+
 That delayed-open test found stale cached event time restarting the apparent
 120-second countdown. Fixed with nonce-bound encrypted/signed `clock.read`,
 PC epoch validation, a five-second sample RTT bound and a 60-second monotonic
@@ -133,6 +149,20 @@ tests cover delayed completion, task failure, timeout and empty-frame retries.
 Production approval deadlines and ordinary quit behavior are unchanged.
 
 Cross-platform CI `35109995360` and mobile CI `35109995336` at `9a1280c` both pass.
+Clock/FCM changes at `020e8f8` also pass cross-platform CI `35112663455` and mobile
+CI `35112663377`. The final Android UI follow-up `3f586b3` explicitly labels
+expired/ended records and does not imply that every terminal record lost context.
+Final source `3f586b3` passes cross-platform CI
+`https://github.com/DaliBerr/Vibe-Halo/actions/runs/35115775577` and mobile CI
+`https://github.com/DaliBerr/Vibe-Halo/actions/runs/35115775735`. The final signed
+APK includes the matching release Firebase app ID, clock challenge and explicit
+terminal-state strings (verified in packaged DEX). SHA-256 of the installable
+release APK is `96fe6dc4a3ec09a4b6d81e24972c19395d90508503159987ddb61c5608707acd`;
+the full binary checksum list and Chinese physical-test guide are in ignored
+`dist/companion-preview/`. Subsequent handoff-only commits do not change binaries.
+The branch remains pushed but unmerged while the plan's real-client/physical
+acceptance and production budget gates remain open; no tag or app-store release
+was created.
 Android CI passes relay/protocol checks plus debug, instrumentation
 APK and R8 release builds and both lint variants on Ubuntu. The cloud CI builds
 the instrumentation APK; actual instrumentation execution is the local emulator
@@ -188,8 +218,8 @@ response is never counted as FCM/watch delivery. No item is silently omitted.
 | T40 | Pass | Mock HTTP v1 429/503/UNREGISTERED, encrypted token revision handling and bounded maintenance paths; delivery unverified. |
 | T41 | Unverified | Local dedup/ACK and both foreground/FCM notification-ID cleanup verified; delayed duplicate FCM versus LAN race matrix remains pending. |
 | T42 | Pass | Terminal revision suppresses old foreground reminder; stale detail cannot regain authority. Background SDK display remains best effort. |
-| T43 | Unverified | Real push is configured; Doze, system reclamation and force-stop remain distinct acceptance cases. |
-| T44 | Unverified | Real background notification opened its bound event; delayed cached-event countdown fixed with fresh PC clock challenge. Physical old-notification lifecycle pending. |
+| T43 | Unverified | Signed emulator APK receives during forced deep idle; explicit force-stop suppresses new display for 50 seconds with no decision. Independent OS reclamation and physical-device matrix remain pending. |
+| T44 | Unverified | Signed release opens a 20-minute-old notification read-only; delayed cached-event countdown fixed with fresh PC clock challenge. Physical cold-start/new-intent lifecycle matrix pending. |
 | T45 | Unverified | Permission/channel checks implemented; actual DND, denied permission and unreachable provider matrix pending. |
 | T46 | Unverified | No-GMS physical environment unavailable; UI distinguishes unconfigured Firebase from foreground capability. |
 | T47 | Unverified | No physical target watch/companion forwarding settings available. |
