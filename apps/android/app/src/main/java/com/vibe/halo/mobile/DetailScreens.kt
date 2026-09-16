@@ -66,12 +66,14 @@ import org.json.JSONObject
             if (event.summary.optString("state") == "pending") {
                 val seconds = tick.let { repo.remainingSeconds(event) }
                 Text(tr(if (event.summary.optBoolean("actionable")) "当前请求" else "排队或等待原生处理") + " · " + event.summary.optInt("pendingCount") + " " + tr("项待处理") + (seconds?.let { " · ${tr("剩余")} ${it}s" } ?: ""), Modifier.padding(vertical = 10.dp), fontSize = 12.sp)
+            } else {
+                Text(tr(if (event.summary.optString("state") == "expired") "事件已过期 · 仅供查看" else "事件已结束 · 仅供查看"), Modifier.padding(vertical = 10.dp), fontSize = 12.sp)
             }
             HaloCard {
                 Text(event.detail.optString("toolName").ifBlank { tr("事件详情") }, fontWeight = FontWeight.Bold)
                 SelectionContainer { Column { Text(event.detail.optString("description"), Modifier.padding(top = 12.dp), fontSize = 13.sp); Text(event.detail.optString("toolInputText"), Modifier.padding(top = 12.dp), fontSize = 12.sp, fontFamily = FontFamily.Monospace) } }
             }
-            if (event.detail.optBoolean("truncated") || event.detail.optBoolean("redacted")) Text(tr("详情有省略或脱敏，当前不能从这里授权。"), fontSize = 12.sp)
+            if (event.summary.optString("state") == "pending" && (event.detail.optBoolean("truncated") || event.detail.optBoolean("redacted"))) Text(tr("详情有省略或脱敏，当前不能从这里授权。"), fontSize = 12.sp)
             for (question in event.detail.getJSONArray("questions").values().map { it as JSONObject }) {
                 val id = question.getString("id"); val selected = answers[id].orEmpty(); val multi = question.getBoolean("multiSelect")
                 Text(question.getString("question"), Modifier.padding(top = 22.dp, bottom = 10.dp), fontSize = 17.sp, fontWeight = FontWeight.Medium)

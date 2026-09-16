@@ -42,6 +42,7 @@ object UiLanguage {
         "事件详情" to "Event details", "详情有省略或脱敏，当前不能从这里授权。" to "Some context is omitted or redacted. Remote approval is unavailable.",
         "补充回答" to "Your answer", "这类输入需要回到原客户端回答。" to "Answer this request in the original client.",
         "当前只读：请刷新状态，或回到电脑处理。" to "Read-only. Refresh or handle this on your computer.", "允许这一次" to "Allow once", "拒绝" to "Deny", "提交回答" to "Submit answers", "回到客户端处理" to "Handle in client",
+        "事件已过期 · 仅供查看" to "Event expired · Read-only", "事件已结束 · 仅供查看" to "Event ended · Read-only",
         "查看长期授权范围…" to "Review persistent permission…", "查询 / 重试上次提交" to "Check / retry previous submission", "确认长期授权范围" to "Confirm persistent permission",
         "这项规则可能影响后续请求。请核对完整范围。" to "This rule can affect future requests. Review its full scope.", "我已核对完整范围" to "I reviewed the entire scope", "确认授权" to "Confirm permission", "取消" to "Cancel",
         "电脑历史 · 只读" to "Computer history · Read-only", "正在读取。电脑需要在线。" to "Loading. Your computer must be online.", "关闭" to "Close",
