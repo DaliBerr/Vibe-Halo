@@ -185,8 +185,9 @@ jobs:
       - name: Exercise compact/expanded screenshots and approval-click flow through XWayland selection
         shell: bash
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           root="$RUNNER_TEMP/vibe-ui-smoke"
+          trap 'find "$root" -name main.log -type f -print -exec cat {} \;' EXIT
           executable="dist/linux-unpacked/vibe-halo"
           run_smoke() {
             local profile="$1"
@@ -232,6 +233,14 @@ jobs:
             VIBE_HALO_SMOKE_ACTION_FILE="$root/click/action.txt" \
             "$executable" --no-sandbox --smoke-test --demo-approval --demo-expanded
           test "$(cat "$root/click/action.txt")" = "resolved"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: linux-ui-smoke-diagnostics
+          path: |
+            ${{ runner.temp }}/vibe-ui-smoke/**/*.png
+            ${{ runner.temp }}/vibe-ui-smoke/**/logs/main.log
+          retention-days: 7
 
   preview-release:
     if: startsWith(github.ref, 'refs/tags/preview-')
