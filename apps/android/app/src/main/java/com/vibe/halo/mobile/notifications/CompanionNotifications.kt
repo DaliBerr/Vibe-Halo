@@ -57,7 +57,12 @@ object CompanionNotifications {
         return "notification_posted"
     }
     fun clearEvent(context: Context, pcId: String, eventId: String, revision: Long) {
-        context.getSystemService(NotificationManager::class.java).cancel("$pcId/$eventId", 1)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val tag = "$pcId/$eventId"
+        manager.cancel(tag, 1)
+        // FCM's background auto-display uses its own notification ID (currently
+        // zero). Cancel matching active tags, not only our foreground builder ID.
+        manager.activeNotifications.filter { it.tag == tag }.forEach { manager.cancel(it.tag, it.id) }
         val seen = context.getSharedPreferences("notification-revisions", Context.MODE_PRIVATE)
         val editor = seen.edit(); if (seen.all.size >= 1000) editor.clear(); editor.putLong("$pcId/$eventId", revision).putBoolean("$pcId/$eventId:posted", false).apply()
     }

@@ -27,7 +27,7 @@ npm test
 npm run build                    # dry-run only; does not deploy
 
 cd ../../apps/android
-./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease :app:lintDebug :app:lintRelease
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:assembleRelease :app:lintDebug :app:lintRelease
 ```
 
 On Windows use `gradlew.bat`. The debug APK is
@@ -37,6 +37,13 @@ maintainer supplies a signing key. Do not distribute a release signed with the
 debug key. The release ID is `com.vibe.halo.mobile`; configure the matching
 Firebase Android application for each build ID. Minimum Android version is 8.0
 (API 26). Google services are required for FCM, but not foreground LAN reads.
+
+For side-loading the release, sign the unsigned APK with a dedicated retained
+keystore using Android SDK `apksigner sign`, and verify it with `apksigner verify
+--verbose --print-certs`. Pass passwords through private process environment or
+stdin, not literal command arguments. Retain the key and its password for future
+updates; a new key cannot update an existing installation. No Play upload or
+desktop release tag is required for this locally signed APK.
 
 No Firebase properties means a usable foreground-only test build. The Devices
 page explicitly reports that push is not configured. A local Worker can be used
@@ -129,6 +136,15 @@ retries pending token/preferences/revocation updates. This worker never polls
 approvals or submits decisions. Android and the relay must reference the same
 Firebase project. An unset configuration, API error, token rejection or permission
 denial must not be reported as successful delivery.
+
+`PublicPushSetupTest` is an explicit opt-in (`-e publicPush 1`) for a configured
+debug APK and a private synthetic bridge fixture. It obtains a real FCM token,
+pairs and registers it without logging it, then exits so a separate background
+notification check can run outside instrumentation. It deliberately leaves the
+test binding active; the caller must revoke that synthetic PC after the check.
+Check the system notification record/visible notification, not only an HTTP 200.
+FCM auto-displayed reminders use a different notification ID from foreground
+reminders; terminal reconciliation cancels all active IDs with the event's tag.
 
 ## Connect and use
 

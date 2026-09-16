@@ -91,6 +91,21 @@ test("history requests require their own signature purpose and current read scop
   binding.scopes = ["events.read"]; await assert.rejects(remote.receiveQuery(request), /forbidden/);
 });
 
+test("clock challenge uses current signed PC time without requiring history scope or phone clock sync", async t => {
+  const { remote, approvals } = await fixture(t), c = remote.crypto, mobile = await c.generateIdentity("mobile");
+  const binding = { bindingId: crypto.randomUUID(), revision: 1, state: "active", mobile: await c.publicDevice(mobile), scopes: ["events.read"] };
+  remote.state.bindings.push(binding);
+  const query = { protocolVersion: 1, type: "clock.read", relayOrigin: remote.state.relayOrigin, requestId: crypto.randomUUID(), pcId: remote.pcId, mobileId: mobile.deviceId, bindingId: binding.bindingId, bindingRevision: 1, issuedAt: 1 };
+  const request = { requestId: query.requestId, mobileId: mobile.deviceId, bindingId: binding.bindingId, bindingRevision: 1, envelope: await c.seal(query, mobile.signKey, remote.state.identity.encryptionKey, "read-request") };
+  const before = Date.now();
+  const result = await c.open(await remote.receiveQuery(request), mobile.encryptionKey, remote.state.identity.signKey, "read-response");
+  assert.equal(result.type, "clock.response"); assert.equal(result.requestId, query.requestId);
+  assert.equal(result.pcSessionEpoch, approvals.pcSessionEpoch);
+  assert.ok(result.pcTime >= before && result.pcTime <= Date.now()); assert.deepEqual(result.records, []);
+  await assert.rejects(remote.receiveQuery({ ...request, requestId: crypto.randomUUID() }), /invalid_query/);
+  binding.scopes = []; await assert.rejects(remote.receiveQuery(request), /forbidden/);
+});
+
 test("PC confirmation retries the identical persisted grant after a lost relay response", async t => {
   const { remote } = await fixture(t), c = remote.crypto;
   const mobile = await c.generateIdentity("mobile");

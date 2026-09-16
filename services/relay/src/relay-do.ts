@@ -127,7 +127,7 @@ export class Relay extends DurableObject<Env> {
     const session = await sessionByHash(tokenHash, this.env);
     this.budget(session.device.deviceId, "queries", 120);
     const binding = await authorize(session, pcId, this.env);
-    if (!binding || !["history.read", "reminders.dismiss"].some(scope => JSON.parse(binding.scopes_json).includes(scope))) throw new Fault("forbidden", 403);
+    if (!binding || !["events.read", "history.read", "reminders.dismiss"].some(scope => JSON.parse(binding.scopes_json).includes(scope))) throw new Fault("forbidden", 403);
     id(requestId);
     this.ctx.storage.sql.exec("DELETE FROM queries WHERE expires_at<=?", now());
     const previous = this.ctx.storage.sql.exec<{ mobile_id: string; digest: string; envelope: string | null }>("SELECT mobile_id,digest,envelope FROM queries WHERE request_id=?", requestId).toArray()[0];

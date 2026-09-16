@@ -28,6 +28,8 @@ class NotificationSafetyTest {
         assertNull(notification.fullScreenIntent)
         assertEquals("approvals", notification.channelId)
         assertFalse(notification.allowSystemGeneratedContextualActions)
+        manager.notify("$pc/$event", 0, notification) // Firebase auto-display's ID.
+        awaitSystem { manager.activeNotifications.count { it.tag == "$pc/$event" } == 2 }
         CompanionNotifications.clearEvent(context, pc, event, 2)
         assertEquals("suppressed_by_user", CompanionNotifications.show(context, data))
         awaitSystem { manager.activeNotifications.none { it.tag == "$pc/$event" } }

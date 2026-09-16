@@ -319,13 +319,17 @@ class RemoteService extends EventEmitter {
     const query = await this.crypto.open(message.envelope, this.state.identity.encryptionKey, binding.mobile.signKey, "read-request");
     if (query.protocolVersion !== 1 || query.requestId !== message.requestId || query.pcId !== this.pcId || query.mobileId !== binding.mobile.deviceId
       || query.bindingId !== binding.bindingId || query.bindingRevision !== binding.revision || query.relayOrigin !== this.state.relayOrigin
-      || !Number.isSafeInteger(query.issuedAt) || Math.abs(Date.now() - query.issuedAt) > 30000
-      || !["history.list", "history.detail", "reminder.dismiss"].includes(query.type)) throw new Error("invalid_query");
+      || !Number.isSafeInteger(query.issuedAt) || (query.type !== "clock.read" && Math.abs(Date.now() - query.issuedAt) > 30000)
+      || !["clock.read", "history.list", "history.detail", "reminder.dismiss"].includes(query.type)) throw new Error("invalid_query");
     if (binding.state !== "active") throw new Error("forbidden");
-    if (!binding.scopes.includes(query.type === "reminder.dismiss" ? "reminders.dismiss" : "history.read")) throw new Error("forbidden");
-    const output = { protocolVersion: 1, type: "history.response", requestId: query.requestId, relayOrigin: this.state.relayOrigin,
+    if (!binding.scopes.includes(query.type === "clock.read" ? "events.read" : query.type === "reminder.dismiss" ? "reminders.dismiss" : "history.read")) throw new Error("forbidden");
+    const output = { protocolVersion: 1, type: query.type === "clock.read" ? "clock.response" : "history.response", requestId: query.requestId, relayOrigin: this.state.relayOrigin,
       pcId: this.pcId, mobileId: binding.mobile.deviceId, bindingId: binding.bindingId, bindingRevision: binding.revision, records: [], nextOffset: null };
-    if (query.type === "reminder.dismiss") {
+    if (query.type === "clock.read") {
+      // The fresh request ID is the challenge; phone wall-clock skew must not
+      // prevent calibration. No history or decision capability is exposed.
+      output.pcTime = Date.now(); output.pcSessionEpoch = this.approvals.pcSessionEpoch;
+    } else if (query.type === "reminder.dismiss") {
       const event = this.journal.events.get(query.eventId);
       if (!this.state.controlEnabled || this.decisions.quiescing || !event || event.summary.kind !== "input" || event.summary.pcSessionEpoch !== query.pcSessionEpoch
         || event.summary.eventRevision !== query.eventRevision || event.summary.pcSessionEpoch !== this.approvals.pcSessionEpoch) throw new Error("forbidden");

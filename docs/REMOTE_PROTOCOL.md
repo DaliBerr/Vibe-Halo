@@ -144,12 +144,23 @@ passive approval notifications never gain fabricated reply/approve protocols.
 ## Reads, reminders and transports
 
 History requests use `read-request`/`read-response` purposes and fresh request IDs.
-Only `history.list`, `history.detail` and `reminder.dismiss` are accepted. The PC
+Only `clock.read`, `history.list`, `history.detail` and `reminder.dismiss` are accepted. The PC
 checks the appropriate current scope after decryption. History is read-only;
 reminder dismissal also requires the local control switch and the matching input
 event epoch/revision, and only dismisses Vibe Halo's reminder, never answers the
-client or finalizes a Hook approval. Result envelopes retain the bound
+client or finalizes a Hook approval. History/reminder result envelopes retain the bound
 `history.response` type and request ID, including an empty records list for dismiss.
+
+`clock.read` requires `events.read` and returns a signed/encrypted `clock.response`
+with the fresh request ID, current `pcTime` (Unix milliseconds) and PC session
+epoch. It exposes no history or decision operation. Its nonce-bound response does
+not depend on the phone wall clock being synchronized. Android accepts a sample
+only within a five-second monotonic round trip, advances conservatively by that
+round trip, never rolls time backwards within an epoch and requires recalibration
+after 60 seconds or backgrounding. Cached event `pcTime` is not a fresh clock
+sample. Countdown and decision timestamps use this clock; failed calibration or
+a different epoch makes the event read-only. The PC still enforces the absolute
+deadline at its final decision gate.
 
 Cloud endpoints cover enrollments, challenge/session, pairing create/claim/status/
 confirm/cancel, devices, binding revoke/PC acknowledgment, push-token/preferences,

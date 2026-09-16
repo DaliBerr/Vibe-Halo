@@ -45,10 +45,12 @@ class CompanionFlowTest {
         val pc = repo.state.value.computers.first { it.pcId == config.getString("pcId") }
         assertEquals("active", pc.state)
         val request = bridge("/request")
+        delay(1600) // The cloud event is already cached before this phone opens it.
         repo.refresh()
         val event = repo.state.value.events.firstOrNull { it.summary.getString("eventId") == request.getString("eventId") }
         assertNotNull(repo.state.value.message, event)
         assertTrue(repo.state.value.message, repo.actionable(event!!))
+        assertTrue("Opening a cached event must not restart its 120-second lifetime", repo.remainingSeconds(event)!! <= 119)
         assertEquals("{\"command\":\"echo synthetic-mobile-test\"}", event.detail.getString("toolInputText"))
         repo.decide(event.key, "allow")
         repeat(10) { repo.checkReceipts(); if (bridge("/status").getJSONArray("outputs").length() == 0) Thread.sleep(300) }

@@ -45,7 +45,7 @@ jobs:
         working-directory: apps/android
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease :app:lintDebug :app:lintRelease --no-daemon
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:assembleRelease :app:lintDebug :app:lintRelease --no-daemon
       - uses: actions/upload-artifact@v7
         with:
           name: Android-companion-builds

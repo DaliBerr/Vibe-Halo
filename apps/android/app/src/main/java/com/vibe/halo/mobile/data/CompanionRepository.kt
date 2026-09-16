@@ -49,6 +49,7 @@ class CompanionRepository(private val context: Context) {
     val state = mutable.asStateFlow()
     val updates = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private val pending = java.util.concurrent.ConcurrentHashMap<String, JSONObject>()
+    private val clocks = java.util.concurrent.ConcurrentHashMap<String, PcClock>()
     private var pairingOffer: JSONObject? = null
     private var confirmedGrant: JSONObject? = null
     private var loaded = false
@@ -164,6 +165,11 @@ class CompanionRepository(private val context: Context) {
                     if (!changed && offset == null) { consistent = true; break }
                 }
                 require(consistent) { "refresh_required" }
+                if (online && foreground) {
+                    val started = SystemClock.elapsedRealtime()
+                    val clock = readQuery(computer, "clock.read", JSONObject())
+                    clocks[computer.key] = PcClock.sample(clock.getString("pcSessionEpoch"), clock.getLong("pcTime"), started, SystemClock.elapsedRealtime(), clocks[computer.key])
+                } else clocks.remove(computer.key)
                 val present = snapshot.map { "${computer.key}/${it.getJSONObject("summary").getString("eventId")}" }.toSet()
                 mutable.value = mutable.value.copy(events = mutable.value.events.map { if (it.computerKey == computer.key && it.key !in present) it.copy(receivedElapsed = 0) else it })
                 for (event in snapshot) {
@@ -174,6 +180,7 @@ class CompanionRepository(private val context: Context) {
                 if (transport == "lan") subscribe(account, computer, true)
                 runCatching { login(account); subscribe(account, computer) }
             } catch (error: Exception) {
+                clocks.remove(computer.key)
                 if (error is ApiError && error.status == 403) revokeLocally(computer)
                 else mutable.value = mutable.value.copy(computers = mutable.value.computers.map { if (it.key == computer.key) it.copy(online = false) else it })
             }
@@ -194,7 +201,7 @@ class CompanionRepository(private val context: Context) {
             if (previous.summary.getLong("eventRevision") > summary.getLong("eventRevision")) return
             if (previous.summary.getString("state") != "pending" && summary.getString("state") == "pending") return
         }
-        val received = if (previous != null && previous.detail.getString("pcTime") >= detail.getString("pcTime")) previous.receivedElapsed else SystemClock.elapsedRealtime()
+        val received = SystemClock.elapsedRealtime()
         val value = RemoteEvent(key, computer.key, detail, received)
         mutable.value = mutable.value.copy(events = mutable.value.events.filterNot { it.key == key } + value)
     }
@@ -203,13 +210,14 @@ class CompanionRepository(private val context: Context) {
         val pc = mutable.value.computers.find { it.key == event.computerKey } ?: return false
         if (!pc.permits(if (event.summary.optString("kind") == "question") "questions.answer" else "approvals.decide")) return false
         if (!pc.online || pc.state != "active" || !event.detail.optBoolean("remoteActionable") || !event.summary.optBoolean("actionable") || event.receivedElapsed <= 0) return false
-        val pcNow = Instant.parse(event.detail.getString("pcTime")).toEpochMilli() + SystemClock.elapsedRealtime() - event.receivedElapsed
+        val pcNow = eventPcTime(event) ?: return false
         return event.summary.getString("state") == "pending" && pcNow < Instant.parse(event.summary.getString("expiresAt")).toEpochMilli()
     }
     fun hasPendingDecision(eventKey: String): Boolean = pending.containsKey(eventKey)
+    private fun eventPcTime(event: RemoteEvent): Long? = clocks[event.computerKey]?.now(event.summary.getString("pcSessionEpoch"), SystemClock.elapsedRealtime())
     fun remainingSeconds(event: RemoteEvent): Long? = runCatching {
         if (event.receivedElapsed <= 0) return null
-        val now = Instant.parse(event.detail.getString("pcTime")).toEpochMilli() + SystemClock.elapsedRealtime() - event.receivedElapsed
+        val now = eventPcTime(event) ?: return null
         ((Instant.parse(event.summary.getString("expiresAt")).toEpochMilli() - now).coerceAtLeast(0) + 999) / 1000
     }.getOrNull()
     suspend fun decide(eventKey: String, optionId: String, answers: JSONObject? = null, persistentConfirmed: Boolean = false) = operation {
@@ -221,7 +229,7 @@ class CompanionRepository(private val context: Context) {
         require(computer.permits(if (optionId == "submit") "questions.answer" else "approvals.decide")) { "forbidden" }
         val persistent = optionId == "always" || optionId.startsWith("suggestion:")
         if (persistent) require(persistentConfirmed && computer.permits("approvals.persistent") && detail.optJSONObject("persistentPreviews")?.optString(optionId)?.isNotEmpty() == true) { "persistent_not_available" }
-        val now = Instant.parse(detail.getString("pcTime")).toEpochMilli() + SystemClock.elapsedRealtime() - event.receivedElapsed
+        val now = eventPcTime(event) ?: error("clock_refresh_required")
         val intent = JSONObject().put("protocolVersion", 1).put("decisionId", UUID.randomUUID().toString()).put("pcId", computer.pcId)
             .put("mobileId", computer.grant.getJSONObject("mobile").getString("deviceId")).put("bindingId", computer.bindingId).put("bindingRevision", computer.grant.getInt("revision"))
             .put("pcSessionEpoch", summary.getString("pcSessionEpoch")).put("eventId", summary.getString("eventId")).put("approvalId", detail.getString("approvalId"))
@@ -334,6 +342,7 @@ class CompanionRepository(private val context: Context) {
         val account = account(pc.origin); val requestId = UUID.randomUUID().toString()
         val query = fresh(pc.origin).put("type", type).put("requestId", requestId).put("pcId", pc.pcId).put("mobileId", account.crypto.publicDevice.getString("deviceId"))
             .put("bindingId", pc.bindingId).put("bindingRevision", pc.grant.getInt("revision"))
+        if (type != "clock.read") clocks[pc.key]?.let { clock -> clock.now(clock.epoch, SystemClock.elapsedRealtime())?.let { query.put("issuedAt", it) } }
         for (key in fields.keys()) query.put(key, fields.get(key))
         val payload = JSONObject().put("requestId", requestId).put("envelope", account.crypto.seal(query, pc.grant.getJSONObject("pc").getJSONObject("encryptionKey"), "read-request"))
         var response = runCatching { lanRequest(account, pc, "/v1/queries", "POST", payload) }.getOrNull()
@@ -344,7 +353,7 @@ class CompanionRepository(private val context: Context) {
         }
         require(response.optString("state") == "desktop_result") { "desktop_offline" }
         val value = account.crypto.open(response.getString("envelope"), pc.grant.getJSONObject("pc").getJSONObject("signKey"), "read-response")
-        bound(value, pc, account, "history.response"); require(value.getString("requestId") == requestId)
+        bound(value, pc, account, if (type == "clock.read") "clock.response" else "history.response"); require(value.getString("requestId") == requestId)
         return value
     }
     suspend fun registerPushToken(token: String) = operation {
@@ -478,6 +487,7 @@ class CompanionRepository(private val context: Context) {
     } }
     fun resume() { foreground = true; discovery.start() }
     fun close() {
+        clocks.clear()
         foreground = false
         mutable.value = mutable.value.copy(computers = mutable.value.computers.map { it.copy(online = false) }, events = mutable.value.events.map { it.copy(receivedElapsed = 0) })
         discovery.stop(); accounts.values.toList().forEach { account -> account.sockets.values.forEach { socket -> socket.close(1000, "background") }; account.sockets.clear() }

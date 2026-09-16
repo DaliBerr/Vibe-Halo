@@ -27,7 +27,7 @@ files. New independent CI builds/lints Android and checks the relay/shared proto
 Verified locally on Windows with Node 24.14.0, Electron 41.10.2, Studio 2025.2.1,
 JBR 21.0.8 and the API 34 Small_Phone emulator:
 
-- Root `npm test`: 218 tests, 217 passed, one existing POSIX-only Windows skip.
+- Root `npm test`: 219 tests, 218 passed, one existing POSIX-only Windows skip.
 - `npm run test:protocol`: 6 passed, generated validators current.
 - Relay TypeScript check and Vitest: 8 passed in local workerd/D1/DO. Dry-run
   deploy bundle succeeds. Test workerd compatibility is capped at 2026-08-22 by
@@ -58,25 +58,27 @@ JBR 21.0.8 and the API 34 Small_Phone emulator:
   code. A candidate-source scan matched none of the actual local test peppers or
   token encryption key; ignored runtime/config/signing files remain excluded.
 
-M0/M1 local foundations are verified. M2–M5 are implemented with local protocol /
-emulator evidence. Public M3 push/CPU/hibernation, real-client M4 and physical
-M5/M6 acceptance remain open. M7 builds/docs/local regressions are prepared;
-**the whole mobile feature is not declared production accepted**. No Firebase
-project, paid plan, store upload or production APK signing was created. The user
-restored Cloudflare login and explicitly asked to proceed with public foreground
-testing while deferring Firebase configuration. A public push claim therefore
-cannot be made; matching Firebase Android/Worker values and physical acceptance
-remain required.
+M0/M1 local foundations are verified. M2–M5 have local protocol/emulator and real
+public foreground/background transport evidence. Sustained M3 CPU/hibernation,
+real-client M4 and physical M5/M6 acceptance remain open. M7 builds/docs/local
+regressions are prepared; **the whole feature is not declared production accepted**.
+The user restored Cloudflare login and supplied Firebase project `vibe-halo`
+Android configuration and a matching service-account JSON in Downloads. A debug
+Android app `com.vibe.halo.mobile.debug` was additionally registered in that same
+project through Firebase's Management API, preserving the user's release app
+`com.vibe.halo.mobile`. No paid plan, store upload or desktop release tag was made.
 
 Public relay: `https://vibe-halo-relay.z1593316231.workers.dev`, deployed version
-`f84afd72-05c8-4e6b-98f9-b5af8094c04e`. New isolated D1 database
+`ccac0b0e-bb24-41cd-941a-0ae8c459f111`. New isolated D1 database
 `912b3b29-35b1-46f8-93df-64b013315e22` has migration `0001_identity.sql`; existing
 account projects were not changed. Production config is the ignored sibling
 `services/relay/wrangler.production.jsonc`, while the committed template remains
-unconfigured. Three independent secrets were provisioned; their local recovery
-copy is Windows-user-DPAPI encrypted in ignored
-`.smoke/relay-production-secrets.dpapi.json`. FCM remains disabled; no service
-private key or public Android Firebase configuration is present.
+unconfigured. Three independent relay secrets and three FCM service fields were
+provisioned as Worker secrets; FCM is enabled. Relay secret recovery is Windows
+user-DPAPI encrypted at
+`C:\Users\15933\.vibe-halo\companion-deployment\relay-secrets.dpapi.json`
+(an earlier ignored `.smoke` copy is retained). Service credentials remain in
+the user's original Downloads JSON and Worker secrets, never Git or APKs.
 
 The API 34 emulator passed `CompanionFlowTest` against this real HTTPS Worker:
 controlled PC enrollment, fingerprint pairing, cloud approval and encrypted
@@ -85,14 +87,37 @@ disconnect, and revocation. `/healthz` returned 200. The public test PC was then
 root-revoked with the admin script; remote D1 reports zero active PCs and zero
 active bindings. The synthetic host and its current ADB forwarding were removed.
 This is real public foreground transport, but still a synthetic client waiter,
-not FCM, a cellular phone, real multicast discovery or long-run free-tier metrics.
+not a cellular phone, real multicast discovery or long-run free-tier metrics.
+
+Real FCM background delivery was then observed on API 34 after instrumentation
+exited and the app returned to Home. D1 contains an encrypted active push token;
+the system showed a Firebase auto-displayed notification (`id=0`, event tag,
+`approvals` channel, PRIVATE visibility). Its visible generic bilingual body has
+no approval/reply action; tapping opened the correct encrypted event detail.
+Evidence includes ignored `.smoke/fcm-background.png` and the target-app system
+notification record. This is actual Google delivery, not the mock provider test.
+
+That delayed-open test found stale cached event time restarting the apparent
+120-second countdown. Fixed with nonce-bound encrypted/signed `clock.read`,
+PC epoch validation, a five-second sample RTT bound and a 60-second monotonic
+clock lease. Time cannot move backwards within an epoch; foreground refresh now
+uses current PC time even for an old cached event. Four Android unit tests and
+the updated public emulator flow (deliberate delayed first fetch) pass. A fifth
+desktop protocol test checks read scope, skew-tolerant clock challenge and wrong
+request-ID rejection. Actual decision deadlines still belong to the PC. Terminal
+notification reconciliation also cancels Firebase's auto-display ID, verified
+alongside the app's foreground notification ID in instrumentation.
 
 Local test deliverables are collected in ignored `dist/companion-preview/`: the
-installable debug APK, minified unsigned release APK, Windows x64 NSIS companion
-preview and SHA-256 checksums. Android business source is `40097ce`; subsequent CI
-fixes add explicit Android SDK initialization and avoid the removed legacy
-`tools` SDK package. The API 34 emulator repeated the full flow against these
-final binaries successfully; the synthetic host was shut down afterwards.
+Firebase-configured debug APK, minified release APK, Windows x64 NSIS companion
+preview and SHA-256 checksums. The installable `Vibe-Halo-Mobile-0.1.0.apk` uses
+the release Firebase app and a dedicated RSA-3072 signing key, with verified APK
+v2/v3 signatures. Key and DPAPI-encrypted password are retained outside temporary
+files at `C:\Users\15933\.vibe-halo\android-signing\`; preserve them for updates.
+Certificate SHA-256 is
+`4771d9bec52ebed7895873037cb67e97d369c52572f7bb45e4441117106d3106`.
+No debug signing key is used for the release. CI initializes the current Android
+SDK explicitly and avoids the removed legacy `tools` package.
 
 Cross-platform packaging at `40097ce` passed Windows, macOS ARM64/x64 and Linux,
 including each platform's packaged startup smoke. The first Ubuntu XWayland UI
@@ -107,7 +132,8 @@ retry empty/unloaded frames and fail after a bounded timeout. Four regression
 tests cover delayed completion, task failure, timeout and empty-frame retries.
 Production approval deadlines and ordinary quit behavior are unchanged.
 
-Android CI `35108605713` passes relay/protocol checks plus debug, instrumentation
+Cross-platform CI `35109995360` and mobile CI `35109995336` at `9a1280c` both pass.
+Android CI passes relay/protocol checks plus debug, instrumentation
 APK and R8 release builds and both lint variants on Ubuntu. The cloud CI builds
 the instrumentation APK; actual instrumentation execution is the local emulator
 evidence above.
@@ -151,7 +177,7 @@ response is never counted as FCM/watch delivery. No item is silently omitted.
 | T29 | Pass | Shared schema/tree/UTF-8 limits and oversized Worker enrollment body rejection. |
 | T30 | Pass | Role-checked PC WSS publishing and phone signature trust; unsupported stream operations reject. |
 | T31 | Unverified | Emulator forwarded pinned HTTPS/WSS succeeds; actual Wi-Fi multicast discovery not a forwarded-loopback test. |
-| T32 | Unverified | Requires configured public FCM and physical/background delivery. |
+| T32 | Unverified | Real public FCM auto-display verified on a background API 34 emulator; target phone/lock-screen Wi-Fi acceptance remains separate. |
 | T33 | Unverified | Public relay foreground path passes; still requires configured FCM and cellular phone. |
 | T34 | Unverified | Cloud fallback and wrong TLS rejection exercised; AP isolation/mDNS blocking/OS LAN denial need real network tests. |
 | T35 | Unverified | Endpoint-bound sessions and monotonic cache implemented; physical IP/IPv6/network-switch matrix pending. |
@@ -160,23 +186,23 @@ response is never counted as FCM/watch delivery. No item is silently omitted.
 | T38 | Unverified | SQLite persistence/hibernation APIs compile and local DO tests pass; public cold reconstruction/hibernation measurement pending. |
 | T39 | Unverified | Bounded retries/capacity failures tested locally; actual free-plan quota exhaustion not induced. |
 | T40 | Pass | Mock HTTP v1 429/503/UNREGISTERED, encrypted token revision handling and bounded maintenance paths; delivery unverified. |
-| T41 | Unverified | Local notification dedup/ACK code verified; delayed real FCM versus LAN notification race needs provider testing. |
+| T41 | Unverified | Local dedup/ACK and both foreground/FCM notification-ID cleanup verified; delayed duplicate FCM versus LAN race matrix remains pending. |
 | T42 | Pass | Terminal revision suppresses old foreground reminder; stale detail cannot regain authority. Background SDK display remains best effort. |
-| T43 | Unverified | Doze, system reclamation and force-stop require configured real push; kept as distinct cases. |
-| T44 | Unverified | Cold cache is read-only and intent carries bounded PC/epoch/event; physical background old-notification lifecycle pending. |
+| T43 | Unverified | Real push is configured; Doze, system reclamation and force-stop remain distinct acceptance cases. |
+| T44 | Unverified | Real background notification opened its bound event; delayed cached-event countdown fixed with fresh PC clock challenge. Physical old-notification lifecycle pending. |
 | T45 | Unverified | Permission/channel checks implemented; actual DND, denied permission and unreachable provider matrix pending. |
 | T46 | Unverified | No-GMS physical environment unavailable; UI distinguishes unconfigured Firebase from foreground capability. |
 | T47 | Unverified | No physical target watch/companion forwarding settings available. |
 | T48 | Unverified | Short generic Chinese/English templates and Unicode crypto pass; actual watch truncation/emoji pending. |
 | T49 | Pass | NotificationManager inspection plus manifest/intent code checks: no decision/reply action or unprotected decision receiver. |
-| T50 | Unverified | No Firebase project configured, so project/application-ID mismatch diagnostics cannot be validated against FCM. |
+| T50 | Unverified | Matching release/debug Firebase apps verified and real debug delivery works; deliberate project/package mismatch matrix not exercised. |
 | T51 | Pass | Main projects Stop/input events before local busy/UI gates; original desktop priority tests pass. |
 | T52 | Pass | Queue watermark/revision fixtures and bounded staged snapshot reconciliation; emulator reconnect succeeds. |
 | T53 | Pass | Bounded encrypted journal/cache and receipt capacity/expiry fixtures; old pending records do not revive. |
 | T54 | Pass | 2 PCs × 3 phones in D1/DO fixtures with selected-binding revocation and separate PC authority. |
 | T55 | Pass | Desktop, shared protocol, Worker Vitest and Android instrumentation run independently. |
 | T56 | Pass | Windows/macOS ARM64/x64/Linux packaging and isolated startup passed CI; local Windows NSIS and Android debug/release builds pass. Physical desktop/client acceptance is separate. |
-| T57 | Unverified | Real Worker foreground requests pass; sustained CPU/DO billing measurement and FCM service-auth cold start remain pending. |
+| T57 | Unverified | Real device signature/FCM service-auth and first push succeed; sustained CPU/DO billing and quota budget measurement remain pending. |
 | T58 | Unverified | Local and public D1 migrations/deployments pass; rollback with live records not performed. |
 | T59 | Pass | Controlled enrollment idempotency/reused code/active-PC cap and malformed-body rejection. |
 | T60 | Pass | Device/session role and signed challenge device/origin/purpose tampering rejected. |
