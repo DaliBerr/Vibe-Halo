@@ -28,17 +28,36 @@ class RemoteService extends EventEmitter {
     };
   }
   get pcId() { return this.state?.identity.deviceId; }
-  async initialize() {
+  async initialize({ autoConnect = false } = {}) {
     this.crypto = await import("../../packages/protocol/src/crypto.mjs");
     try {
       this.state = this.credentials.load();
       if (this.state) {
         await this.crypto.publicDevice(this.state.identity);
         this.decisions.pcId = this.pcId; this.journal.load();
-        if (this.state.enabled) await this.start();
+        if (this.state.enrolled && this.state.enabled) await this.start();
       }
     } catch (error) { this.status = error.message; this.enabled = false; this.storageBlocked = true; }
+    if (autoConnect && !this.storageBlocked && !this.state?.enrolled && !this.state?.autoConnectDisabled) this.connectDefault();
     return this.snapshot();
+  }
+  connectDefault() {
+    if (this.storageBlocked) return Promise.resolve(this.snapshot());
+    if (this.configurationFlight) return this.configurationFlight;
+    const generation = this.generation;
+    clearTimeout(this.enrollmentTimer);
+    this.configurationFlight = this.configure().catch(error => {
+      if (generation !== this.generation) return this.snapshot();
+      this.status = ["capacity_exceeded", "registration_closed", "device_revoked", "identity_conflict", "rate_limited", "secure_storage_unavailable"].includes(error.message) ? error.message : "offline";
+      this.emit("changed");
+      if (!["device_revoked", "identity_conflict", "secure_storage_unavailable"].includes(this.status)) {
+        this.enrollmentAttempt = (this.enrollmentAttempt || 0) + 1;
+        const delay = this.status === "rate_limited" ? 300000 : Math.min(300000, 5000 * 2 ** Math.min(this.enrollmentAttempt, 6));
+        this.enrollmentTimer = setTimeout(() => this.connectDefault(), delay); this.enrollmentTimer.unref();
+      }
+      return this.snapshot();
+    }).finally(() => { this.configurationFlight = null; });
+    return this.configurationFlight;
   }
   save() { this.credentials.save(this.state); this.emit("changed"); }
   snapshot() {
@@ -48,24 +67,28 @@ class RemoteService extends EventEmitter {
       pairing: this.pairing ? { pairingId: this.pairing.pairingId, code: this.pairing.code, expiresAt: this.pairing.expiresAt,
         mobileName: this.pairing.mobile?.name || "", fingerprint: this.pairing.fingerprint || "" } : null };
   }
-  async configure({ relayOrigin, enrollmentCode, name = "My computer" }) {
+  async configure({ relayOrigin, name = require("node:os").hostname() } = {}) {
     if (this.storageBlocked) throw new Error(this.status);
     if (!this.credentials.available()) throw new Error("secure_storage_unavailable");
-    const origin = this.crypto.relayOrigin(relayOrigin, this.allowLocal);
+    const generation = this.generation;
+    const origin = this.crypto.relayOrigin(relayOrigin || this.state?.relayOrigin || process.env.VIBE_HALO_RELAY_ORIGIN || require("./defaults").DEFAULT_RELAY_ORIGIN, this.allowLocal);
     if (this.state && this.state.relayOrigin !== origin) throw new Error("remove_existing_identity_first");
     if (!this.state) {
       const identity = await this.crypto.generateIdentity("pc", name);
-      this.state = { version: 1, identity, tls: await createTlsIdentity(), relayOrigin: origin, bindings: [], enabled: false, controlEnabled: false, enrolled: false };
+      const tls = await createTlsIdentity();
+      if (generation !== this.generation) return this.snapshot();
+      this.state = { version: 1, identity, tls, relayOrigin: origin, bindings: [], enabled: true, controlEnabled: false, enrolled: false };
       this.save(); this.decisions.pcId = this.pcId;
     }
     if (!this.state.enrolled) {
-      const code = String(enrollmentCode || "").replace(/[\s-]/g, "").toUpperCase();
+      this.status = "connecting"; this.state.autoConnectDisabled = false; this.save();
       const device = await this.crypto.publicDevice(this.state.identity);
       this.state.registrationId ||= randomUUID(); this.save();
-      const proof = await this.crypto.sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: this.state.registrationId, device, codeDigest: await this.crypto.sha256(code) }, this.state.identity.signKey, "enrollment");
-      await this.request("/v1/enrollments", { method: "POST", body: { code, device, proof }, auth: false });
+      const proof = await this.crypto.sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: this.state.registrationId, device }, this.state.identity.signKey, "enrollment");
+      await this.request("/v1/enrollments", { method: "POST", body: { device, proof }, auth: false });
       this.state.enrolled = true; this.save();
     }
+    if (generation !== this.generation) return this.snapshot();
     await this.start(); return this.snapshot();
   }
   async request(route, { method = "GET", body, auth = true, retry = true } = {}) {
@@ -361,7 +384,7 @@ class RemoteService extends EventEmitter {
   }
   async stop(disable = false) {
     this.enabled = false; this.generation += 1;
-    for (const timer of [this.publishTimer, this.reconnectTimer, this.renewTimer]) clearTimeout(timer);
+    for (const timer of [this.publishTimer, this.reconnectTimer, this.renewTimer, this.enrollmentTimer]) clearTimeout(timer);
     if (this.socket?.readyState === WebSocket.OPEN) {
       const socket = this.socket;
       await new Promise(resolve => {
@@ -370,7 +393,7 @@ class RemoteService extends EventEmitter {
       });
     }
     this.socket?.terminate(); this.socket = null; await this.lan?.stop(); this.lan = null;
-    if (disable && this.state) { this.state.enabled = false; this.state.controlEnabled = false; this.save(); }
+    if (disable && this.state) { this.state.enabled = false; this.state.autoConnectDisabled = true; this.state.controlEnabled = false; this.save(); }
     if (this.state && !this.journal.damaged) this.journal.flush();
     this.status = "disabled"; this.emit("changed");
   }

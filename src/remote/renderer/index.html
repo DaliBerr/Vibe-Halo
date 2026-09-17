@@ -5,16 +5,14 @@
 <body><main><header><span class="eyebrow">VIBE HALO / COMPANION</span><h1>让进度，随身可见。</h1><p>手机查看请求与完成提醒，电脑负责核验每一个决定。</p></header>
 <p id="message" role="status" aria-live="polite"></p>
 <section><div class="heading"><h2>这台电脑</h2><span id="status" class="badge">未开启</span></div>
-<form id="setup"><label>电脑名称<input id="name" maxlength="48" value="我的电脑" autocomplete="off"></label>
-<label>中继服务地址<input id="origin" type="url" placeholder="https://relay.example.com" maxlength="240" required autocomplete="off"></label>
-<label>准入码<input id="enrollment" type="password" maxlength="100" autocomplete="off" placeholder="由服务管理员提供"></label>
-<button type="submit">连接并开启手机伴侣</button></form>
+<form id="setup"><p>正在自动连接手机伴侣服务，连接后即可配对手机。</p>
+<button id="retry" type="submit">重新连接</button></form>
 <div id="configured" hidden><p id="service"></p><p id="lan"></p><button id="toggle" type="button">关闭手机伴侣</button>
 <label class="switch"><input id="control" type="checkbox">允许手机提交审批和精确回答</label><p class="hint">默认关闭。长期授权还需单独授予权限并在手机核对完整范围。通知上不会出现批准按钮。</p><button id="testNotification" type="button" class="secondary">发送测试提醒</button></div></section>
 <section id="pairSection" hidden><div class="heading"><h2>连接手机</h2><button id="pair" type="button" class="secondary">生成配对码</button></div>
 <label class="switch"><input id="readOnly" type="checkbox">只读配对（仅查看事件和历史）</label>
 <label class="switch"><input id="persistent" type="checkbox">允许此手机在核对完整范围后提交长期授权</label>
-<div id="pairing" hidden><p>在 Android 应用输入相同服务地址和下方配对码，有效期 5 分钟。</p><output id="code" class="code"></output>
+<div id="pairing" hidden><p>在 Android 应用输入下方配对码，有效期 5 分钟。</p><output id="code" class="code"></output>
 <p id="phone"></p><output id="fingerprint" class="fingerprint"></output><p id="compare" hidden>请与手机上显示的指纹逐字核对，一致后确认。</p>
 <button id="confirm" type="button" hidden>指纹一致，确认连接</button><button id="cancelPair" type="button" class="secondary">取消配对</button></div></section>
 <section><h2>已连接设备</h2><div id="devices"><p class="hint">还没有连接的手机。</p></div></section>

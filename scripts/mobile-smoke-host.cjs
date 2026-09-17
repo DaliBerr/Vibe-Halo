@@ -17,26 +17,13 @@ const { readBody } = require("../src/remote/lan-service");
   const relayOrigin = process.env.VIBE_HALO_SMOKE_RELAY_ORIGIN || "http://127.0.0.1:8787";
   const origin = new URL(relayOrigin);
   if (origin.origin !== relayOrigin || origin.username || origin.password || (origin.protocol !== "https:" && relayOrigin !== "http://127.0.0.1:8787")) throw new Error("Use an exact HTTPS relay origin, or the local test relay.");
-  let code;
-  if (relayOrigin !== "http://127.0.0.1:8787") {
-    if (!process.env.VIBE_HALO_SMOKE_ENROLLMENT_FILE) throw new Error("Public synthetic testing requires a separately issued enrollment-code file.");
-    code = fs.readFileSync(process.env.VIBE_HALO_SMOKE_ENROLLMENT_FILE, "utf8").split(/\r?\n/)[0].trim();
-    if (!/^[A-F0-9]{32}$/.test(code)) throw new Error("Invalid enrollment-code file.");
-  } else {
-    code = crypto.randomBytes(16).toString("hex").toUpperCase();
-    const vars = Object.fromEntries(fs.readFileSync(path.join(relay, ".dev.vars"), "utf8").split(/\r?\n/).filter(line => /^[A-Z_]+=/.test(line)).map(line => { const i = line.indexOf("="); return [line.slice(0, i), line.slice(i + 1).replace(/^['"]|['"]$/g, "")]; }));
-    const hmac = crypto.createHmac("sha256", vars.ENROLLMENT_PEPPER).update(code).digest("hex");
-    const sql = path.join(root, ".smoke", "mobile-enrollment.sql");
-    fs.writeFileSync(sql, `INSERT INTO enrollment_codes(code_hmac,expires_at) VALUES('${hmac}',${Date.now() + 1200000});`);
-    execFileSync(process.execPath, [path.join(relay, "node_modules", "wrangler", "bin", "wrangler.js"), "d1", "execute", "DB", "--local", "--file", sql], { cwd: relay, stdio: "pipe", timeout: 30000 });
-  }
   const key = crypto.randomBytes(32);
   const safeStorage = { isEncryptionAvailable: () => true,
     encryptString(value) { const iv = crypto.randomBytes(12), cipher = crypto.createCipheriv("aes-256-gcm", key, iv); const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]); return Buffer.concat([iv, cipher.getAuthTag(), encrypted]); },
     decryptString(value) { const decipher = crypto.createDecipheriv("aes-256-gcm", key, value.subarray(0, 12)); decipher.setAuthTag(value.subarray(12, 28)); return Buffer.concat([decipher.update(value.subarray(28)), decipher.final()]).toString("utf8"); } };
   const approvals = new ApprovalStore(), decisions = new DecisionService({ approvalStore: approvals });
   const remote = new RemoteService({ userData: fs.mkdtempSync(path.join(root, ".smoke", "mobile-runtime-")), safeStorage, approvals, decisions, allowLocal: true, lanOptions: { advertise: false } });
-  await remote.initialize(); await remote.configure({ relayOrigin, enrollmentCode: code, name: "Synthetic PC" });
+  await remote.initialize(); await remote.configure({ relayOrigin, name: "Synthetic PC" });
   remote.setControl(true); await remote.beginPairing();
   const bridgeToken = crypto.randomBytes(32).toString("hex"), outputs = [];
   const fixture = { relayOrigin, bridgeOrigin: "http://127.0.0.1:8788", bridgeToken, code: remote.pairing.code, pcId: remote.pcId, lanPort: remote.lan?.port };

@@ -12,7 +12,7 @@ class RemoteSettingsWindow {
       try {
         switch (input.action) {
           case "status": return this.remote.snapshot();
-          case "configure": return await remote.configure({ relayOrigin: input.relayOrigin, enrollmentCode: input.enrollmentCode, name: input.name });
+          case "configure": return await remote.connectDefault();
           case "enable": await remote.start(); return remote.snapshot();
           case "disable": await remote.stop(true); return remote.snapshot();
           case "control": return remote.setControl(input.enabled);

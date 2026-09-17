@@ -1,8 +1,55 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-09-16 (Android companion implementation; acceptance scope below)
+Updated: 2026-09-17 (automatic companion connection; local acceptance below)
 Current version: `0.5.9`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-09-17 — Automatic companion connection; separate service administration
+
+The user explicitly replaced controlled PC enrollment with default automatic
+connection, removed administrator codes from the application, and requested local
+verification without remote CI/CD. This supersedes the default-off/enrollment-code
+product choices in the historical entry below; remote control still defaults off.
+
+- Desktop startup asynchronously registers a signed device identity against the
+  default relay, without blocking local Hooks on a network request. Failed initial
+  registration retries with backoff and the same persisted identity. An explicit
+  disable survives restart, and a late registration response cannot re-enable it.
+- Desktop onboarding has no relay-address or enrollment-code inputs. Android selects
+  the same default service; only the phone pairing code and matching fingerprints
+  are needed. Self-hosted Android origin is under an optional setting; desktop
+  first setup accepts VIBE_HALO_RELAY_ORIGIN. Existing origins/grants are preserved.
+- Service operations stay in services/relay/scripts/admin.mjs, outside app packages:
+  status, open-registration, close-registration, revoke-pc. No public admin endpoint
+  or operator credentials were added. Public registration retains rate limiting,
+  a transactional active-PC cap, identity-conflict checks and revoked-device denial.
+- Migration 0002_self_service_registration.sql applied to the existing isolated D1.
+  Worker version 55b66a15-35ec-4508-aecc-149d60baabff deployed at the existing public
+  origin. FCM configuration and resource limits remain unchanged. This is a direct
+  deployment needed for local public-service tests, not a CI/CD workflow run.
+- Local root suite: 223 tests, 222 passed and the existing Windows POSIX skip.
+  Relay type check and 10 runtime tests pass, including two distinct PCs racing
+  for the last capacity slot, idempotent retry at capacity, closure and revocation.
+- Updated Firebase Android debug and minified release builds/lint pass; release APK
+  signed using the existing dedicated key and installed in the API 34 emulator.
+  CompanionFlowTest passes against the public relay after code-free PC enrollment:
+  fingerprint pairing, encrypted cloud decision, pinned LAN fallback, exact forms,
+  timeout clock and revocation. Requests/waiters are synthetic, not real coding UI.
+- Packaged Windows whitelist and local approval smoke pass. Real Electron/safeStorage
+  UI test connects automatically, shows no admission/address inputs, has no renderer
+  errors or horizontal overflow, keeps control off, and persists disable/re-enable.
+  The installed desktop was updated in place; its local encrypted state confirms
+  enrolled=true, enabled=true, controlEnabled=false with the expected relay.
+- Signed Android onboarding visually verified: pairing-code field only by default,
+  optional self-hosted settings collapsed. A transient emulator System UI ANR was
+  dismissed using the earlier Android Studio task guidance; app UI recovered.
+- Both synthetic public PC roots were revoked, and bridge/ADB forwards were stopped.
+  The actual installed desktop identity is preserved. Updated deliverables remain
+  in dist/companion-preview, including refreshed usage instructions and hashes.
+
+No remote CI/CD, store upload or release tag was requested or run. Physical phone,
+watch/cellular and real-client acceptance from the earlier task remain open; the
+larger companion branch is not merged as a production-accepted feature.
 
 ## 2026-09-16 — Android companion implementation and local acceptance
 

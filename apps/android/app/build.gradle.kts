@@ -16,6 +16,9 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        val relayOrigin = providers.gradleProperty("relay.origin").orElse("https://vibe-halo-relay.z1593316231.workers.dev").get()
+        require(relayOrigin.matches(Regex("https://[A-Za-z0-9.-]+(:[0-9]+)?"))) { "relay.origin must be an HTTPS origin" }
+        buildConfigField("String", "DEFAULT_RELAY_ORIGIN", "\"$relayOrigin\"")
         for ((field, property) in mapOf("FIREBASE_APP_ID" to "firebase.appId", "FIREBASE_API_KEY" to "firebase.apiKey", "FIREBASE_PROJECT_ID" to "firebase.projectId", "FIREBASE_SENDER_ID" to "firebase.senderId")) {
             val value = providers.gradleProperty(property).orElse("").get().replace("\\", "\\\\").replace("\"", "\\\"")
             buildConfigField("String", field, "\"$value\"")

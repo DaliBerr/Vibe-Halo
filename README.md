@@ -74,7 +74,7 @@ AI coding clients often wait in the background for a permission decision, a foll
 - **One queue** — all clients share a global FIFO, so approvals cannot cover or reorder one another.
 - **Clear provenance** — the title always identifies the client that produced the event.
 - **Fail-open to the native UI** — close, disconnect, timeout, malformed response, and unknown option paths never invent a decision.
-- **Local by default** — agent Hooks use a token-authenticated loopback service. An optional Android companion adds encrypted LAN/cloud access only after explicit setup and pairing.
+- **Local by default** — agent Hooks use a token-authenticated loopback service. The desktop automatically connects to the companion relay; encrypted phone access requires explicit pairing.
 - **Optional local history** — a tray-opened, freely draggable side panel keeps bounded approval, question, and Codex/ZCode plan details without occupying the desktop permanently.
 
 ## Key features
@@ -279,7 +279,7 @@ The Windows NSIS uninstaller invokes the same cleanup path. On macOS, dragging t
 - The renderer cannot access raw client protocol payloads, configuration rules, bridge tokens, or the updater.
 - IPC validates the current request ID, option ID, types, answer counts, and answer lengths.
 - Logs omit process tokens and full command content and rotate by size.
-- The app has no telemetry or user-account system. Optional remote access is disabled by default and requires your own relay, device pairing and an explicit local control switch.
+- The app has no telemetry or user-account system. The desktop automatically registers with the default companion relay. Phone access requires pairing, and decisions require an explicit local control switch. Disabling the companion persists across restarts.
 - An official Windows stable build contacts public GitHub Releases only for update checks. Source, local, and preview builds keep the updater disabled.
 - Client configuration uses atomic writes, first-state backups, and ownership markers. Explicit hook disables are preserved.
 - Recent-event records contain locally visible commands, parameters, paths, questions, and answers. Obvious structured secret fields are replaced with `[REDACTED]`, but command strings can still contain secrets typed by the user.
@@ -360,8 +360,9 @@ The project has no database, web backend, frontend framework, Docker deployment,
 
 The optional Android companion now has native phone UI, device pairing, pinned LAN
 HTTPS/WSS, a self-hosted Cloudflare relay, encrypted approvals/forms/history and
-FCM reminder support. It is disabled by default, requires your own service
-configuration, and does not ship a hosted relay. Notifications have no approval or
+FCM reminder support. The local preview automatically connects to the default test
+relay; phones use a pairing code and PC confirmation. Self-hosting remains supported.
+Service administration is a separate operator tool, not an app-user setup step. Notifications have no approval or
 reply buttons. See [build and setup](docs/REMOTE_SETUP.md),
 [decisions](docs/REMOTE_DECISIONS.md), [protocol](docs/REMOTE_PROTOCOL.md) and
 [dated acceptance evidence](HANDOFF.md). Source availability does not imply that

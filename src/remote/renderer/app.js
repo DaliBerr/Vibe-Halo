@@ -2,8 +2,8 @@
 const t = window.companionText;
 const $ = id => document.getElementById(id);
 let state = {}, busy = false;
-const statuses = { disabled: "未开启", connected: "已连接", offline: "云端离线", lan_unavailable: "局域网不可用", revocation_pending_cloud: "等待云端撤销", secure_storage_unavailable: "系统安全存储不可用", credential_store_invalid: "设备凭据损坏", remote_journal_invalid: "事件记录损坏" };
-const errors = { invalid_code: "准入码无效或已使用。", invalid_relay_origin: "请输入有效的 HTTPS 服务地址。", secure_storage_unavailable: "系统安全存储不可用，无法保存设备身份。", remove_existing_identity_first: "已有服务身份，请先在原服务撤销设备。", capacity_exceeded: "设备数量已达到服务上限。", pairing_expired: "配对已过期，请生成新配对码。" };
+const errors = { secure_storage_unavailable: "系统安全存储不可用，无法保存设备身份。", capacity_exceeded: "服务暂时已满，稍后会自动重试。", registration_closed: "服务暂时停止接入新电脑，稍后会自动重试。", rate_limited: "连接过于频繁，稍后会自动重试。", device_revoked: "此电脑已被服务撤销。", identity_conflict: "设备身份冲突，请检查本机配置。", pairing_expired: "配对已过期，请生成新配对码。" };
+const statuses = { ...errors, connecting: "正在连接…", disabled: "未开启", connected: "已连接", offline: "云端离线", lan_unavailable: "局域网不可用", revocation_pending_cloud: "等待云端撤销", secure_storage_unavailable: "系统安全存储不可用", credential_store_invalid: "设备凭据损坏", remote_journal_invalid: "事件记录损坏" };
 async function act(input, quiet = false) {
   if (busy) return;
   busy = true;
@@ -15,6 +15,7 @@ function render(value) {
   state = value; $("status").textContent = t(statuses[value.status] || value.status);
   const configured = value.enrolled === true;
   $("setup").hidden = configured; $("configured").hidden = !configured;
+  $("retry").disabled = value.status === "connecting";
   $("service").textContent = value.relayOrigin; $("lan").textContent = value.lanPort ? `${t("局域网服务已开启 · 端口")} ${value.lanPort}` : t("局域网服务未开启");
   $("toggle").textContent = t(value.enabled ? "关闭手机伴侣" : "开启手机伴侣");
   $("testNotification").disabled = !value.enabled;
@@ -34,7 +35,7 @@ function render(value) {
   }
   if (!value.bindings.length) { const empty = document.createElement("p"); empty.textContent = t("还没有连接的手机。"); $("devices").append(empty); }
 }
-$("setup").onsubmit = async event => { event.preventDefault(); const code = $("enrollment").value; $("enrollment").value = ""; await act({ action: "configure", relayOrigin: $("origin").value, enrollmentCode: code, name: $("name").value }); };
+$("setup").onsubmit = async event => { event.preventDefault(); await act({ action: "configure" }, true); };
 $("toggle").onclick = () => act({ action: state.enabled ? "disable" : "enable" });
 $("control").onchange = event => act({ action: "control", enabled: event.target.checked });
 $("pair").onclick = () => act({ action: "pair", scopes: $("readOnly").checked ? ["events.read", "history.read"] : ["events.read", "history.read", "approvals.decide", "questions.answer", "reminders.dismiss", ...($("persistent").checked ? ["approvals.persistent"] : [])] });

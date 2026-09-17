@@ -679,7 +679,7 @@ function startApplication() {
     settings = new SettingsStore(path.join(app.getPath("userData"), "settings.json"));
     remote = new RemoteService({ userData: app.getPath("userData"), safeStorage, approvals, decisions,
       allowLocal: !app.isPackaged && process.env.VIBE_HALO_TEST === "1" });
-    await remote.initialize();
+    await remote.initialize({ autoConnect: process.env.VIBE_HALO_TEST !== "1" });
     remoteWindow = new RemoteSettingsWindow({ BrowserWindow, ipcMain, remote });
     localization = createLocalizer({ preference: settings.get("language"), systemLocale: app.getLocale() });
     remote.getLocale = () => localization.locale;

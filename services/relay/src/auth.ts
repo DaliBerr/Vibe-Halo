@@ -1,31 +1,30 @@
-import { Fault, body, record, text, id, device, signed, fresh, hmac, normalizeCode, response, now, rate, sha256, canonical } from "./common";
+import { Fault, body, record, text, id, device, signed, fresh, response, now, rate, sha256, canonical } from "./common";
 
 export async function enroll(request: Request, env: Env): Promise<Response> {
   await rate(request, env, "enrollment", 10);
-  const input = record(await body(request), ["code", "device", "proof"]);
-  const code = normalizeCode(input.code);
+  const input = record(await body(request), ["device", "proof"]);
   const pc = await device(input.device, "pc");
   const proof = await signed(input.proof, pc.signKey, "enrollment"); fresh(proof, env);
-  const registrationId = id(proof.registrationId);
-  if (canonical(proof.device) !== canonical(pc) || proof.codeDigest !== await sha256(code)) throw new Fault("invalid_proof", 401);
-  const codeHmac = await hmac(code, env.ENROLLMENT_PEPPER);
-  const existing = await env.DB.prepare("SELECT consumed_by,registration_id FROM enrollment_codes WHERE code_hmac=? AND expires_at>?").bind(codeHmac, now())
-    .first<{ consumed_by: string | null; registration_id: string | null }>();
-  if (!existing) throw new Fault("invalid_code", 403);
-  if (existing.consumed_by) {
-    const stored = await env.DB.prepare("SELECT public_json FROM devices WHERE id=? AND status='active'").bind(pc.deviceId).first<{ public_json: string }>();
-    if (existing.consumed_by === pc.deviceId && existing.registration_id === registrationId && stored && canonical(JSON.parse(stored.public_json)) === canonical(pc)) return response({ deviceId: pc.deviceId, enrolled: true });
-    throw new Fault("invalid_code", 403);
-  }
-  const capacity = Number(env.MAX_PCS) || 10;
-  const result = await env.DB.batch([
-    env.DB.prepare("INSERT INTO devices(id,kind,public_json,status,created_at) SELECT ?,'pc',?,'active',? FROM enrollment_codes WHERE code_hmac=? AND consumed_by IS NULL AND expires_at>? AND (SELECT COUNT(*) FROM devices WHERE kind='pc' AND status='active')<?")
-      .bind(pc.deviceId, JSON.stringify(pc), now(), codeHmac, now(), capacity),
-    env.DB.prepare("INSERT INTO spaces(id,pc_id) SELECT ?,id FROM devices WHERE id=? AND NOT EXISTS(SELECT 1 FROM spaces WHERE pc_id=?)").bind(`space_${pc.deviceId}`, pc.deviceId, pc.deviceId),
-    env.DB.prepare("UPDATE enrollment_codes SET consumed_by=?,registration_id=? WHERE code_hmac=? AND consumed_by IS NULL AND EXISTS(SELECT 1 FROM devices WHERE id=?)").bind(pc.deviceId, registrationId, codeHmac, pc.deviceId),
+  id(proof.registrationId);
+  if (canonical(proof.device) !== canonical(pc)) throw new Fault("invalid_proof", 401);
+  const capacity = Math.max(0, Math.min(10000, Number(env.MAX_PCS) || 0));
+  const publicJson = JSON.stringify(pc);
+  // The capacity check and insert run in one transaction. Existing identities can
+  // retry a lost response even after registration closes; keys are never replaced.
+  const result = await env.DB.batch<Record<string, unknown>>([
+    env.DB.prepare("INSERT INTO devices(id,kind,public_json,status,created_at) SELECT ?,'pc',?,'active',? WHERE EXISTS(SELECT 1 FROM relay_settings WHERE id='registration' AND value='open') AND (SELECT COUNT(*) FROM devices WHERE kind='pc' AND status='active')<? ON CONFLICT(id) DO NOTHING")
+      .bind(pc.deviceId, publicJson, now(), capacity),
+    env.DB.prepare("INSERT INTO spaces(id,pc_id) SELECT ?,id FROM devices WHERE id=? AND status='active' AND public_json=? ON CONFLICT(pc_id) DO NOTHING").bind(`space_${pc.deviceId}`, pc.deviceId, publicJson),
+    env.DB.prepare("SELECT d.public_json,d.status,s.status AS space_status FROM devices d LEFT JOIN spaces s ON s.pc_id=d.id WHERE d.id=?").bind(pc.deviceId),
+    env.DB.prepare("SELECT value FROM relay_settings WHERE id='registration'"),
   ]);
-  if (result[0].meta.changes !== 1) throw new Fault("capacity_or_code_unavailable", 409);
-  return response({ deviceId: pc.deviceId, enrolled: true }, 201);
+  const stored = result[2].results[0];
+  if (stored) {
+    if (stored.status !== "active" || stored.space_status !== "active") throw new Fault("device_revoked", 403);
+    if (canonical(JSON.parse(String(stored.public_json))) !== canonical(pc)) throw new Fault("identity_conflict", 409);
+    return response({ deviceId: pc.deviceId, enrolled: true }, result[0].meta.changes === 1 ? 201 : 200);
+  }
+  throw new Fault(result[3].results[0]?.value === "open" ? "capacity_exceeded" : "registration_closed", 503);
 }
 
 export async function challenge(request: Request, env: Env): Promise<Response> {

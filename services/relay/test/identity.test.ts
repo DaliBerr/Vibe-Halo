@@ -15,9 +15,7 @@ const privateHeaders = (token: string) => ({ authorization: `Bearer ${token}` })
 
 async function enrolled() {
   const pc = await generateIdentity("pc"); const publicPc = await publicDevice(pc);
-  const code = crypto.randomUUID().replace(/-/g, "").toUpperCase();
-  await env.DB.prepare("INSERT INTO enrollment_codes(code_hmac,expires_at) VALUES(?,?)").bind(await hmac(code, env.ENROLLMENT_PEPPER), Date.now() + 60000).run();
-  const request = { code, device: publicPc, proof: await sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: crypto.randomUUID(), device: publicPc, codeDigest: await sha256(code) }, pc.signKey, "enrollment") };
+  const request = { device: publicPc, proof: await sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: crypto.randomUUID(), device: publicPc }, pc.signKey, "enrollment") };
   const result = await post("/v1/enrollments", request);
   expect(result.status).toBe(201);
   return { pc, publicPc, request, token: await login(pc) };
@@ -48,12 +46,32 @@ async function paired(existingRoot?: Awaited<ReturnType<typeof enrolled>>, exist
 }
 
 describe("device identity and pairing", () => {
-  it("requires controlled PC enrollment and consumes a code atomically", async () => {
+  it("registers without a code, retries safely, and rejects replaced keys and revoked devices", async () => {
     const root = await enrolled();
     expect((await post("/v1/enrollments", root.request)).status).toBe(200);
-    const stranger = await generateIdentity("pc"), publicStranger = await publicDevice(stranger);
-    const forged = { ...root.request, device: publicStranger, proof: await sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: crypto.randomUUID(), device: publicStranger, codeDigest: await sha256(root.request.code) }, stranger.signKey, "enrollment") };
-    expect((await post("/v1/enrollments", forged)).status).toBe(403);
+    const stranger = await generateIdentity("pc"), device = { ...await publicDevice(stranger), deviceId: root.pc.deviceId };
+    const forged = { device, proof: await sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: crypto.randomUUID(), device }, stranger.signKey, "enrollment") };
+    expect((await post("/v1/enrollments", forged)).status).toBe(409);
+    await env.DB.prepare("UPDATE devices SET status='revoked' WHERE id=?").bind(root.pc.deviceId).run();
+    expect((await post("/v1/enrollments", root.request)).status).toBe(403);
+  });
+  it("keeps registration management outside the public API and honors closure without breaking retries", async () => {
+    const root = await enrolled();
+    await env.DB.prepare("UPDATE relay_settings SET value='closed' WHERE id='registration'").run();
+    try {
+      expect((await post("/v1/enrollments", root.request)).status).toBe(200);
+      const pc = await generateIdentity("pc"), device = await publicDevice(pc);
+      const proof = await sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: crypto.randomUUID(), device }, pc.signKey, "enrollment");
+      const closed = await post("/v1/enrollments", {device, proof});
+      expect(closed.status).toBe(503); expect((await closed.json<{error:string}>()).error).toBe("registration_closed");
+      expect((await post("/v1/admin/open-registration", {}, root.token)).status).toBe(404);
+    } finally { await env.DB.prepare("UPDATE relay_settings SET value='open' WHERE id='registration'").run(); }
+  });
+  it("rejects forged registration and limits unauthenticated attempts", async () => {
+    const pc = await generateIdentity("pc"), device = await publicDevice(pc);
+    const proof = await sign({ protocolVersion: 1, relayOrigin: "https://other.test", issuedAt: Date.now(), registrationId: crypto.randomUUID(), device }, pc.signKey, "enrollment");
+    for (let n=0;n<10;n++) expect((await post("/v1/enrollments", {device,proof})).status).toBe(401);
+    expect((await post("/v1/enrollments", {device,proof})).status).toBe(429);
   });
   it("consumes challenge exactly once and rejects cross-service proof", async () => {
     const root = await enrolled();
@@ -160,13 +178,16 @@ describe("device identity and pairing", () => {
   it("enforces the configured active-PC cap and bounded unauthenticated bodies", async () => {
     const capacity = Number(env.MAX_PCS);
     const count = (await env.DB.prepare("SELECT COUNT(*) AS n FROM devices WHERE kind='pc' AND status='active'").first<{ n: number }>())!.n;
-    for (let n = count; n < capacity; n++) await enrolled();
+    for (let n = count; n < capacity - 1; n++) await enrolled();
+    await env.DB.prepare("DELETE FROM rate_limits").run();
     const pc = await generateIdentity("pc"), device = await publicDevice(pc);
-    const code = crypto.randomUUID().replace(/-/g, "").toUpperCase();
-    await env.DB.prepare("INSERT INTO enrollment_codes(code_hmac,expires_at) VALUES(?,?)").bind(await hmac(code, env.ENROLLMENT_PEPPER), Date.now() + 60000).run();
-    const input = { code, device, proof: await sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: crypto.randomUUID(), device, codeDigest: await sha256(code) }, pc.signKey, "enrollment") };
-    const attempts = await Promise.all([post("/v1/enrollments", input), post("/v1/enrollments", input)]);
-    expect(attempts.map(value => value.status)).toEqual([409, 409]);
+    const input = { device, proof: await sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: crypto.randomUUID(), device }, pc.signKey, "enrollment") };
+    const other = await generateIdentity("pc"), otherDevice = await publicDevice(other);
+    const otherInput = { device: otherDevice, proof: await sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: crypto.randomUUID(), device: otherDevice }, other.signKey, "enrollment") };
+    const attempts = await Promise.all([post("/v1/enrollments", input), post("/v1/enrollments", otherInput)]);
+    expect(attempts.map(value => value.status).sort()).toEqual([201, 503]);
+    const winner = attempts[0].status === 201 ? input : otherInput;
+    expect((await post("/v1/enrollments", winner)).status).toBe(200);
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM devices WHERE kind='pc' AND status='active'").first<{ n: number }>())!.n).toBe(capacity);
     expect((await post("/v1/enrollments", { blob: "x".repeat(17000) })).status).toBe(413);
   });

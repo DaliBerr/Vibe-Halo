@@ -20,14 +20,16 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 @Composable fun PairingScreen(state: CompanionState, repo: CompanionRepository, modifier: Modifier, back: () -> Unit) {
-    val scope = rememberCoroutineScope(); var origin by rememberSaveable { mutableStateOf("") }; var code by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope(); var origin by rememberSaveable { mutableStateOf(BuildConfig.DEFAULT_RELAY_ORIGIN) }; var code by remember { mutableStateOf("") }
+    var customRelay by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.pairing?.pairingId) { while (repo.state.value.pairing != null) { delay(3000); repo.pollPairing() } }
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
         TextButton(onClick = back) { Text(tr("← 返回")) }; Spacer(Modifier.height(20.dp)); Text(tr("连接，从信任开始。"), fontSize = 29.sp, fontWeight = FontWeight.SemiBold)
-        Text(tr("在电脑托盘打开「手机伴侣」，将服务地址与配对码填在这里。"), Modifier.padding(vertical = 18.dp), fontSize = 14.sp, lineHeight = 23.sp)
+        Text(tr("在电脑托盘打开「手机伴侣」，生成配对码后填在这里。"), Modifier.padding(vertical = 18.dp), fontSize = 14.sp, lineHeight = 23.sp)
         val pair = state.pairing
         if (pair == null) {
-            OutlinedTextField(origin, { origin = it.take(240) }, label = { Text(tr("中继服务地址")) }, placeholder = { Text("https://relay.example.com") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            TextButton(onClick = { customRelay = !customRelay }) { Text(tr(if (customRelay) "收起自建服务设置" else "使用自建服务")) }
+            if (customRelay) OutlinedTextField(origin, { origin = it.take(240) }, label = { Text(tr("中继服务地址")) }, placeholder = { Text("https://relay.example.com") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp)); OutlinedTextField(code, { code = it.take(100) }, label = { Text(tr("一次性配对码")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Button(enabled = !state.busy && origin.isNotBlank() && code.isNotBlank(), onClick = { scope.launch { repo.beginPairing(origin, code); code = "" } }, modifier = Modifier.fillMaxWidth().padding(top = 24.dp).height(52.dp)) { Text(tr("核对设备")) }
         } else {

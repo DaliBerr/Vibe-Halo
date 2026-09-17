@@ -29,6 +29,66 @@ async function fixture(t) {
   t.after(async () => { await remote.stop(); approvals.shutdown(); fs.rmSync(directory, { recursive: true, force: true }); });
   return { remote, approvals, decisions, storage, directory };
 }
+
+async function registrationFixture(t) {
+  const f = await fixture(t);
+  f.remote.state = null; f.remote.enabled = false;
+  f.remote.start = async () => { f.remote.enabled = true; f.remote.state.enabled = true; f.remote.save(); };
+  return f;
+}
+
+test("automatic connection uses the default service, one identity and no enrollment code", async t => {
+  const { remote } = await registrationFixture(t), sent = [];
+  remote.request = async (route, options) => { sent.push({ route, ...options }); return { enrolled: true }; };
+  await remote.initialize({ autoConnect: true });
+  await Promise.all([remote.configurationFlight, remote.connectDefault()]);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].route, "/v1/enrollments");
+  assert.equal("code" in sent[0].body, false);
+  assert.equal(remote.state.relayOrigin, require("../src/remote/defaults").DEFAULT_RELAY_ORIGIN);
+  assert.equal(remote.state.controlEnabled, false);
+  assert.equal(remote.enabled, true);
+  assert.equal(remote.state.enrolled, true);
+  assert.equal(remote.credentials.load().identity.deviceId, remote.pcId);
+});
+
+test("offline registration preserves identity and retries without blocking startup", async t => {
+  const { remote } = await registrationFixture(t); let finish;
+  remote.request = () => new Promise((_resolve, reject) => { finish = reject; });
+  await remote.initialize({ autoConnect: true });
+  while (!finish) await new Promise(resolve => setImmediate(resolve));
+  const pcId = remote.pcId;
+  finish(new Error("offline")); await remote.configurationFlight;
+  assert.equal(remote.status, "offline"); assert.ok(remote.enrollmentTimer);
+  remote.request = async () => ({ enrolled: true });
+  await remote.connectDefault();
+  assert.equal(remote.pcId, pcId); assert.equal(remote.state.enrolled, true);
+});
+
+test("disabling while registration is in flight cannot restart the companion", async t => {
+  const { remote } = await registrationFixture(t); let finish;
+  remote.request = () => new Promise(resolve => { finish = resolve; });
+  await remote.initialize({ autoConnect: true });
+  while (!finish) await new Promise(resolve => setImmediate(resolve));
+  await remote.stop(true); finish({ enrolled: true }); await remote.configurationFlight;
+  assert.equal(remote.enabled, false); assert.equal(remote.state.enabled, false);
+  assert.equal(remote.state.autoConnectDisabled, true);
+  await remote.initialize({ autoConnect: true });
+  assert.equal(remote.enabled, false); assert.equal(remote.configurationFlight, null);
+});
+
+test("registration closure remains visible and revoked identities are never replaced", async t => {
+  const { remote } = await registrationFixture(t);
+  remote.request = async () => { throw new Error("registration_closed"); };
+  await remote.connectDefault();
+  assert.equal(remote.status, "registration_closed"); assert.ok(remote.enrollmentTimer);
+  const pcId = remote.pcId;
+  remote.request = async () => { throw new Error("device_revoked"); };
+  await remote.connectDefault();
+  assert.equal(remote.status, "device_revoked"); assert.equal(remote.pcId, pcId);
+  assert.equal(remote.enrollmentTimer._destroyed, true);
+  assert.equal(remote.enabled, false);
+});
 test("verified encrypted gateway rejects tamper and shares idempotency across transports", async t => {
   const f = await fixture(t), { remote, approvals } = f, c = remote.crypto;
   const mobile = await c.generateIdentity("mobile"); const bindingId = crypto.randomUUID();

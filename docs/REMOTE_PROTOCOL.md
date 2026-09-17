@@ -26,10 +26,13 @@ key alias, name-only trust, or automatic key replacement is accepted.
 
 ## Enrollment, sessions and pairing
 
-A root PC needs an administrator-created one-time enrollment code. D1 stores its
-HMAC, expiry, consumed device ID and registration transaction ID. Proof covers the
-exact PC public device, relay origin, code SHA-256 and fresh issuedAt. Repeating
-the same registration is idempotent; another device cannot reuse the code.
+A PC registers automatically without an enrollment code. Its ES256 proof covers the
+exact public device, relay origin, registration transaction ID and fresh issuedAt.
+A D1 transaction enforces the active-PC capacity and operator registration switch.
+Retries with the same active identity are idempotent, including when registration
+is closed or capacity is full. Different keys cannot replace an identity; revoked
+identities cannot register again. The operator CLI uses Cloudflare credentials
+separately; the public API exposes no service-management operation.
 
 Device authentication uses a 60-second, one-consumption challenge containing
 nonce, device ID, signing key ID, origin and `device-session` purpose. The ES256

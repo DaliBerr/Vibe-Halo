@@ -65,25 +65,39 @@ HTTPS; never expose the debug Worker or synthetic bridge to a public interface.
 3. Set `RELAY_ORIGIN` to the exact HTTPS origin, with no path/query/fragment. Add
    your custom-domain route, or intentionally enable `workers_dev` and use its
    exact HTTPS origin. All devices and signed handshakes must use that origin.
-4. Provision independent random `ENROLLMENT_PEPPER`, `PAIRING_PEPPER`, and
-   `PUSH_TOKEN_KEY` with `npx wrangler secret put NAME`. The first two must contain
+4. Provision independent random `PAIRING_PEPPER` and
+   `PUSH_TOKEN_KEY` with `npx wrangler secret put NAME`. The pairing pepper must contain
    at least 32 random characters; the last is base64 of exactly 32 random bytes.
-   Do not rotate peppers while enrollment/pairing transactions are in flight.
+   Do not rotate the pairing pepper while pairing transactions are in flight.
    Push-key rotation invalidates old encrypted push tokens and requires token
    registration again; it does not replace device identities.
 5. Run `npx wrangler d1 migrations apply vibe-halo-relay --remote`, then
    `npx wrangler deploy`. SQLite Durable Objects migration `v1` is included.
    Check `/healthz` and inspect the deployment in Cloudflare before pairing.
-6. Generate one controlled PC enrollment code. Supply the same enrollment pepper
-   securely in the shell environment, then run:
+6. The desktop and Android preview default to the deployed relay. No enrollment
+   code or operator credentials are entered in the app. For self-hosting, set
+   desktop process environment variable `VIBE_HALO_RELAY_ORIGIN` before first
+   startup, and use Android's **Use a self-hosted service** option (or build with
+   `-Prelay.origin=https://your-relay.example`). Existing device origins are preserved.
 
-   ```sh
-   node scripts/admin.mjs enrollment-code --remote --out /private/path/pc-code.txt
-   ```
+## Separate service administration
 
-   The script creates the file exclusively, never prints the code, and inserts
-   only its HMAC and expiry into D1. The code expires in 30 minutes and can enroll
-   one PC. Local testing uses `--local` and the ignored `.dev.vars` pepper.
+The operator CLI under `services/relay/scripts/admin.mjs` uses local Cloudflare
+credentials. It is not included in desktop or Android packages. From
+`services/relay`, using the exact production configuration:
+
+```sh
+node scripts/admin.mjs status --remote --config wrangler.production.jsonc
+node scripts/admin.mjs close-registration --remote --config wrangler.production.jsonc
+node scripts/admin.mjs open-registration --remote --config wrangler.production.jsonc
+node scripts/admin.mjs revoke-pc --remote --config wrangler.production.jsonc --pc pc_DEVICE_ID
+```
+
+Apply migration `0002_self_service_registration.sql` before deploying this version.
+It creates the registration switch, initially open. Closing it only blocks new
+identities, not reconnecting registered devices. The old enrollment-code generator
+is removed; historical code rows are unused and expire through existing cleanup.
+The old ENROLLMENT_PEPPER secret is unused; it need not be rotated or distributed.
 
 Default capacity is 10 active PCs and 6 active phones per PC. Keep these limits
 small on free infrastructure. Use the Cloudflare dashboard to check D1 rows,
@@ -93,12 +107,10 @@ application does not change plans or buy capacity. API and WebSocket rate limits
 are not a promise that every workload fits a free allowance. Public production
 CPU and hibernation billing require deployment measurement.
 
-For a synthetic public-relay emulator run, issue a fresh enrollment code to a
-private file, then run `scripts/mobile-smoke-host.cjs` from the repository root
-with `VIBE_HALO_TEST=1`, `VIBE_HALO_SMOKE_RELAY_ORIGIN` set to the exact deployed
-HTTPS origin and `VIBE_HALO_SMOKE_ENROLLMENT_FILE` pointing to that file. This
-harness does not discover production credentials or generate public codes. It
-uses an isolated synthetic PC with ephemeral test encryption and binds its
+For a synthetic public-relay emulator run, run `scripts/mobile-smoke-host.cjs`
+from the repository root with `VIBE_HALO_TEST=1` and
+`VIBE_HALO_SMOKE_RELAY_ORIGIN` set to the exact deployed HTTPS origin. No private
+enrollment file is needed. This harness uses an isolated synthetic PC with ephemeral test encryption and binds its
 authenticated test bridge only to loopback. Forward bridge port 8788 and the
 fixture's LAN port to the emulator; run `CompanionFlowTest` with the private
 fixture copied to the debug app. The cloud leg now traverses the real Worker,
@@ -148,12 +160,12 @@ reminders; terminal reconciliation cancels all active IDs with the event's tag.
 
 ## Connect and use
 
-1. Open **Mobile companion / 手机伴侣** from the desktop tray. Enter the relay
-   origin, PC name and one-time PC enrollment code; enable the companion.
+1. The desktop connects automatically. Open **Mobile companion / 手机伴侣** from
+   the tray and wait for **Connected**. No enrollment code or relay entry is needed.
+   Network errors retry in the background. Disabling the companion is remembered.
 2. Generate a pairing code. Choose read-only permissions, or permissions for
    decisions and exact answers. Persistent authorization is a separate opt-in.
-3. On Android choose **Connect a computer**, enter the same relay origin and
-   pairing code, and compare all three fingerprint groups on both devices.
+3. On Android choose **Connect a computer**, enter the pairing code (the default service is already selected), and compare all three fingerprint groups on both devices.
 4. Confirm the fingerprint on the PC, then explicitly finish pairing on the
    phone. A claim alone creates no trusted phone. Cancel or let an uncertain
    transaction expire; never confirm a mismatched fingerprint.
