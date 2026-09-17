@@ -60,6 +60,7 @@ object UiLanguage {
         "设备权限已撤销，或没有这项操作权限。" to "Access was revoked or this operation is not permitted.", "操作未完成，请检查连接后重试。" to "Operation incomplete. Check the connection and retry.",
         "通知已允许" to "Notifications allowed", "仍可在应用内查看请求" to "Requests remain available in the app"
     )
-    fun text(value: String): String = if (mode == "zh-CN" || mode == "system" && Locale.getDefault().language == "zh") value else english[value] ?: value
+    fun resolvedLocale(): String = if (mode == "zh-CN" || mode == "system" && Locale.getDefault().language == "zh") "zh-CN" else "en-US"
+    fun text(value: String): String = if (resolvedLocale() == "zh-CN") value else english[value] ?: value
 }
 fun tr(value: String): String = UiLanguage.text(value)

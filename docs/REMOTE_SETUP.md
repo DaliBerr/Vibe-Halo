@@ -158,6 +158,15 @@ Check the system notification record/visible notification, not only an HTTP 200.
 FCM auto-displayed reminders use a different notification ID from foreground
 reminders; terminal reconciliation cancels all active IDs with the event's tag.
 
+## Notification language and meaning
+
+Phone/watch notifications follow the Android app language (including system mode).
+Install the updated APK and open it while online once to sync this preference;
+offline changes are retained for retry. Legacy clients with no language preference
+receive Chinese. Push text distinguishes approval, an in-app answer, a choice/input
+requiring the original computer client, plan ready, and task completed. It includes
+no command or question contents. Watches mirror the phone's single-language text.
+
 ## Connect and use
 
 1. The desktop connects automatically. Open **Mobile companion / 手机伴侣** from

@@ -2,13 +2,26 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { chooseDisplay, locateLinuxWindowBounds } = require("../src/window-locator");
+const { chooseDisplay, locateDisplay, locateLinuxWindowBounds } = require("../src/window-locator");
 
 const primary = { id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, workArea: { x: 0, y: 0, width: 1920, height: 1040 } };
 const secondary = { id: 2, bounds: { x: 1920, y: 0, width: 2560, height: 1440 }, workArea: { x: 1920, y: 0, width: 2560, height: 1400 } };
 
 test("chooses source window display first", () => {
   assert.equal(chooseDisplay([primary, secondary], { x: 2100, y: 100, width: 800, height: 600 }, { x: 10, y: 10 }, primary).id, 2);
+});
+
+test("Windows source bounds are converted from physical pixels before selecting a display", async () => {
+  const physical = { x: 2200, y: 100, width: 600, height: 800 };
+  const screen = {
+    getAllDisplays: () => [primary, secondary], getPrimaryDisplay: () => primary,
+    getCursorScreenPoint: () => ({ x: 2100, y: 20 }),
+    screenToDipRect: (window, rect) => { assert.equal(window, null); assert.deepEqual(rect, physical); return { x: 1100, y: 50, width: 300, height: 400 }; },
+  };
+  assert.equal(chooseDisplay([primary, secondary], physical, screen.getCursorScreenPoint(), primary).id, 2);
+  assert.equal((await locateDisplay(screen, {}, { platform: "win32", locateWindowBounds: async () => physical })).id, 1);
+  screen.screenToDipRect = () => { throw new Error("display changed"); };
+  assert.equal((await locateDisplay(screen, {}, { platform: "win32", locateWindowBounds: async () => physical })).id, 2);
 });
 
 test("falls back to cursor display and then primary", () => {

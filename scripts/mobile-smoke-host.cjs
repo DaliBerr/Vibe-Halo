@@ -37,6 +37,10 @@ const { readBody } = require("../src/remote/lan-service");
         await remote.pollPairing();
         if (remote.pairing.fingerprint !== input.fingerprint) throw new Error("fingerprint_mismatch");
         await remote.confirmPairing(input.fingerprint); result = { confirmed: true };
+      } else if (request.url === "/reminder") {
+        if (!["input", "plan", "completion"].includes(input.kind)) throw new Error("invalid_kind");
+        const eventId = remote.recordReminder({ agentId: "codex", requestKey: crypto.randomUUID(), title: "Synthetic notification", content: "Synthetic notification classification check" }, input.kind);
+        await remote.publishAll(); result = { eventId };
       } else if (request.url === "/request") {
         const question = input.kind === "question";
         const agent = question ? "hermes" : "codex";

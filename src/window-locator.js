@@ -170,7 +170,13 @@ async function locateLinuxWindowBounds(pidChain, options = {}) {
 
 async function locateDisplay(screenApi, entry, options = {}) {
   const chain = [entry?.sourcePid, ...(entry?.pidChain || [])];
-  const windowBounds = await (options.locateWindowBounds || locateWindowBounds)(chain, options);
+  let windowBounds = await (options.locateWindowBounds || locateWindowBounds)(chain, options);
+  // Win32 returns physical pixels; Electron's displays and cursor use DIP.
+  // Mixing them can place an input reminder on the wrong monitor at 150%/200%.
+  if ((options.platform || process.platform) === "win32" && windowBounds) {
+    try { windowBounds = normalizeBounds(screenApi.screenToDipRect(null, windowBounds)); }
+    catch { windowBounds = null; } // Prefer the cursor to a guessed scaled location.
+  }
   const displays = screenApi.getAllDisplays();
   return chooseDisplay(displays, windowBounds, screenApi.getCursorScreenPoint(), screenApi.getPrimaryDisplay());
 }

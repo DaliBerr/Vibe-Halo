@@ -21,6 +21,19 @@ import java.util.concurrent.TimeUnit
  * background FCM check. The caller must revoke the test PC after observing it. */
 @RunWith(AndroidJUnit4::class)
 class PublicPushSetupTest {
+    @Test fun syncSelectedNotificationLanguage() = runBlocking {
+        val mode = InstrumentationRegistry.getArguments().getString("notificationLocale")
+        assumeTrue(mode == "zh-CN" || mode == "en-US")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        UiLanguage.mode = mode!!
+        context.getSharedPreferences("ui-preferences", android.content.Context.MODE_PRIVATE).edit().putString("language", mode).commit()
+        val repo = CompanionRepository(context)
+        try {
+            repo.load(false)
+            assertTrue("A synthetic paired PC is required", repo.state.value.computers.any { it.state == "active" })
+            assertTrue("Language preferences must reach the relay", repo.syncMaintenance())
+        } finally { repo.close() }
+    }
     @Test fun enrollSyntheticPcAndRegisterRealPushToken() = runBlocking {
         assumeTrue(InstrumentationRegistry.getArguments().getString("publicPush") == "1")
         val context = InstrumentationRegistry.getInstrumentation().targetContext

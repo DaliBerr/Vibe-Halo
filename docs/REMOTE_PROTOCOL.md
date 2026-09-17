@@ -212,3 +212,7 @@ Before sending, jobs recheck binding, event revision, expiry and acknowledged st
 No analytics, account login, remote private-key backup or notification-listener
 permission is introduced. No forward-secrecy claim is made against later device
 ECDH private-key compromise, and timing/adapter metadata remains visible to relay.
+
+Notification preferences may include `locale: "zh-CN" | "en-US"`, authenticated by
+the paired phone and protected by the existing monotonic revision. Notification
+copy uses this locale; the bounded six-field FCM routing data is unchanged.

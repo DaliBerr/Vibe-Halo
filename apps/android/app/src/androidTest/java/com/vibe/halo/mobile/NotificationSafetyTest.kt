@@ -11,6 +11,22 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class NotificationSafetyTest {
+    @Test fun notificationCopyFollowsAppLanguageAndDistinguishesNativeInput() {
+        val original = UiLanguage.mode
+        try {
+            UiLanguage.mode = "en-US"
+            for (kind in listOf("approval", "question", "input", "plan", "completion")) {
+                val (title, body) = CompanionNotifications.copy(kind)
+                assertFalse(Regex("[\\u4e00-\\u9fff]").containsMatchIn(title + body))
+            }
+            assertTrue(CompanionNotifications.copy("input").second.contains("original app"))
+            UiLanguage.mode = "zh-CN"
+            assertEquals("需要审批", CompanionNotifications.copy("approval").first)
+            assertEquals("任务已完成", CompanionNotifications.copy("completion").first)
+            assertTrue(CompanionNotifications.copy("input").second.contains("原应用"))
+            assertTrue(CompanionNotifications.copy("question").second.contains("Vibe Halo"))
+        } finally { UiLanguage.mode = original }
+    }
     @Test fun notificationIsReadOnlyAndDeduplicated() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val manager = context.getSystemService(NotificationManager::class.java)

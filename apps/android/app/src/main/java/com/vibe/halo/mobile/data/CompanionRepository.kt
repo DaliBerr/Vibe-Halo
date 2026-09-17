@@ -368,10 +368,32 @@ class CompanionRepository(private val context: Context) {
             account.store.update { it.put("pendingRevocations", JSONArray(it.optJSONArray("pendingRevocations")?.values().orEmpty().filterNot { value -> value == id })) }
         }
         if (mutable.value.computers.none { it.origin == account.origin && it.state == "active" }) return
-        val prefs = saved.optJSONObject("pendingPreferences") ?: JSONObject()
+        val locale = com.vibe.halo.mobile.UiLanguage.resolvedLocale()
+        val activePcs = mutable.value.computers.filter { it.origin == account.origin && it.state == "active" }
+        if (activePcs.any { saved.optJSONObject("notificationLocales")?.optString(it.pcId) != locale || saved.optJSONObject("pendingPreferences")?.has(it.pcId) == true }) account.store.update { latest ->
+            val pending = latest.optJSONObject("pendingPreferences") ?: JSONObject()
+            val syncedLocales = latest.optJSONObject("notificationLocales") ?: JSONObject()
+            val revisions = latest.optJSONObject("notificationPreferenceRevisions") ?: JSONObject()
+            for (pc in activePcs) {
+                if (syncedLocales.optString(pc.pcId) != locale || pending.has(pc.pcId)) {
+                    val pref = pending.optJSONObject(pc.pcId) ?: JSONObject()
+                        .put("enabled", !context.getSharedPreferences("notification-preferences", Context.MODE_PRIVATE).getBoolean("${pc.pcId}:muted", false))
+                        .put("approvals", true).put("questions", true).put("completions", true)
+                    val revision = maxOf(System.currentTimeMillis(), revisions.optLong(pc.pcId) + 1, pref.optLong("revision") + 1)
+                    pref.put("locale", locale).put("revision", revision)
+                    pending.put(pc.pcId, pref); revisions.put(pc.pcId, revision)
+                }
+            }
+            latest.put("pendingPreferences", pending).put("notificationPreferenceRevisions", revisions)
+        }
+        val prefs = account.store.read().optJSONObject("pendingPreferences") ?: JSONObject()
         for (pcId in prefs.keys()) {
             try { request(account, "/v1/pcs/$pcId/notification-preferences", "PUT", prefs.getJSONObject(pcId)) } catch (error: ApiError) { if (error.status != 403) throw error }
-            account.store.update { it.optJSONObject("pendingPreferences")?.remove(pcId) }
+            account.store.update {
+                it.optJSONObject("pendingPreferences")?.remove(pcId)
+                val locales = it.optJSONObject("notificationLocales") ?: JSONObject()
+                locales.put(pcId, locale); it.put("notificationLocales", locales)
+            }
         }
         val token = registry.read().optString("pushToken")
         if (token.isNotEmpty() && saved.optString("registeredPushDigest") != DeviceCrypto.sha256(token)) {

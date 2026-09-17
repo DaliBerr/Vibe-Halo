@@ -36,7 +36,8 @@ export async function registerPush(request: Request, env: Env, session: Session)
 export async function preferences(request: Request, env: Env, session: Session, pcId: string): Promise<Response> {
   await authorize(session, pcId, env);
   if (session.device.kind !== "mobile") throw new Fault("forbidden", 403);
-  const input = record(await body(request), ["enabled", "approvals", "questions", "completions", "revision"]);
+  const input = record(await body(request), ["enabled", "approvals", "questions", "completions", "revision", "locale"]);
+  if (input.locale !== undefined && input.locale !== "zh-CN" && input.locale !== "en-US") throw new Fault("invalid_preferences");
   for (const key of ["enabled", "approvals", "questions", "completions"]) if (typeof input[key] !== "boolean") throw new Fault("invalid_preferences");
   if (!Number.isSafeInteger(input.revision) || Number(input.revision) < 1) throw new Fault("invalid_revision");
   await env.DB.prepare("INSERT INTO notification_preferences(mobile_id,pc_id,value_json,revision) VALUES(?,?,?,?) ON CONFLICT(mobile_id,pc_id) DO UPDATE SET value_json=excluded.value_json,revision=excluded.revision WHERE excluded.revision>notification_preferences.revision")
@@ -61,6 +62,19 @@ async function accessToken(env: Env): Promise<string> {
   oauth = { key: cacheKey, token: data.access_token, expiresAt: now() + Math.min(data.expires_in, 3600) * 1000 };
   return oauth.token;
 }
+export function notificationCopy(kind: unknown, locale: unknown) {
+  const english = locale === "en-US";
+  const copy: Record<string, [string, string, string, string]> = {
+    approval: ["需要审批", "请打开 Vibe Halo 查看并处理。", "Approval needed", "Open Vibe Halo to review and respond."],
+    question: ["有问题等待回答", "请打开 Vibe Halo 查看选项并回答。", "Answer needed", "Open Vibe Halo to view the options and answer."],
+    input: ["需要选择或回答", "请回到电脑上的原应用完成选择或回答。", "Choice or answer needed", "Return to the original app on your computer to respond."],
+    plan: ["计划已准备好", "请打开 Vibe Halo 查看计划。", "Plan ready", "Open Vibe Halo to view the plan."],
+    completion: ["任务已完成", "请打开 Vibe Halo 查看完成消息。", "Task completed", "Open Vibe Halo to view the completion update."],
+  };
+  const value = copy[String(kind)] || copy.input;
+  return { title: value[english ? 2 : 0], body: value[english ? 3 : 1] };
+}
+
 export async function deliverPush(env: Env, pcId: string, mobileId: string, summary: Record<string, unknown>, current = () => true, retryAfter = (_milliseconds: number) => {}): Promise<"sent" | "skip" | "retry"> {
   if (String(env.FCM_ENABLED) !== "true") return "skip";
   const binding = await env.DB.prepare("SELECT b.id FROM bindings b JOIN spaces s ON s.pc_id=b.pc_id JOIN devices d ON d.id=b.pc_id WHERE b.pc_id=? AND b.mobile_id=? AND b.state='active' AND s.status='active' AND d.status='active'").bind(pcId, mobileId).first();
@@ -82,7 +96,7 @@ export async function deliverPush(env: Env, pcId: string, mobileId: string, summ
     const result = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(env.FCM_PROJECT_ID)}/messages:send`, {
       method: "POST", signal: AbortSignal.timeout(8000), headers: { authorization: `Bearer ${access}`, "content-type": "application/json" },
       body: JSON.stringify({ message: { token,
-        notification: { title: "Vibe Halo", body: category === "completions" ? "有一项进展可查看 · An update is ready" : "有一项请求待查看 · A request needs attention" },
+        notification: notificationCopy(summary.kind, pref.locale),
         data: { protocolVersion: "1", pcId, pcSessionEpoch: String(summary.pcSessionEpoch), eventId: String(summary.eventId), eventRevision: String(summary.eventRevision), kind: String(summary.kind) },
         android: { priority: category === "completions" ? "NORMAL" : "HIGH", ttl: `${ttl}s`, collapse_key: pcId,
           notification: { channel_id: category, tag: `${pcId}/${summary.eventId}`, visibility: "PRIVATE", default_sound: true } } } }),

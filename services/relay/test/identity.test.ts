@@ -2,7 +2,7 @@ import { env, SELF, applyD1Migrations } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, it, expect, vi } from "vitest";
 import { generateIdentity, publicDevice, sign, sha256, canonical } from "../../../packages/protocol/src/crypto.mjs";
 import { hmac } from "../src/common";
-import { deliverPush, encryptToken } from "../src/push";
+import { deliverPush, encryptToken, notificationCopy } from "../src/push";
 import { generateKeyPair, exportPKCS8 } from "jose";
 
 beforeAll(async () => { await applyD1Migrations(env.DB, env.TEST_MIGRATIONS); });
@@ -168,6 +168,18 @@ describe("device identity and pairing", () => {
       expect(messages[0].message.notification).toBeDefined();
       expect(Object.keys(messages[0].message.data).sort()).toEqual(["eventId", "eventRevision", "kind", "pcId", "pcSessionEpoch", "protocolVersion"]);
       expect(messages[0].message.android.notification.channel_id).toBe("approvals");
+      expect(messages[0].message.notification.title).toBe("需要审批");
+      const mobileToken = await login(pair.mobile);
+      const preferencesUrl = origin + `/v1/pcs/${pair.pc.deviceId}/notification-preferences`;
+      const prefs = { enabled: true, approvals: true, questions: true, completions: true, revision: Date.now(), locale: "en-US" };
+      expect((await SELF.fetch(preferencesUrl, { method: "PUT", headers: privateHeaders(mobileToken), body: JSON.stringify(prefs) })).status).toBe(200);
+      expect((await SELF.fetch(preferencesUrl, { method: "PUT", headers: privateHeaders(mobileToken), body: JSON.stringify({ ...prefs, locale: ["en-US"] }) })).status).toBe(400);
+      expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, { ...summary, kind: "input" })).toBe("sent");
+      expect(messages.at(-1)!.message.notification).toEqual({ title: "Choice or answer needed", body: "Return to the original app on your computer to respond." });
+      for (const kind of ["approval", "question", "input", "plan", "completion"]) {
+        expect(JSON.stringify(notificationCopy(kind, "en-US"))).not.toMatch(/[\u4e00-\u9fff]/);
+        expect(notificationCopy(kind, "zh-CN").title).toMatch(/[\u4e00-\u9fff]/);
+      }
       expect(JSON.stringify(messages[0]).length).toBeLessThan(2048);
       status = 503; expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, summary)).toBe("retry");
       status = 429; expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, summary)).toBe("retry");

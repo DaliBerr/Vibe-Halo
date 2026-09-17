@@ -4,6 +4,45 @@ Updated: 2026-09-17 (automatic companion connection; local acceptance below)
 Current version: `0.5.9`
 Source directory: `C:\Tools\Clawd-island`
 
+## 2026-09-17 — Input-reminder display and single-language notifications
+
+User report: the Codex three-choice test in task 01a0af32-3e83-7260-8fc1-135ed47b9a3d
+reached phone/watch but was not seen on the PC island. Installed logs show the
+request was detected and input-request-compact was queued at 11:48:37 UTC, then
+resolved at 11:50:26. Those historical logs record requested UI state, not proof
+of physical visibility or the display used at that moment.
+
+Found and fixed a reproducible mixed-DPI placement error: native Windows window
+rectangles are physical pixels, while Electron display rectangles are DIP. A local
+real-window test on the 100% + 150% display arrangement selected the wrong monitor
+with the old calculation, and the source monitor after screenToDipRect conversion.
+Compact input text and expanded three-choice read-only rows both rendered, with
+zero renderer errors. Codex answers still belong in the original Codex interface.
+
+Cloud FCM previously concatenated Chinese and English and grouped input/approvals
+under one generic message. Now the authenticated phone preference includes an
+optional validated zh-CN/en-US locale; language changes queue a persisted preference
+and sync online, including when following the system language. The previous enabled
+preference is preserved, and revisions stay monotonic. Legacy clients without a
+synced locale receive Chinese until upgraded. Foreground and background copy now
+distinguishes approval, in-app answer, original-client input/choice, plan and completion.
+Notifications still contain only short classification text and the same six routing
+fields, with no command/question contents, decision actions or inline replies.
+
+Verification: root 224 tests (223 pass, existing Windows POSIX skip); relay type
+check and 10 tests; Firebase debug/release builds and lint; dedicated release APK
+signature verification; Android NotificationSafetyTest 2 tests; opt-in real-FCM
+setup and language-sync tests. Actual background SDK notifications (ID 0) received
+English "Choice or answer needed" after en-US sync, then Chinese "任务已完成" after
+zh-CN sync. Physical watch mirroring is still for the user to verify after updating.
+
+Worker version 139d683d-f449-4afc-90d7-fd18e2080d6a deployed at the existing origin.
+No schema migration or credential rotation. Windows package and local approval
+smoke passed; the installed desktop matches the fixed build. Signed APK and Windows
+installer refreshed in dist/companion-preview. Synthetic public root/bridge are
+cleaned up after the check; actual user bindings are preserved. No remote CI/CD or
+release tag; the wider companion acceptance gates below still apply.
+
 ## 2026-09-17 — Automatic companion connection; separate service administration
 
 The user explicitly replaced controlled PC enrollment with default automatic

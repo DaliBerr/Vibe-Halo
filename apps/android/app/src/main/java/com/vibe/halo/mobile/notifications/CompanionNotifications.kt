@@ -17,6 +17,16 @@ import com.vibe.halo.mobile.tr
 import com.vibe.halo.mobile.security.SecureStore
 
 object CompanionNotifications {
+    fun copy(kind: String): Pair<String, String> {
+        val english = com.vibe.halo.mobile.UiLanguage.resolvedLocale() == "en-US"
+        return when (kind) {
+            "approval" -> if (english) "Approval needed" to "Open Vibe Halo to review and respond." else "需要审批" to "请打开 Vibe Halo 查看并处理。"
+            "question" -> if (english) "Answer needed" to "Open Vibe Halo to view the options and answer." else "有问题等待回答" to "请打开 Vibe Halo 查看选项并回答。"
+            "input" -> if (english) "Choice or answer needed" to "Return to the original app on your computer to respond." else "需要选择或回答" to "请回到电脑上的原应用完成选择或回答。"
+            "plan" -> if (english) "Plan ready" to "Open Vibe Halo to view the plan." else "计划已准备好" to "请打开 Vibe Halo 查看计划。"
+            else -> if (english) "Task completed" to "Open Vibe Halo to view the completion update." else "任务已完成" to "请打开 Vibe Halo 查看完成消息。"
+        }
+    }
     fun channels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannels(listOf(
@@ -41,12 +51,12 @@ object CompanionNotifications {
         channels(context)
         val channel = if (kind in listOf("completion", "plan")) "completions" else if (kind == "approval") "approvals" else "questions"
         if (manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE) return "suppressed_by_user"
-        val title = when (kind) { "approval" -> "有一个请求等待查看"; "question", "input" -> "客户端正在等待输入"; "plan" -> "计划已准备好"; else -> "任务已完成" }
+        val (title, body) = copy(kind)
         val intent = Intent(context, MainActivity::class.java).setAction("com.vibe.halo.mobile.OPEN_EVENT").putExtra("pcId", pcId).putExtra("eventId", eventId).putExtra("pcSessionEpoch", data["pcSessionEpoch"])
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pending = PendingIntent.getActivity(context, key.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val builder = Notification.Builder(context, channel).setSmallIcon(R.drawable.ic_halo).setContentTitle(tr(title))
-            .setContentText(tr("打开 Vibe Halo 查看最新状态")).setContentIntent(pending).setAutoCancel(true)
+        val builder = Notification.Builder(context, channel).setSmallIcon(R.drawable.ic_halo).setContentTitle(title)
+            .setContentText(body).setContentIntent(pending).setAutoCancel(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE).setOnlyAlertOnce(true).setCategory(if (channel != "completions") Notification.CATEGORY_REMINDER else Notification.CATEGORY_STATUS)
             .setGroup("vibe-halo-$pcId")
         if (Build.VERSION.SDK_INT >= 29) builder.setAllowSystemGeneratedContextualActions(false)
