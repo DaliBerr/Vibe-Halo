@@ -8,6 +8,22 @@ import java.util.Locale
 object UiLanguage {
     var mode by mutableStateOf("system")
     private val english = mapOf(
+        "无法读取已保存的设备。数据已保留，请重试。" to "Saved devices could not be loaded. Your data is preserved. Please retry.", "重试" to "Retry",
+        "待处理" to "Pending", "历史记录" to "History", "暂无待处理请求" to "No pending requests", "暂无历史记录" to "No history yet",
+        "这台手机" to "This phone", "修改名称" to "Rename", "恢复系统名称" to "Use system name", "名称待同步" to "Name pending sync", "保存" to "Save",
+        "名称须为 1–48 个字符，不能包含控制字符。" to "Use 1–48 characters without control characters.", "连接详情" to "Connection details", "连接另一台电脑" to "Connect another computer", "电脑" to "Computer",
+        "通知与后台设置" to "Notifications and background", "设置手机伴侣" to "Set up your phone", "完成电脑连接后即可使用，其他设置可以稍后完成。" to "Pair a computer to start. Other settings can be completed later.",
+        "已开启" to "Enabled", "已手动确认" to "Confirmed manually", "稍后设置" to "Set up later", "未设置" to "Not set up", "通知设置" to "Notification settings",
+        "后台锁定" to "Keep in recent apps", "在最近任务中长按 Vibe Halo 卡片，点击锁形按钮。不同系统版本的入口可能不同。" to "In recent apps, long-press Vibe Halo and tap the lock. The location varies by system version.",
+        "如果系统支持，请在最近任务中锁定 Vibe Halo。" to "If supported, lock Vibe Halo in recent apps.", "查看操作步骤" to "View instructions", "我已完成" to "I have done this",
+        "后台省电策略" to "Background battery settings", "应用详情 → 省电策略 → 不限制；同时允许后台自启动。" to "App info → Battery saver → No restrictions. Also allow background autostart.",
+        "在应用的电池设置中允许后台运行，或取消电池优化。" to "Allow background activity or disable optimization in this app's battery settings.", "打开省电设置" to "Open battery settings", "后台自启动设置" to "Background autostart settings",
+        "已配对" to "Paired", "在电脑托盘打开手机伴侣，生成配对码。" to "Open Mobile companion in the computer's tray and generate a pairing code.", "进入应用" to "Continue", "完成" to "Done", "请先完成一台电脑的配对。" to "Pair at least one computer to continue.",
+        "打开最近任务 → 找到 Vibe Halo → 长按卡片 → 点击锁形按钮。完成后返回应用确认。此状态需要手动确认。" to "Open recent apps → Find Vibe Halo → Long-press the card → Tap the lock. Return here to confirm. This setting cannot be checked automatically.", "知道了" to "Got it",
+        "最近同步事件" to "Recent synced events", "最近 24 小时 · 已同步到手机" to "Past 24 hours · Synced to this phone", "电脑历史" to "Computer history", "最多保留 30 天、200 条记录／电脑" to "Up to 30 days and 200 records per computer",
+        "电脑离线，暂时无法读取历史" to "Computer offline; history is unavailable", "内容摘要不可用" to "Summary unavailable", "记录详情" to "Record details", "回答" to "Answer", "未记录回答" to "Answer not recorded",
+        "内容已截取或记录不完整。" to "Content is shortened or incomplete.", "当前显示摘要，完整记录暂不可用。" to "Showing the summary; the full record is unavailable.",
+        "已允许" to "Allowed", "已拒绝" to "Denied", "已回答" to "Answered", "已超时" to "Timed out", "连接已断开" to "Disconnected", "已关闭" to "Dismissed", "已交回客户端" to "Returned to the client", "已结束" to "Finished", "需要回到电脑处理" to "Continue on your computer",
         "已连接" to "Connected", "当前请求" to "Current request", "排队或等待原生处理" to "Queued or awaiting the original client", "项待处理" to "pending", "剩余" to "Time left",
         "查看事件" to "Read events", "读取历史" to "Read history", "提交审批" to "Decide approvals", "精确回答" to "Answer questions", "关闭提醒" to "Dismiss reminders", "长期授权" to "Persistent permissions", "正在读取。电脑需要在线。" to "Loading. Your computer must be online.",
         "审批提醒" to "Approval reminders",

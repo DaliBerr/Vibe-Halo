@@ -169,6 +169,22 @@ no command or question contents. Watches mirror the phone's single-language text
 
 ## Connect and use
 
+Desktop names initially follow the system hostname. Android reads the system's
+device name, falling back to manufacturer/model. Rename this device in desktop
+Mobile companion or Android Devices; **Use system name** restores automatic naming.
+Names allow 1–48 Unicode characters and no control characters. Changes persist
+offline and sync when connected. Signed display profiles are separate from
+immutable device identities/grants: renaming never requires another pairing.
+
+On first Android launch, a four-step checklist offers system notifications,
+recent-app locking, background battery settings and computer pairing. The first
+three can be deferred, but pairing one computer is required to enter the app.
+Existing paired users skip this gate on upgrade. **Devices → Notifications and
+background** reopens the checklist. Xiaomi/HyperOS guidance includes No restrictions
+and background autostart; unavailable deep links fall back to app settings.
+Vendor locking/restrictions require manual confirmation when the OS cannot report
+them. These settings reduce restrictions; they do not guarantee background delivery.
+
 1. The desktop connects automatically. Open **Mobile companion / 手机伴侣** from
    the tray and wait for **Connected**. No enrollment code or relay entry is needed.
    Network errors retry in the background. Disabling the companion is remembered.
@@ -194,9 +210,14 @@ foreground app falls back to the configured cloud relay. Do not open router port
 or expose the local Hook listener. Android background notifications use FCM even
 on the same Wi-Fi; there is no permanent background socket/approval poller.
 
-The Now page aggregates bound PCs while keeping their queues separate. History
-includes recent remote events; **Load computer history** fetches the selected PC's
-original read-only history. Closing an input reminder does not answer the client.
+The Pending page aggregates bound PCs while keeping their queues separate. History
+separates recent synced events (24 hours) from original computer history (up to
+30 days/200 records per PC). Opening History loads authorized online PCs; Refresh
+retries manually. Cards show client, computer, project/session context, content
+summary, outcome and time. Details show bounded operation/question/answer/plan
+sections rather than raw JSON. Legacy malformed or truncated responses fall back
+to a readable summary. Active approvals and persistent permission scopes still
+retain their required review context. Closing an input reminder does not answer the client.
 Closing a detail, swiping a notification or backgrounding the app does not make a
 decision. `desktop_accepted` means the PC accepted the decision, not that the
 coding client ran a command. A lost receipt is queried/retried with the same

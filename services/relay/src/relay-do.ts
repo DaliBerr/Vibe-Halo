@@ -56,6 +56,10 @@ export class Relay extends DurableObject<Env> {
       try { socket.send(JSON.stringify(value)); } catch { socket.close(); }
     }
   }
+  async profilesChanged(): Promise<void> {
+    await this.sendPc({ type: "profiles.changed" });
+    await this.notify({ type: "profiles.changed" });
+  }
   async invalidate(bindingId: string): Promise<void> {
     await this.sendPc({ type: "bindings.changed", bindingId });
     await this.notify({ type: "bindings.changed", bindingId });

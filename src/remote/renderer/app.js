@@ -11,8 +11,11 @@ async function act(input, quiet = false) {
   finally { busy = false; }
 }
 function render(value) {
+  if (document.activeElement !== $("deviceName")) $("deviceName").value = value.name || "";
+  $("nameForm").hidden = !value.pcId;
   window.applyCompanionLanguage(value.locale);
   state = value; $("status").textContent = t(statuses[value.status] || value.status);
+  $("nameStatus").textContent = t(value.namePending ? "名称待同步" : value.nameMode === "system" ? "跟随系统名称" : "自定义名称");
   const configured = value.enrolled === true;
   $("setup").hidden = configured; $("configured").hidden = !configured;
   $("retry").disabled = value.status === "connecting";
@@ -35,6 +38,8 @@ function render(value) {
   }
   if (!value.bindings.length) { const empty = document.createElement("p"); empty.textContent = t("还没有连接的手机。"); $("devices").append(empty); }
 }
+$("nameForm").onsubmit = async event => { event.preventDefault(); const name = $("deviceName").value.trim(); if (!name || [...name].length > 48 || /[\p{Cc}\p{Cf}]/u.test(name.replace(/\u200d/g, ""))) { $("message").textContent = t("名称须为 1–48 个字符，不能包含控制字符。"); return; } await act({ action: "rename", name }); };
+$("resetName").onclick = () => act({ action: "rename", reset: true });
 $("setup").onsubmit = async event => { event.preventDefault(); await act({ action: "configure" }, true); };
 $("toggle").onclick = () => act({ action: state.enabled ? "disable" : "enable" });
 $("control").onchange = event => act({ action: "control", enabled: event.target.checked });

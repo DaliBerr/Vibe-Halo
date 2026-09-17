@@ -32,6 +32,7 @@
     "申请连接：": "Connection requested by: ", "等待手机输入配对码…": "Waiting for your phone…",
     "已连接 · 可提交决定": "Connected · decisions enabled", "已连接 · 只读": "Connected · read-only", "已撤销": "Revoked", "等待确认": "Awaiting confirmation", "撤销": "Revoke"
   };
+  Object.assign(strings, { "手机伴侣": "Mobile companion", "连接手机，查看通知和处理请求。": "Connect your phone to receive notifications and handle requests.", "保存名称": "Save name", "恢复系统名称": "Use system name", "名称待同步": "Name pending sync", "跟随系统名称": "Using system name", "自定义名称": "Custom name", "名称须为 1–48 个字符，不能包含控制字符。": "Use 1–48 characters without control characters." });
   let english = false;
   const text = value => english ? strings[value] || value : value;
   const nodes = [], walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);

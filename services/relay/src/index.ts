@@ -1,6 +1,7 @@
 import { enroll, challenge, createSession } from "./auth";
 import { createPairing, claim, status, confirm } from "./pairing";
 import { registerPush, preferences } from "./push";
+import { updateProfile } from "./device-profile";
 import { Fault, authenticate, authorize, body, record, id, text, response, now, type Binding } from "./common";
 export { Relay } from "./relay-do";
 function relayResponse(value: object, status = 200): Response {
@@ -20,6 +21,7 @@ export default {
       const pairingPath = /^\/v1\/pairings\/([A-Za-z0-9_.:-]+)\/(status|confirm|cancel)$/.exec(route);
       if (pairingPath?.[2] === "status" && request.method === "POST") return await status(request, env, pairingPath[1]);
       const session = await authenticate(request, env);
+      if (route === "/v1/device-profile" && request.method === "PUT") return await updateProfile(request, env, session);
       if (route === "/v1/push-token" && ["PUT", "DELETE"].includes(request.method)) return await registerPush(request, env, session);
       const preferencesPath = /^\/v1\/pcs\/([A-Za-z0-9_.:-]+)\/notification-preferences$/.exec(route);
       if (preferencesPath && request.method === "PUT") return await preferences(request, env, session, preferencesPath[1]);
@@ -36,7 +38,7 @@ export default {
       }
       if (route === "/v1/devices" && request.method === "GET") {
         const column = session.device.kind === "pc" ? "pc_id" : "mobile_id";
-        const result = await env.DB.prepare(`SELECT b.*,p.public_json AS pc_json,m.public_json AS mobile_json FROM bindings b JOIN devices p ON p.id=b.pc_id JOIN devices m ON m.id=b.mobile_id WHERE b.${column}=? LIMIT 64`).bind(session.device.deviceId).all();
+        const result = await env.DB.prepare(`SELECT b.*,p.public_json AS pc_json,m.public_json AS mobile_json,pp.profile_jws AS pc_profile,mp.profile_jws AS mobile_profile FROM bindings b JOIN devices p ON p.id=b.pc_id JOIN devices m ON m.id=b.mobile_id LEFT JOIN device_profiles pp ON pp.device_id=p.id LEFT JOIN device_profiles mp ON mp.device_id=m.id WHERE b.${column}=? LIMIT 64`).bind(session.device.deviceId).all();
         return response({ bindings: result.results });
       }
       const bindingPath = /^\/v1\/bindings\/([A-Za-z0-9_.:-]+)$/.exec(route);

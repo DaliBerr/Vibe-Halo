@@ -49,7 +49,8 @@ class DeviceCrypto(context: Context, private val store: SecureStore) {
             encryptionPrivate = encryption.private
             val signing = publicJwk(keyStore.getCertificate(alias).publicKey as ECPublicKey, "sig")
             val encrypting = publicJwk(encryption.public as ECPublicKey, "enc")
-            publicDevice = JSONObject().put("deviceId", "mobile_${UUID.randomUUID()}").put("kind", "mobile").put("name", "Android")
+            val initialName = com.vibe.halo.mobile.data.DeviceNames.current(context).take(48).let { if (it.lastOrNull()?.isHighSurrogate() == true) it.dropLast(1) else it }
+            publicDevice = JSONObject().put("deviceId", "mobile_${UUID.randomUUID()}").put("kind", "mobile").put("name", initialName)
                 .put("signKey", signing).put("encryptionKey", encrypting)
             saved.put("identity", publicDevice).put("encryptionPrivate", Base64.encodeToString(encryptionPrivate.encoded, Base64.NO_WRAP))
             store.write(saved)

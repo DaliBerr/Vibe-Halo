@@ -46,6 +46,30 @@ async function paired(existingRoot?: Awaited<ReturnType<typeof enrolled>>, exist
 }
 
 describe("device identity and pairing", () => {
+  it("syncs signed display names without replacing identity or grants and rejects replay/forgery", async () => {
+    const pairedRoot = await paired();
+    expect((await post(`/v1/pairings/${pairedRoot.pairingId}/confirm`, { grant: pairedRoot.grantJws }, pairedRoot.token)).status).toBe(201);
+    const mobileToken = await login(pairedRoot.mobile);
+    const write = async (identity: typeof pairedRoot.pc, token: string, revision: number, name: string, deviceId = identity.deviceId) => {
+      const profile = await sign({ protocolVersion: 1, relayOrigin: origin, deviceId, revision, name }, identity.signKey, "device-profile");
+      return SELF.fetch(origin + "/v1/device-profile", { method: "PUT", headers: { ...privateHeaders(token), "content-type": "application/json" }, body: JSON.stringify({ profile }) });
+    };
+    expect((await write(pairedRoot.pc, pairedRoot.token, 2, "RETARD" )).status).toBe(200);
+    expect((await write(pairedRoot.pc, pairedRoot.token, 2, "RETARD" )).status).toBe(200);
+    expect((await write(pairedRoot.pc, pairedRoot.token, 1, "old" )).status).toBe(409);
+    expect((await write(pairedRoot.pc, pairedRoot.token, 2, "changed" )).status).toBe(409);
+    expect((await write(pairedRoot.mobile, mobileToken, 1, "小米 15" )).status).toBe(200);
+    expect((await write(pairedRoot.mobile, mobileToken, 3, "forged", pairedRoot.pc.deviceId)).status).toBe(400);
+    expect((await write(pairedRoot.pc, mobileToken, 3, "forged")).status).toBe(401);
+    expect((await write(pairedRoot.pc, pairedRoot.token, 3, "bad\nname")).status).toBe(400);
+    const list = await SELF.fetch(origin + "/v1/devices", { headers: privateHeaders(mobileToken) });
+    const data = await list.json<{bindings: {grant_jws:string;pc_json:string;pc_profile:string;mobile_profile:string}[]}>();
+    expect(data.bindings[0].grant_jws).toBe(pairedRoot.grantJws);
+    expect(JSON.parse(data.bindings[0].pc_json)).toEqual(pairedRoot.publicPc);
+    expect(data.bindings[0].pc_profile).toBeTruthy(); expect(data.bindings[0].mobile_profile).toBeTruthy();
+    expect(await login(pairedRoot.pc)).toBeTruthy();
+    await env.DB.prepare("UPDATE devices SET status='revoked' WHERE id=?").bind(pairedRoot.pc.deviceId).run();
+  });
   it("registers without a code, retries safely, and rejects replaced keys and revoked devices", async () => {
     const root = await enrolled();
     expect((await post("/v1/enrollments", root.request)).status).toBe(200);

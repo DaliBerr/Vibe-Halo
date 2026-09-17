@@ -1,8 +1,63 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-09-17 (automatic companion connection; local acceptance below)
+Updated: 2026-09-17 (device names, Android onboarding and readable history)
 Current version: `0.5.9`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-09-17 — Device names, first-run setup and readable Android history
+
+Implemented the user-approved plan on codex/mobile-foundation. Device display
+names follow system names by default (installed PC: RETARD), support local rename
+and reset, and sync signed monotonic profiles without modifying identity keys,
+pairing transcripts or existing grants. Android migrates the old Android default
+to the system name; existing custom names persist. Queued profile changes survive
+offline operation and restart. Desktop/phone peer lists verify the pinned sender
+key before using profile metadata. Pairing screens can show the latest profile.
+
+Android first launch now shows four separate setup steps: notifications, locking
+in recent apps, battery/background settings and pairing. The first three can be
+deferred; one completed pairing is needed to enter the application. Existing
+active bindings bypass this first-run gate on upgrade; Devices reopens setup.
+Xiaomi/HyperOS settings have intent fallbacks and explicitly manual confirmation
+for states the OS cannot report. No background-residency guarantee is made.
+
+Replaced slogans with functional labels, reused desktop Halo artwork for launcher
+and in-app branding, added adaptive/monochrome notification icons, and collapsed
+device connection details. History separates 24-hour synced events from computer
+history. Cards show content, client, PC, project/session context, result and time;
+details show questions/answers or bounded excerpts instead of JSON. Optional
+history viewVersion 2 preserves old client response shapes; Android converts valid
+legacy responses and falls back to summaries for malformed/truncated text. Active
+decision and persistent-scope review requirements remain unchanged.
+
+Deployed additive D1 migration 0003 and Worker version
+4a586e89-fd8b-4c55-b266-27f8d1f21747 at the existing relay. No credentials, bindings,
+limits or notification routing fields changed. Local verification: root 227 tests
+(226 pass, existing Windows POSIX skip), relay typecheck plus 11 tests, Firebase
+debug/release builds and lint, Android setup/history/layout/notification tests,
+and public CompanionFlowTest including bidirectional rename, immutable pairing,
+readable encrypted history, cloud/LAN decisions and revocation. UI screenshots
+cover Chinese/English, large text and the signed release's light/dark setup.
+Desktop packaged approval smoke and real settings-window rename/reset passed;
+the installed desktop and signed APK deliverables were updated without CI/CD.
+
+Two environment findings were resolved during acceptance. Emulator DNS timed out
+despite IP connectivity; restarting Small_Phone with explicit 1.1.1.1/8.8.8.8 DNS
+restored the successful public flow. The release emulator also contained a binary,
+invalid-UTF-8 companion cache last modified 2026-09-16 18:20 UTC, before this task.
+Its encrypted bytes were preserved in .smoke/release-cache-inspect and the exact
+emulator file was renamed with a corrupt-20260916-preserved suffix. No physical
+phone data was touched. Added a non-destructive load-error/retry screen so invalid
+saved data cannot leave the new initial-loading gate spinning indefinitely.
+
+Evidence logs/screenshots use .smoke/device-ui-*, .smoke/setup-*,
+.smoke/history-zh.png and .smoke/release-setup-*.png. Synthetic cloud PCs were
+revoked, the bridge was stopped, and test forwards were removed. Actual installed
+PC pc_16d9239a-dd96-4093-bb58-3af861b11c04 and its active phone binding remain;
+the user's enabled control preference is preserved. Physical Xiaomi 15 device-name,
+HyperOS settings and locked-phone/watch delivery remain user acceptance. No tag,
+store release, remote CI/CD or main merge: the wider companion acceptance gates
+below still apply.
 
 ## 2026-09-17 — Input-reminder display and single-language notifications
 

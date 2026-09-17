@@ -186,7 +186,7 @@ remote desktop endpoint exists.
 ## Notifications and privacy
 
 The Worker sends FCM HTTP v1 `notification + data`. Body/title are short generic
-bilingual reminders. Data is restricted to version, PC/epoch/event IDs, revision
+reminders in the phone app's selected language. Data is restricted to version, PC/epoch/event IDs, revision
 and kind, with no authorization, token, command or answer. Requests use HIGH
 priority, completions NORMAL; TTL never exceeds event expiry and is capped at
 10 minutes. Stable channels are approvals, questions, completions and
@@ -216,3 +216,26 @@ ECDH private-key compromise, and timing/adapter metadata remains visible to rela
 Notification preferences may include `locale: "zh-CN" | "en-US"`, authenticated by
 the paired phone and protected by the existing monotonic revision. Notification
 copy uses this locale; the bounded six-field FCM routing data is unchanged.
+
+## Display profiles and readable history
+
+Display names are mutable metadata; `publicDevice` and existing signed grants stay
+immutable. `PUT /v1/device-profile` accepts `{profile: JWS}` using purpose
+`device-profile`. Its payload is `{protocolVersion:1, relayOrigin, deviceId,
+revision, name}`; the authenticated owner, signature, origin, positive safe-integer
+revision and 1–48 Unicode-character name are checked. Controls/format controls
+(except the emoji joiner) are rejected. D1 migration 0003 stores the newest signed
+profile separately; identical retries are idempotent, stale/conflicting revisions
+are rejected. `/v1/devices` adds `pc_profile`/`mobile_profile`, and
+`profiles.changed` invalidates display caches without changing binding revisions.
+Peers verify with their pinned identity keys and retain only newer profiles.
+Pairing offers and claim proofs optionally carry a signed `profile`; the existing
+fingerprint/grant transcript is unchanged. Old clients ignore the extra metadata.
+
+Encrypted `history.list`/`history.detail` queries accept optional `viewVersion:2`.
+The projection includes bounded human-readable context, outcome and timestamps;
+details include question/answer rows or an excerpt. No raw tool-input object is
+projected in v2. Legacy requests retain their response shape; `resolvedAt` now
+uses the stored `finalizedAt`. New Android clients convert valid legacy JSON in
+memory and show a summary/incomplete notice for malformed or truncated records.
+This presentation change does not change active decision context requirements.

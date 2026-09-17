@@ -358,6 +358,12 @@ The project has no database, web backend, frontend framework, Docker deployment,
 
 ## Development
 
+Device names default to system names and can be changed locally and synced to peers.
+First-run Android setup covers notifications, recent-app locking, battery settings
+and computer pairing; pairing is required to enter the app, while the other steps
+can be deferred. History cards show project/session context, summaries, results and
+times; details are concise read-only sections instead of raw JSON.
+
 The optional Android companion now has native phone UI, device pairing, pinned LAN
 HTTPS/WSS, a self-hosted Cloudflare relay, encrypted approvals/forms/history and
 FCM reminder support. The local preview automatically connects to the default test

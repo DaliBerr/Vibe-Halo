@@ -2,9 +2,10 @@
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Vibe Halo · 手机伴侣</title><link rel="stylesheet" href="style.css"></head>
-<body><main><header><span class="eyebrow">VIBE HALO / COMPANION</span><h1>让进度，随身可见。</h1><p>手机查看请求与完成提醒，电脑负责核验每一个决定。</p></header>
+<body><main><header><span class="eyebrow">VIBE HALO</span><h1>手机伴侣</h1><p>连接手机，查看通知和处理请求。</p></header>
 <p id="message" role="status" aria-live="polite"></p>
 <section><div class="heading"><h2>这台电脑</h2><span id="status" class="badge">未开启</span></div>
+<form id="nameForm"><label for="deviceName">电脑名称</label><input id="deviceName" type="text" autocomplete="off"><button type="submit">保存名称</button><button id="resetName" type="button" class="secondary">恢复系统名称</button><p id="nameStatus" class="hint"></p></form>
 <form id="setup"><p>正在自动连接手机伴侣服务，连接后即可配对手机。</p>
 <button id="retry" type="submit">重新连接</button></form>
 <div id="configured" hidden><p id="service"></p><p id="lan"></p><button id="toggle" type="button">关闭手机伴侣</button>

@@ -24,6 +24,9 @@ const { readBody } = require("../src/remote/lan-service");
   const approvals = new ApprovalStore(), decisions = new DecisionService({ approvalStore: approvals });
   const remote = new RemoteService({ userData: fs.mkdtempSync(path.join(root, ".smoke", "mobile-runtime-")), safeStorage, approvals, decisions, allowLocal: true, lanOptions: { advertise: false } });
   await remote.initialize(); await remote.configure({ relayOrigin, name: "Synthetic PC" });
+  const { HistoryStore } = require("../src/history-store");
+  remote.historyStore = new HistoryStore(); remote.historyStore.load();
+  remote.historyStore.append({ kind: "question", agentId: "codex", agentName: "Codex", title: "等待回答", sessionId: "synthetic-session-123", cwd: "C:\\Projects\\Demo", questions: [{ id: "q", question: "请选择部署环境", options: [{ id: "a", label: "开发" }, { id: "b", label: "测试" }, { id: "c", label: "生产" }] }], answers: { q: ["测试"] }, answerAvailable: true, outcome: "submit", createdAt: Date.now(), finalizedAt: Date.now() });
   remote.setControl(true); await remote.beginPairing();
   const bridgeToken = crypto.randomBytes(32).toString("hex"), outputs = [];
   const fixture = { relayOrigin, bridgeOrigin: "http://127.0.0.1:8788", bridgeToken, code: remote.pairing.code, pcId: remote.pcId, lanPort: remote.lan?.port };
@@ -33,10 +36,17 @@ const { readBody } = require("../src/remote/lan-service");
       if (request.headers.authorization !== `Bearer ${bridgeToken}`) throw new Error("unauthorized");
       const input = request.method === "POST" ? await readBody(request, 16384) : {};
       let result = {};
-      if (request.url === "/confirm") {
+      if (request.url === "/renew") {
+        await remote.beginPairing(); fixture.code = remote.pairing.code;
+        fs.writeFileSync(path.join(root, ".smoke", "mobile-smoke-config.json"), JSON.stringify(fixture)); result = { renewed: true };
+      } else if (request.url === "/confirm") {
         await remote.pollPairing();
         if (remote.pairing.fingerprint !== input.fingerprint) throw new Error("fingerprint_mismatch");
         await remote.confirmPairing(input.fingerprint); result = { confirmed: true };
+      } else if (request.url === "/rename") {
+        await remote.rename(input.name); result = { name: remote.snapshot().name };
+      } else if (request.url === "/names") {
+        await remote.refreshBindings(); result = { name: remote.snapshot().name, phones: remote.snapshot().bindings.map(binding => binding.name) };
       } else if (request.url === "/reminder") {
         if (!["input", "plan", "completion"].includes(input.kind)) throw new Error("invalid_kind");
         const eventId = remote.recordReminder({ agentId: "codex", requestKey: crypto.randomUUID(), title: "Synthetic notification", content: "Synthetic notification classification check" }, input.kind);

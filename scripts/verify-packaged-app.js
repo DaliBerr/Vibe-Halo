@@ -35,6 +35,7 @@ for (const required of [
   "/src/remote/settings-preload.js",
   "/src/remote/renderer/index.html",
   "/packages/protocol/src/crypto.mjs",
+  "/packages/protocol/src/device-profile.mjs",
   "/packages/protocol/package.json",
   "/packages/protocol/src/index.js",
   "/packages/protocol/generated/validators.js",

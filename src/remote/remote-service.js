@@ -30,10 +30,12 @@ class RemoteService extends EventEmitter {
   get pcId() { return this.state?.identity.deviceId; }
   async initialize({ autoConnect = false } = {}) {
     this.crypto = await import("../../packages/protocol/src/crypto.mjs");
+    this.profiles = await import("../../packages/protocol/src/device-profile.mjs");
     try {
       this.state = this.credentials.load();
       if (this.state) {
         await this.crypto.publicDevice(this.state.identity);
+        await this.ensureProfile();
         this.decisions.pcId = this.pcId; this.journal.load();
         if (this.state.enrolled && this.state.enabled) await this.start();
       }
@@ -60,12 +62,40 @@ class RemoteService extends EventEmitter {
     return this.configurationFlight;
   }
   save() { this.credentials.save(this.state); this.emit("changed"); }
+  async ensureProfile() {
+    if (!this.state) return;
+    const systemName = [...require("node:os").hostname()].slice(0, 48).join("");
+    if (!this.state.nameMode) this.state.nameMode = ["我的电脑", "My computer", "Android", "Vibe Halo", systemName].includes(this.state.identity.name) ? "system" : "custom";
+    const name = this.state.nameMode === "system" ? systemName : this.state.profile?.name || this.state.identity.name;
+    if (this.state.profile?.name === name) return;
+    this.state.profile = { protocolVersion: 1, deviceId: this.pcId, relayOrigin: this.state.relayOrigin,
+      revision: Math.max(Date.now(), (this.state.profile?.revision || 0) + 1), name: this.profiles.deviceName(name) };
+    this.state.profileJws = await this.crypto.sign(this.state.profile, this.state.identity.signKey, "device-profile");
+    this.state.profilePending = true; this.save();
+  }
+  async rename(name, reset = false) {
+    if (!this.state) throw new Error("service_unconfigured");
+    const next = reset ? [...require("node:os").hostname()].slice(0, 48).join("") : this.profiles.deviceName(name);
+    this.state.nameMode = reset ? "system" : "custom";
+    this.state.profile = { protocolVersion: 1, deviceId: this.pcId, relayOrigin: this.state.relayOrigin,
+      revision: Math.max(Date.now(), (this.state.profile?.revision || 0) + 1), name: next };
+    this.state.profileJws = await this.crypto.sign(this.state.profile, this.state.identity.signKey, "device-profile");
+    this.state.profilePending = true; this.save();
+    await this.syncProfile().catch(() => {}); return this.snapshot();
+  }
+  async syncProfile() {
+    if (!this.state?.enrolled || !this.enabled || !this.state.profilePending) return;
+    const profile = this.state.profileJws;
+    await this.request("/v1/device-profile", { method: "PUT", body: { profile } });
+    if (this.state.profileJws === profile) { this.state.profilePending = false; this.save(); }
+  }
   snapshot() {
     return { locale: this.getLocale?.() || "zh-CN", enabled: this.enabled, enrolled: this.state?.enrolled === true, controlEnabled: this.state?.controlEnabled === true, status: this.status,
+      name: this.state?.profile?.name || this.state?.identity.name || "", nameMode: this.state?.nameMode || "system", namePending: this.state?.profilePending === true,
       relayOrigin: this.state?.relayOrigin || "", pcId: this.pcId || "", lanPort: this.lan?.port || null,
-      bindings: (this.state?.bindings || []).map(value => ({ bindingId: value.bindingId, name: value.mobile.name, mobileId: value.mobile.deviceId, state: value.state, revision: value.revision, scopes: value.scopes })),
+      bindings: (this.state?.bindings || []).map(value => ({ bindingId: value.bindingId, name: value.mobileProfile?.name || value.mobile.name, mobileId: value.mobile.deviceId, state: value.state, revision: value.revision, scopes: value.scopes })),
       pairing: this.pairing ? { pairingId: this.pairing.pairingId, code: this.pairing.code, expiresAt: this.pairing.expiresAt,
-        mobileName: this.pairing.mobile?.name || "", fingerprint: this.pairing.fingerprint || "" } : null };
+        mobileName: this.pairing.mobileProfile?.name || this.pairing.mobile?.name || "", fingerprint: this.pairing.fingerprint || "" } : null };
   }
   async configure({ relayOrigin, name = require("node:os").hostname() } = {}) {
     if (this.storageBlocked) throw new Error(this.status);
@@ -80,6 +110,7 @@ class RemoteService extends EventEmitter {
       this.state = { version: 1, identity, tls, relayOrigin: origin, bindings: [], enabled: true, controlEnabled: false, enrolled: false };
       this.save(); this.decisions.pcId = this.pcId;
     }
+    await this.ensureProfile();
     if (!this.state.enrolled) {
       this.status = "connecting"; this.state.autoConnectDisabled = false; this.save();
       const device = await this.crypto.publicDevice(this.state.identity);
@@ -130,6 +161,9 @@ class RemoteService extends EventEmitter {
     if (this.storageBlocked) throw new Error(this.status);
     if (!this.state?.enrolled || this.enabled) return;
     this.enabled = true; this.state.enabled = true; this.decisions.quiescing = false; this.save();
+    clearInterval(this.profileTimer);
+    this.profileTimer = setInterval(() => { if (!this.profileFlight) this.profileFlight = this.ensureProfile().then(() => this.syncProfile()).catch(() => {}).finally(() => { this.profileFlight = null; }); }, 30000);
+    this.profileTimer.unref();
     this.lan = new LanService(this, this.lanOptions);
     try { await this.lan.start(); } catch { this.status = "lan_unavailable"; }
     this.captureApprovals(); this.connect();
@@ -138,7 +172,7 @@ class RemoteService extends EventEmitter {
     if (!this.enabled || this.connecting) return;
     const generation = this.generation; this.connecting = true;
     (async () => {
-      await this.login(); await this.refreshBindings();
+      await this.login(); await this.syncProfile().catch(() => {}); await this.refreshBindings();
       if (!this.enabled || generation !== this.generation) return;
       const socket = new WebSocket(`${this.state.relayOrigin.replace(/^http/, "ws")}/v1/pcs/${this.pcId}/stream`, {
         headers: { authorization: `Bearer ${this.session.token}` }, maxPayload: 262144, handshakeTimeout: 10000, followRedirects: false,
@@ -165,6 +199,7 @@ class RemoteService extends EventEmitter {
     this.socket.send(message); return true;
   }
   async onMessage(value) {
+    if (value.type === "profiles.changed") await this.refreshBindings();
     if (value.type === "sync.request") { await this.refreshBindings(); await this.publishAll(true); }
     if (value.type === "bindings.changed") { await this.refreshBindings(); this.lan?.notify(); }
     if (value.type === "decision.submit") {
@@ -182,6 +217,12 @@ class RemoteService extends EventEmitter {
     let changed = false;
     for (const local of this.state.bindings) {
       const cloud = bindings.find(value => value.id === local.bindingId);
+      if (cloud?.mobile_profile && local.state === "active") {
+        try {
+          const profile = this.profiles.checkedProfile(await this.crypto.verify(cloud.mobile_profile, local.mobile.signKey, "device-profile"), local.mobile.deviceId, this.state.relayOrigin);
+          if (profile.revision > (local.mobileProfile?.revision || 0)) { local.mobileProfile = profile; changed = true; }
+        } catch { /* Display metadata cannot alter local trust. */ }
+      }
       if (local.state === "confirming" && cloud?.state === "active" && cloud.grant_jws === local.grantJws) { local.state = "active"; changed = true; }
       // Relay can reduce authority, never create or expand PC-local trust.
       if ((!cloud || cloud.state !== "active" || cloud.revision !== local.revision) && local.state === "active") { local.state = "revoked"; changed = true; }
@@ -194,7 +235,7 @@ class RemoteService extends EventEmitter {
     if (!this.enabled || !Array.isArray(scopes) || !scopes.includes("events.read") || scopes.some(value => !this.crypto.SCOPES.includes(value))) throw new Error("invalid_scopes");
     if (this.pairing) await this.cancelPairing();
     const offer = { protocolVersion: 1, relayOrigin: this.state.relayOrigin, issuedAt: Date.now(), pairingId: randomUUID(),
-      pc: await this.crypto.publicDevice(this.state.identity), lanTlsPin: this.state.tls.pin, scopes };
+      pc: await this.crypto.publicDevice(this.state.identity), profile: this.state.profileJws, lanTlsPin: this.state.tls.pin, scopes };
     const result = await this.request("/v1/pairings", { method: "POST", body: { offer: await this.crypto.sign(offer, this.state.identity.signKey, "pairing-offer") } });
     this.pairing = { ...result, offer }; this.emit("changed"); return this.snapshot();
   }
@@ -215,6 +256,7 @@ class RemoteService extends EventEmitter {
       const mobile = await this.crypto.publicDevice(result.claim.mobile);
       const proof = await this.crypto.verify(result.claim.proof, mobile.signKey, "pairing-claim");
       if (this.crypto.canonical(proof.mobile) !== this.crypto.canonical(mobile) || proof.relayOrigin !== this.state.relayOrigin || proof.codeDigest !== await this.crypto.sha256(this.pairing.code)) throw new Error("invalid_claim");
+      if (proof.profile) this.pairing.mobileProfile = this.profiles.checkedProfile(await this.crypto.verify(proof.profile, mobile.signKey, "device-profile"), mobile.deviceId, this.state.relayOrigin);
       const { protocolVersion, relayOrigin, pairingId, pc, lanTlsPin, scopes } = this.pairing.offer;
       this.pairing.transcript = { protocolVersion, relayOrigin, pairingId, pc, mobile, lanTlsPin, scopes };
       this.pairing.mobile = mobile; this.pairing.fingerprint = await this.crypto.pairingFingerprint(this.pairing.transcript);
@@ -229,7 +271,7 @@ class RemoteService extends EventEmitter {
     const grantJws = previous?.grantJws || await this.crypto.sign(grant, this.state.identity.signKey, "binding-grant");
     // Persist explicit local trust before the relay is allowed to activate it.
     this.state.bindings = this.state.bindings.filter(value => value.mobile.deviceId !== grant.mobile.deviceId);
-    this.state.bindings.push({ ...grant, grantJws, state: "confirming", persistentEnabled: grant.scopes.includes("approvals.persistent") });
+    this.state.bindings.push({ ...grant, grantJws, mobileProfile: pairing.mobileProfile, state: "confirming", persistentEnabled: grant.scopes.includes("approvals.persistent") });
     while (this.state.bindings.length > 32) {
       const index = this.state.bindings.findIndex(value => value.state === "revoked");
       if (index < 0) throw new Error("capacity_exceeded");
@@ -367,7 +409,7 @@ class RemoteService extends EventEmitter {
       if (!Number.isInteger(offset) || offset < 0 || offset > 200) throw new Error("invalid_cursor");
       const records = this.historyStore?.list() || [];
       for (const item of records.slice(offset, offset + 25)) {
-        const record = { id: item.id, kind: item.kind, agentId: item.agentId, title: item.title, toolName: item.toolName, outcome: item.outcome, createdAt: item.createdAt, resolvedAt: item.resolvedAt };
+        const record = query.viewVersion === 2 ? require("./history-view").historyView(item) : { id: item.id, kind: item.kind, agentId: item.agentId, title: item.title, toolName: item.toolName, outcome: item.outcome, createdAt: item.createdAt, resolvedAt: item.finalizedAt };
         output.records.push(record);
         if (Buffer.byteLength(JSON.stringify(output)) > 60000) { output.records.pop(); break; }
       }
@@ -376,13 +418,17 @@ class RemoteService extends EventEmitter {
       if (typeof query.historyId !== "string" || query.historyId.length > 240) throw new Error("invalid_id");
       const record = this.historyStore?.get(query.historyId);
       if (record) {
+        if (query.viewVersion === 2) output.records.push(require("./history-view").historyView(record, true));
+        else {
         const text = JSON.stringify(record, null, 2);
         output.records.push({ id: record.id, text: require("../history-store").truncateUtf8(text, 48000), truncated: Buffer.byteLength(text) > 48000 });
+        }
       }
     }
     return this.crypto.seal(output, this.state.identity.signKey, binding.mobile.encryptionKey, "read-response");
   }
   async stop(disable = false) {
+    clearInterval(this.profileTimer);
     this.enabled = false; this.generation += 1;
     for (const timer of [this.publishTimer, this.reconnectTimer, this.renewTimer, this.enrollmentTimer]) clearTimeout(timer);
     if (this.socket?.readyState === WebSocket.OPEN) {

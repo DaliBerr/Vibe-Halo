@@ -285,6 +285,7 @@ class HistoryStore extends EventEmitter {
       kind: record.kind,
       agentId: record.agentId,
       agentName: record.agentName,
+      sessionId: record.sessionId,
       title: cleanText(record.title, 640),
       titleKey: record.titleKey,
       titleParams: clone(record.titleParams),

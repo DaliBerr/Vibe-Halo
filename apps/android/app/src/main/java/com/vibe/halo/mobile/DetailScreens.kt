@@ -24,7 +24,7 @@ import org.json.JSONObject
     var customRelay by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.pairing?.pairingId) { while (repo.state.value.pairing != null) { delay(3000); repo.pollPairing() } }
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
-        TextButton(onClick = back) { Text(tr("← 返回")) }; Spacer(Modifier.height(20.dp)); Text(tr("连接，从信任开始。"), fontSize = 29.sp, fontWeight = FontWeight.SemiBold)
+        TextButton(onClick = back) { Text(tr("← 返回")) }; Spacer(Modifier.height(20.dp)); Text(tr("连接电脑"), fontSize = 29.sp, fontWeight = FontWeight.SemiBold)
         Text(tr("在电脑托盘打开「手机伴侣」，生成配对码后填在这里。"), Modifier.padding(vertical = 18.dp), fontSize = 14.sp, lineHeight = 23.sp)
         val pair = state.pairing
         if (pair == null) {

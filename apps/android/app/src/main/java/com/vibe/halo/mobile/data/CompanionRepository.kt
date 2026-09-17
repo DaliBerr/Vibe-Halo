@@ -26,9 +26,9 @@ import java.time.format.DateTimeFormatterBuilder
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-data class Computer(val key: String, val origin: String, val grant: JSONObject, val state: String, val online: Boolean = false, val transport: String = "cloud") {
+data class Computer(val key: String, val origin: String, val grant: JSONObject, val state: String, val online: Boolean = false, val transport: String = "cloud", val profile: JSONObject? = null) {
     val pcId: String get() = grant.getJSONObject("pc").getString("deviceId")
-    val name: String get() = grant.getJSONObject("pc").getString("name")
+    val name: String get() = profile?.optString("name") ?: grant.getJSONObject("pc").getString("name")
     val bindingId: String get() = grant.getString("bindingId")
     fun permits(scope: String) = grant.getJSONArray("scopes").values().contains(scope)
 }
@@ -37,7 +37,7 @@ data class RemoteEvent(val key: String, val computerKey: String, val detail: JSO
 }
 data class PairingView(val origin: String, val pairingId: String, val name: String, val fingerprint: String, val expiresAt: Long, val confirmedOnPc: Boolean = false)
 data class HistoryItem(val computerKey: String, val record: JSONObject)
-data class CompanionState(val computers: List<Computer> = emptyList(), val events: List<RemoteEvent> = emptyList(), val history: List<HistoryItem> = emptyList(), val historyDetails: Map<String, String> = emptyMap(), val pairing: PairingView? = null, val message: String = "", val busy: Boolean = false)
+data class CompanionState(val computers: List<Computer> = emptyList(), val events: List<RemoteEvent> = emptyList(), val history: List<HistoryItem> = emptyList(), val historyDetails: Map<String, JSONObject> = emptyMap(), val pairing: PairingView? = null, val message: String = "", val busy: Boolean = false, val loaded: Boolean = false, val loadError: Boolean = false, val deviceName: String = "", val namePending: Boolean = false)
 class ApiError(val code: String, val status: Int) : Exception(code)
 
 class CompanionRepository(private val context: Context) {
@@ -67,13 +67,15 @@ class CompanionRepository(private val context: Context) {
     suspend fun load(startDiscovery: Boolean = true) = operation {
         foreground = startDiscovery
         if (loaded) { if (startDiscovery) discovery.start(); return@operation }
+        mutable.value = mutable.value.copy(loadError = false, computers = emptyList(), events = emptyList())
         val saved = registry.read()
         for (raw in saved.optJSONArray("origins")?.values().orEmpty()) {
             val origin = checkedOrigin(raw as String); val account = account(origin); val data = account.store.read()
             val pcs = data.optJSONArray("bindings")?.values().orEmpty().map { rawBinding ->
                 val item = rawBinding as JSONObject; val grant = item.getJSONObject("grant")
                 verifyGrant(account, item.getString("grantJws"), grant)
-                Computer("$origin/${grant.getString("bindingId")}", origin, grant, item.getString("state"))
+                val profile = data.optJSONObject("peerProfiles")?.optString(grant.getJSONObject("pc").getString("deviceId"))?.let { signed -> runCatching { verifiedProfile(account, grant.getJSONObject("pc"), signed) }.getOrNull() }
+                Computer("$origin/${grant.getString("bindingId")}", origin, grant, item.getString("state"), profile = profile)
             }
             val keys = pcs.filter { it.state == "active" }.map { it.key }.toSet()
             val events = data.optJSONArray("events")?.values().orEmpty().mapNotNull { rawEvent ->
@@ -82,12 +84,15 @@ class CompanionRepository(private val context: Context) {
             }.filter { it.computerKey in keys }
             mutable.value = mutable.value.copy(computers = mutable.value.computers + pcs, events = mutable.value.events + events)
         }
+        DeviceNames.migrate(context, accounts.values.firstOrNull()?.crypto?.publicDevice?.optString("name"))
         prune(); if (startDiscovery) discovery.start(); loaded = true
-    }
+        mutable.value = mutable.value.copy(loaded = true, loadError = false, deviceName = DeviceNames.current(context))
+    }.also { if (!loaded) mutable.value = mutable.value.copy(loadError = true) }
     suspend fun beginPairing(originText: String, codeText: String) = operation {
         val origin = checkedOrigin(originText.trim()); val account = account(origin)
         val code = codeText.replace(Regex("[\\s-]"), "").uppercase(); require(Regex("[A-Z0-9]{10,64}").matches(code)) { "invalid_code" }
-        val proof = fresh(origin).put("mobile", account.crypto.publicDevice).put("codeDigest", DeviceCrypto.sha256(code))
+        ensureProfile(account)
+        val proof = fresh(origin).put("mobile", account.crypto.publicDevice).put("codeDigest", DeviceCrypto.sha256(code)).put("profile", account.store.read().getString("profileJws"))
         val result = request(account, "/v1/pairings/claim", "POST", JSONObject().put("code", code).put("mobile", account.crypto.publicDevice).put("proof", account.crypto.sign(proof, "pairing-claim")), false)
         val offerJws = result.getString("offer")
         // The offered root key is not trusted until the human compares this transcript on the PC.
@@ -98,7 +103,8 @@ class CompanionRepository(private val context: Context) {
         val transcript = JSONObject().put("protocolVersion", 1).put("relayOrigin", origin).put("pairingId", offer.getString("pairingId"))
             .put("pc", offer.getJSONObject("pc")).put("mobile", account.crypto.publicDevice).put("lanTlsPin", offer.getString("lanTlsPin")).put("scopes", offer.getJSONArray("scopes"))
         pairingOffer = transcript; confirmedGrant = null
-        mutable.value = mutable.value.copy(pairing = PairingView(origin, result.getString("pairingId"), offer.getJSONObject("pc").getString("name"), DeviceCrypto.fingerprint(transcript), result.getLong("expiresAt")), message = "请在电脑上核对指纹并确认。")
+        val profile = offer.optString("profile").takeIf { it.isNotEmpty() }?.let { verifiedProfile(account, offer.getJSONObject("pc"), it) }
+        mutable.value = mutable.value.copy(pairing = PairingView(origin, result.getString("pairingId"), profile?.getString("name") ?: offer.getJSONObject("pc").getString("name"), DeviceCrypto.fingerprint(transcript), result.getLong("expiresAt")), message = "请在电脑上核对指纹并确认。")
     }
     suspend fun pollPairing() = operation {
         val pairing = mutable.value.pairing ?: return@operation
@@ -313,7 +319,7 @@ class CompanionRepository(private val context: Context) {
         require(pc.permits("history.read")) { "forbidden" }
         var offset: Int? = 0; val items = mutableListOf<HistoryItem>()
         while (offset != null && items.size < 200) {
-            val response = readQuery(pc, "history.list", JSONObject().put("offset", offset))
+            val response = readQuery(pc, "history.list", JSONObject().put("offset", offset).put("viewVersion", 2))
             val records = response.getJSONArray("records"); require(records.length() <= 25)
             items += records.values().map { HistoryItem(pc.key, it as JSONObject) }
             val next = if (response.isNull("nextOffset")) null else response.getInt("nextOffset")
@@ -331,11 +337,12 @@ class CompanionRepository(private val context: Context) {
     suspend fun loadHistoryDetail(computerKey: String, historyId: String) = operation {
         val pc = mutable.value.computers.first { it.key == computerKey && it.state == "active" }
         require(pc.permits("history.read")) { "forbidden" }
-        val response = readQuery(pc, "history.detail", JSONObject().put("historyId", historyId))
+        val response = readQuery(pc, "history.detail", JSONObject().put("historyId", historyId).put("viewVersion", 2))
         val record = response.getJSONArray("records").optJSONObject(0) ?: error("not_found")
-        val text = record.getString("text"); require(text.toByteArray().size <= 48000)
-        val details = mutable.value.historyDetails.toMutableMap(); details["$computerKey/$historyId"] = text
-        while (details.size > 200 || details.values.sumOf { it.toByteArray().size } > 4 * 1024 * 1024) details.remove(details.keys.first())
+        require(record.toString().toByteArray().size <= 60000)
+        val readable = HistoryPresentation.detail(record, mutable.value.history.find { it.computerKey == computerKey && it.record.optString("id") == historyId }?.record)
+        val details = mutable.value.historyDetails.toMutableMap(); details["$computerKey/$historyId"] = readable
+        while (details.size > 200 || details.values.sumOf { it.toString().toByteArray().size } > 4 * 1024 * 1024) details.remove(details.keys.first())
         mutable.value = mutable.value.copy(historyDetails = details)
     }
     private fun readQuery(pc: Computer, type: String, fields: JSONObject): JSONObject {
@@ -361,7 +368,51 @@ class CompanionRepository(private val context: Context) {
         registry.update { it.put("pushToken", token) }
         for (account in accounts.values) runCatching { maintain(account) }
     }
+    private fun verifiedProfile(account: Account, device: JSONObject, signed: String): JSONObject =
+        DeviceNames.profile(DeviceCrypto.verify(signed, device.getJSONObject("signKey"), "device-profile"), device.getString("deviceId"), account.origin)
+    private fun ensureProfile(account: Account) {
+        val saved = account.store.read(); val name = DeviceNames.current(context)
+        if (saved.optJSONObject("profile")?.optString("name") == name) return
+        val profile = JSONObject().put("protocolVersion", 1).put("deviceId", account.crypto.publicDevice.getString("deviceId"))
+            .put("relayOrigin", account.origin).put("name", name).put("revision", maxOf(System.currentTimeMillis(), (saved.optJSONObject("profile")?.optLong("revision") ?: 0) + 1))
+        account.store.update { it.put("profile", profile).put("profileJws", account.crypto.sign(profile, "device-profile")).put("profilePending", true) }
+    }
+    private fun syncProfile(account: Account) {
+        ensureProfile(account)
+        if (mutable.value.computers.none { it.origin == account.origin && it.state == "active" }) return
+        val saved = account.store.read()
+        if (saved.optBoolean("profilePending")) {
+            request(account, "/v1/device-profile", "PUT", JSONObject().put("profile", saved.getString("profileJws")))
+            account.store.update { it.put("profilePending", false) }
+        }
+        val bindings = request(account, "/v1/devices").getJSONArray("bindings")
+        require(bindings.length() <= 64)
+        for (raw in bindings.values()) {
+            val row = raw as JSONObject
+            val pc = mutable.value.computers.find { it.origin == account.origin && it.bindingId == row.optString("id") && it.state == "active" } ?: continue
+            val signed = row.optString("pc_profile").takeUnless { it.isBlank() || it == "null" } ?: continue
+            runCatching {
+                val profile = verifiedProfile(account, pc.grant.getJSONObject("pc"), signed)
+                if (profile.getLong("revision") > (pc.profile?.optLong("revision") ?: 0)) {
+                    account.store.update { val peers = it.optJSONObject("peerProfiles") ?: JSONObject(); peers.put(pc.pcId, signed); it.put("peerProfiles", peers) }
+                    mutable.value = mutable.value.copy(computers = mutable.value.computers.map { if (it.key == pc.key) it.copy(profile = profile) else it })
+                }
+            }
+        }
+    }
+    suspend fun renameDevice(name: String?) = operation {
+        DeviceNames.set(context, name)
+        accounts.values.forEach { ensureProfile(it) }
+        mutable.value = mutable.value.copy(deviceName = DeviceNames.current(context), namePending = accounts.isNotEmpty())
+        accounts.values.forEach { runCatching { syncProfile(it) } }
+        updateNameState()
+    }
+    private fun updateNameState() {
+        mutable.value = mutable.value.copy(deviceName = DeviceNames.current(context), namePending = accounts.values.any { account -> mutable.value.computers.any { it.origin == account.origin && it.state == "active" } && account.store.read().optBoolean("profilePending") })
+    }
     private fun maintain(account: Account) {
+        runCatching { syncProfile(account) }
+        updateNameState()
         val saved = account.store.read()
         for (id in saved.optJSONArray("pendingRevocations")?.values().orEmpty()) {
             try { request(account, "/v1/bindings/$id", "DELETE") } catch (error: ApiError) { if (error.status !in listOf(403, 404)) throw error }
@@ -453,7 +504,7 @@ class CompanionRepository(private val context: Context) {
                 if (text.toByteArray().size > 16384) { webSocket.close(1009, "too_large"); return }
                 runCatching {
                     val value = JSONObject(text); Wire.safe(value)
-                    if (value.optString("type") in listOf("events.changed", "decision.result", "bindings.changed")) updates.tryEmit(Unit)
+                    if (value.optString("type") in listOf("events.changed", "decision.result", "bindings.changed", "profiles.changed")) updates.tryEmit(Unit)
                 }
             }
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { account.sockets.remove(key, webSocket) }
@@ -499,7 +550,9 @@ class CompanionRepository(private val context: Context) {
     }
     private suspend fun operation(block: () -> Unit) = withContext(Dispatchers.IO) { mutex.withLock {
         mutable.value = mutable.value.copy(busy = true)
-        try { block() } catch (error: Exception) { if (error is kotlinx.coroutines.CancellationException) throw error; mutable.value = mutable.value.copy(message = when ((error as? ApiError)?.code ?: error.message) {
+        try { block() } catch (error: Exception) { if (error is kotlinx.coroutines.CancellationException) throw error
+            android.util.Log.w("VibeHalo", "operation_failed:${error.javaClass.simpleName}:${(error as? ApiError)?.code.orEmpty()}:" + error.stackTrace.take(4).joinToString { "${it.className}.${it.methodName}:${it.lineNumber}" })
+            mutable.value = mutable.value.copy(message = when ((error as? ApiError)?.code ?: error.message) {
             "invalid_code" -> "配对码无效或已经使用，请在电脑上生成新配对码。"
             "pairing_expired" -> "配对已过期，请重新配对。"
             "refresh_required" -> "当前详情已失效或电脑离线，请先刷新。"

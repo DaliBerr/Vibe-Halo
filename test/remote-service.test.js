@@ -37,6 +37,20 @@ async function registrationFixture(t) {
   return f;
 }
 
+test("offline rename survives restart without changing identity or signed grants", async t => {
+  const { remote } = await fixture(t);
+  remote.state.identity.name = "我的电脑"; remote.state.enrolled = true;
+  const identity = JSON.stringify(remote.state.identity);
+  remote.state.bindings = [{ bindingId: "test-binding", mobile: { deviceId: "mobile_test", name: "Android" }, grantJws: "unchanged", state: "active", revision: 1, scopes: ["events.read"] }];
+  remote.request = async () => { throw new Error("offline"); };
+  await remote.ensureProfile(); assert.equal(remote.snapshot().name, os.hostname());
+  await remote.rename("自定义电脑 😀"); assert.equal(remote.snapshot().namePending, true);
+  const restored = remote.credentials.load(); assert.equal(restored.profile.name, "自定义电脑 😀");
+  assert.equal(JSON.stringify(restored.identity), identity); assert.equal(restored.bindings[0].grantJws, "unchanged");
+  remote.request = async () => ({}); await remote.syncProfile(); assert.equal(remote.snapshot().namePending, false);
+  await remote.rename(null, true); assert.equal(remote.snapshot().name, os.hostname());
+});
+
 test("automatic connection uses the default service, one identity and no enrollment code", async t => {
   const { remote } = await registrationFixture(t), sent = [];
   remote.request = async (route, options) => { sent.push({ route, ...options }); return { enrolled: true }; };

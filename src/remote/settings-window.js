@@ -12,6 +12,7 @@ class RemoteSettingsWindow {
       try {
         switch (input.action) {
           case "status": return this.remote.snapshot();
+          case "rename": return await remote.rename(input.name, input.reset === true);
           case "configure": return await remote.connectDefault();
           case "enable": await remote.start(); return remote.snapshot();
           case "disable": await remote.stop(true); return remote.snapshot();
@@ -26,7 +27,7 @@ class RemoteSettingsWindow {
         }
       } catch (error) {
         const allowed = ["secure_storage_unavailable", "credential_store_invalid", "remote_journal_invalid", "invalid_code", "invalid_relay_origin", "remove_existing_identity_first", "capacity_exceeded", "pairing_expired", "invalid_claim", "invalid_scopes", "service_unconfigured"];
-        return { error: allowed.includes(error.message) ? error.message : "operation_failed" };
+        return { error: error.message === "invalid_device_name" ? error.message : allowed.includes(error.message) ? error.message : "operation_failed" };
       }
     });
     this.changed = () => { if (this.window && !this.window.isDestroyed()) this.window.webContents.send("mobile-settings:changed", remote.snapshot()); };

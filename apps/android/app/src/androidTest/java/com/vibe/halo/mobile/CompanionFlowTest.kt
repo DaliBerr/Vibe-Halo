@@ -44,6 +44,21 @@ class CompanionFlowTest {
         repo.finishPairing(); assertNull(repo.state.value.message, repo.state.value.pairing)
         val pc = repo.state.value.computers.first { it.pcId == config.getString("pcId") }
         assertEquals("active", pc.state)
+        val originalName = com.vibe.halo.mobile.data.DeviceNames.current(context)
+        repo.renameDevice("Synthetic 小米 15")
+        assertTrue(bridge("/names").getJSONArray("phones").toString().contains("Synthetic 小米 15"))
+        bridge("/rename", JSONObject().put("name", "Synthetic RETARD"))
+        repo.refresh()
+        assertEquals("Synthetic RETARD", repo.state.value.computers.first { it.key == pc.key }.name)
+        repo.loadHistory(pc.key)
+        val record = repo.state.value.history.first { it.computerKey == pc.key }.record
+        assertEquals("请选择部署环境", record.getString("preview"))
+        assertEquals("Demo", record.getString("projectName"))
+        repo.loadHistoryDetail(pc.key, record.getString("id"))
+        val readable = repo.state.value.historyDetails["${pc.key}/${record.getString("id")}"]!!
+        assertEquals("测试", readable.getJSONArray("questions").getJSONObject(0).getString("answer"))
+        assertFalse(readable.has("text"))
+        repo.renameDevice(originalName)
         val request = bridge("/request")
         delay(1600) // The cloud event is already cached before this phone opens it.
         repo.refresh()
