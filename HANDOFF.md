@@ -21,6 +21,10 @@ Xiaomi background locking, vendor battery/autostart behavior and lock-screen
 phone/watch delivery still require physical-device acceptance. CI does not
 replace those checks. The owner has authorized publication with these boundaries.
 
+Candidate CI exposed macOS runner hostnames longer than the 48-character device
+name limit. Corrected the rename test to expect the bounded system name; production
+name handling already enforced the limit.
+
 Release checks: root/protocol tests, local Android build/lint and signature
 verification, plus the exact release commit's cross-platform and mobile CI.
 Publish immutable `v0.6.0` and `preview-0.6.0` tags only after candidate checks pass.
