@@ -359,10 +359,11 @@ The project has no database, web backend, frontend framework, Docker deployment,
 ## Development
 
 Device names default to system names and can be changed locally and synced to peers.
-First-run Android setup covers notifications, recent-app locking, battery settings
-and computer pairing; pairing is required to enter the app, while the other steps
-can be deferred. History cards show project/session context, summaries, results and
-times; details are concise read-only sections instead of raw JSON.
+First-run Android setup shows one step at a time: computer pairing, notifications,
+recent-app locking and battery settings. Pairing is required; the remaining steps
+can be deferred. Available system checks refresh automatically; unsupported vendor
+settings remain unverified. History details use separate title/type, source, content
+and result cards, including for cached synced events, without raw protocol JSON.
 
 The optional Android companion now has native phone UI, device pairing, pinned LAN
 HTTPS/WSS, a self-hosted Cloudflare relay, encrypted approvals/forms/history and

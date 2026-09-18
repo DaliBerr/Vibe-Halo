@@ -8,6 +8,22 @@ import java.util.Locale
 object UiLanguage {
     var mode by mutableStateOf("system")
     private val english = mapOf(
+        "标题与类别" to "Title and type", "来源" to "Source", "内容摘要" to "Summary", "处理结果" to "Result",
+        "审批" to "Approval", "问答" to "Question", "回到电脑处理" to "Continue on computer", "计划" to "Plan", "任务完成" to "Completion", "事件" to "Event",
+        "项目" to "Project", "会话" to "Session", "命令" to "Command", "文件" to "File", "查询" to "Query", "用途" to "Purpose",
+        "内容暂无法解析" to "Content could not be read", "未提供内容摘要" to "No summary provided", "内容已截取。" to "Content shortened.",
+        "记录不完整，当前仅显示可读部分。" to "Incomplete record; showing the readable parts.", "未记录具体处理结果" to "Detailed result not recorded",
+        "后台省电设置" to "Background battery settings", "已配对，即将继续" to "Paired. Continuing…", "通知已开启，即将继续" to "Notifications enabled. Continuing…",
+        "允许通知，及时收到审批、问题和完成提醒。" to "Allow notifications for approvals, questions and completed tasks.", "部分通知类别已关闭，请在通知设置中开启。" to "Some notification categories are disabled. Enable them in notification settings.",
+        "上滑并停留，打开最近任务；三键导航请点击最近任务键。" to "Swipe up and hold to open recent apps, or tap the Recents navigation button.",
+        "长按应用卡片 → 点击锁形按钮" to "Hold the app card → Tap the lock", "返回后可直接下一步。系统未提供后台锁定的检测结果。" to "Return and continue. The system does not report whether the app is locked in recents.",
+        "系统电池优化：已豁免" to "System battery optimization: Exempt", "系统电池优化：未豁免" to "System battery optimization: Not exempt",
+        "系统后台限制：已开启" to "System background restrictions: On", "系统后台限制：未开启" to "System background restrictions: Off", "系统后台限制：无法检测" to "System background restrictions: Unavailable",
+        "小米省电策略与自启动：未验证" to "Xiaomi battery policy and autostart: Not verified", "返回后自动刷新可检测的状态，无需手动确认。" to "Available checks refresh when you return. No manual confirmation is needed.",
+        "无法打开系统设置，请从系统设置中找到 Vibe Halo。" to "Could not open settings. Find Vibe Halo in system settings.",
+        "上滑并停留，找到 Vibe Halo，长按卡片后点锁形按钮。" to "Swipe up and hold. Find Vibe Halo, hold its card and tap the lock.",
+        "省电策略设为不限制，并允许后台自启动。" to "Set battery use to No restrictions and allow background autostart.", "在应用详情中允许后台运行。" to "Allow background activity in app info.",
+        "打开通知设置" to "Open notification settings", "长按 Vibe Halo 卡片，点击锁形按钮。" to "Hold the Vibe Halo card and tap the lock.", "显示锁定提示" to "Show locking instructions", "打开应用详情" to "Open app info", "下一步" to "Next", "上一步" to "Back",
         "无法读取已保存的设备。数据已保留，请重试。" to "Saved devices could not be loaded. Your data is preserved. Please retry.", "重试" to "Retry",
         "待处理" to "Pending", "历史记录" to "History", "暂无待处理请求" to "No pending requests", "暂无历史记录" to "No history yet",
         "这台手机" to "This phone", "修改名称" to "Rename", "恢复系统名称" to "Use system name", "名称待同步" to "Name pending sync", "保存" to "Save",

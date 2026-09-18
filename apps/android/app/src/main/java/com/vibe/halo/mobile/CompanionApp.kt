@@ -29,8 +29,7 @@ import kotlinx.coroutines.launch
     val snack = remember { SnackbarHostState() }
     LaunchedEffect(state.loaded) {
         if (state.loaded && !prefs.getBoolean("initialized", false)) {
-            introComplete = state.computers.any { it.state == "active" }
-            prefs.edit().putBoolean("initialized", true).putBoolean("complete", introComplete).apply()
+            introComplete = SetupProgress(context).initialize(state.computers.any { it.state == "active" })
         }
     }
     LaunchedEffect(state.message) { if (state.message.isNotEmpty()) snack.showSnackbar(tr(state.message)) }
@@ -55,9 +54,9 @@ import kotlinx.coroutines.launch
             }
             !state.loaded -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             pairing -> PairingScreen(state, repo, Modifier) { pairing = false }
-            !introComplete || setup -> SetupScreen(!introComplete, state.computers.any { it.state == "active" }, { pairing = true }) {
+            !introComplete || setup -> SetupScreen(!introComplete, state.computers.any { it.state == "active" }, { pairing = true }, onDone = {
                 introComplete = true; setup = false; prefs.edit().putBoolean("complete", true).apply()
-            }
+            }, pairingContent = { PairingScreen(state, repo, Modifier, embedded = true) {} })
             historySelection != null -> HistoryDetailScreen(state, historySelection!!) { historySelection = null }
             event != null -> EventScreen(event, state, repo, Modifier) { selected = null }
             else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
@@ -90,7 +89,7 @@ import kotlinx.coroutines.launch
                         }) { Text(tr(label)) } }
                         state.computers.forEach { ComputerCard(it, state.busy, repo) }
                         Button(onClick = { pairing = true }, Modifier.fillMaxWidth()) { Text(tr("连接另一台电脑")) }
-                        OutlinedButton(onClick = { setup = true }, Modifier.fillMaxWidth()) { Text(tr("通知与后台设置")) }
+                        OutlinedButton(onClick = { SetupProgress(context).step = 0; setup = true }, Modifier.fillMaxWidth()) { Text(tr("通知与后台设置")) }
                         if (BuildConfig.FIREBASE_APP_ID.isEmpty()) Text(tr("此构建尚未配置推送服务，当前可在前台同步。"), fontSize = 12.sp)
                     }
                 }

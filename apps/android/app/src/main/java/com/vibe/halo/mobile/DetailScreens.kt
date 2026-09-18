@@ -19,27 +19,29 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
-@Composable fun PairingScreen(state: CompanionState, repo: CompanionRepository, modifier: Modifier, back: () -> Unit) {
+@Composable fun PairingScreen(state: CompanionState, repo: CompanionRepository, modifier: Modifier, embedded: Boolean = false, back: () -> Unit) {
     val scope = rememberCoroutineScope(); var origin by rememberSaveable { mutableStateOf(BuildConfig.DEFAULT_RELAY_ORIGIN) }; var code by remember { mutableStateOf("") }
     var customRelay by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.pairing?.pairingId) { while (repo.state.value.pairing != null) { delay(3000); repo.pollPairing() } }
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
-        TextButton(onClick = back) { Text(tr("← 返回")) }; Spacer(Modifier.height(20.dp)); Text(tr("连接电脑"), fontSize = 29.sp, fontWeight = FontWeight.SemiBold)
-        Text(tr("在电脑托盘打开「手机伴侣」，生成配对码后填在这里。"), Modifier.padding(vertical = 18.dp), fontSize = 14.sp, lineHeight = 23.sp)
+    Column(modifier.fillMaxSize().imePadding().padding(if (embedded) 0.dp else 24.dp)) {
+        if (!embedded) { TextButton(onClick = back) { Text(tr("← 返回")) }; Text(tr("连接电脑"), fontSize = 29.sp, fontWeight = FontWeight.SemiBold) }
         val pair = state.pairing
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        Text(tr("在电脑托盘打开「手机伴侣」，生成配对码后填在这里。"), Modifier.padding(vertical = 18.dp), fontSize = 14.sp, lineHeight = 23.sp)
         if (pair == null) {
             TextButton(onClick = { customRelay = !customRelay }) { Text(tr(if (customRelay) "收起自建服务设置" else "使用自建服务")) }
             if (customRelay) OutlinedTextField(origin, { origin = it.take(240) }, label = { Text(tr("中继服务地址")) }, placeholder = { Text("https://relay.example.com") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp)); OutlinedTextField(code, { code = it.take(100) }, label = { Text(tr("一次性配对码")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Button(enabled = !state.busy && origin.isNotBlank() && code.isNotBlank(), onClick = { scope.launch { repo.beginPairing(origin, code); code = "" } }, modifier = Modifier.fillMaxWidth().padding(top = 24.dp).height(52.dp)) { Text(tr("核对设备")) }
         } else {
             HaloCard {
                 Text(pair.name, fontSize = 21.sp); Text(tr("两端指纹"), Modifier.padding(top = 22.dp), fontSize = 12.sp)
                 SelectionContainer { Text(pair.fingerprint, Modifier.padding(vertical = 15.dp), fontFamily = FontFamily.Monospace, fontSize = 24.sp, color = MaterialTheme.colorScheme.primary) }
                 Text(tr(if (pair.confirmedOnPc) "电脑已确认。指纹一致后，完成绑定。" else "请在电脑上核对同样的指纹并确认。"), fontSize = 13.sp)
             }
-            Button(enabled = pair.confirmedOnPc && !state.busy, onClick = { scope.launch { repo.finishPairing(); if (repo.state.value.pairing == null) { repo.refresh(); back() } } }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text(tr(if (pair.confirmedOnPc) "指纹一致，完成绑定" else "等待电脑确认…")) }
         }
+        }
+        if (pair == null) Button(enabled = !state.busy && origin.isNotBlank() && code.isNotBlank(), onClick = { scope.launch { repo.beginPairing(origin, code); code = "" } }, modifier = Modifier.fillMaxWidth()) { Text(tr("核对设备")) }
+        else Button(enabled = pair.confirmedOnPc && !state.busy, onClick = { scope.launch { repo.finishPairing(); if (repo.state.value.pairing == null) { repo.refresh(); back() } } }, modifier = Modifier.fillMaxWidth()) { Text(tr(if (pair.confirmedOnPc) "指纹一致，完成绑定" else "等待电脑确认…")) }
     }
 }
 @Composable fun EventScreen(event: RemoteEvent, state: CompanionState, repo: CompanionRepository, modifier: Modifier, back: () -> Unit) {

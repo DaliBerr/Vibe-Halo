@@ -11,6 +11,7 @@ build/icon.png
 **/.dev.vars.*
 !**/.dev.vars.example
 **/.gradle/
+**/.kotlin/
 apps/android/**/build/
 apps/android/local.properties
 apps/android/.idea/

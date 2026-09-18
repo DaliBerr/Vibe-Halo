@@ -176,14 +176,19 @@ Names allow 1–48 Unicode characters and no control characters. Changes persist
 offline and sync when connected. Signed display profiles are separate from
 immutable device identities/grants: renaming never requires another pairing.
 
-On first Android launch, a four-step checklist offers system notifications,
-recent-app locking, background battery settings and computer pairing. The first
-three can be deferred, but pairing one computer is required to enter the app.
+On first Android launch, a full-screen wizard presents one step at a time:
+computer pairing, notifications, recent-app locking, then background battery settings.
+Pairing is required; the remaining steps can be deferred. Navigation stays at the
+bottom, and only the current step's content scrolls when needed.
 Existing paired users skip this gate on upgrade. **Devices → Notifications and
-background** reopens the checklist. Xiaomi/HyperOS guidance includes No restrictions
-and background autostart; unavailable deep links fall back to app settings.
-Vendor locking/restrictions require manual confirmation when the OS cannot report
-them. These settings reduce restrictions; they do not guarantee background delivery.
+background** reopens the wizard. Xiaomi/HyperOS guidance includes No restrictions
+and background autostart. The battery button opens this app's system details.
+Recent apps are opened with the system gesture or navigation button; no accessibility
+or overlay permission is requested. In-app instructions use a black panel; system
+pages use standard system-styled toasts. Notification and standard battery checks
+refresh on return. Vendor locking/power/autostart settings remain unverified when
+the OS cannot report them; there is no manual completion checkbox. Continuing a step
+does not mark settings as enabled. These settings do not guarantee background delivery.
 
 1. The desktop connects automatically. Open **Mobile companion / 手机伴侣** from
    the tray and wait for **Connected**. No enrollment code or relay entry is needed.

@@ -1,8 +1,46 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-09-17 (device names, Android onboarding and readable history)
+Updated: 2026-09-18 (synced-event history parsing and pairing-first Android wizard)
 Current version: `0.5.9`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-09-18 — Synced-event history parsing and pairing-first wizard
+
+Fixed the real-phone report of protocol JSON in recent-event history. Android's
+optString had stringified the nested summary object, and plain completion/plan
+toolInputText was skipped. History now uses a typed HistoryView for both synced
+events and computer records, accepts only actual text fields, parses known tool
+arguments/question arrays, and shows title/type, source, content and result cards.
+Legacy and cached records are normalized on read without clearing data. Unknown
+structures and missing answers have explicit fallback labels; a resolved request
+does not imply approval or an answer. Active approval review remains unchanged.
+
+Replaced the scrolling setup checklist with a persisted one-step-at-a-time wizard:
+pairing, notifications, recent-app locking, battery settings. Pairing is embedded
+with fixed action controls, required before first entry, and verified pairing /
+notifications advance automatically. Other steps can be deferred. Existing paired
+upgrades still enter the app directly; reopening setup does not revoke that access.
+Notification checks include permission, global enablement and primary channels;
+resume refreshes standard battery optimization/background restriction signals.
+OEM lock/autostart/power policy remains unverified, never inferred from visiting
+settings or the old manual-confirm flags. Removed manual completion controls.
+
+User explicitly selected no additional permissions: recents uses the user's
+gesture/navigation key; black instructions are in-app, and system pages get a
+standard Toast with OS-controlled styling. Battery setup opens application details,
+not Xiaomi's hidden powerkeeper activity. No accessibility/overlay permission,
+relay API, migration, desktop binary or production configuration change is needed.
+
+Verification: root 227 tests (226 passed, existing Windows POSIX skip), Android
+debug/release builds and lint, 13 instrumentation tests including the real nested
+event envelope, legacy data, question arrays, missing/malformed content, lifecycle
+refresh, upgrade gate and small-screen navigation. Screenshots and logs are in
+.smoke/history-wizard-* and .smoke/wizard-*. Signed release installed over the
+existing emulator application using the original certificate (SHA-256 starts
+4771d9bec52ebed7). No phone/device data reset or remote CI/CD was performed.
+Physical Xiaomi 15 settings/toast behavior and locked-phone/watch notification
+delivery remain user acceptance. Continue on codex/mobile-foundation; the wider
+companion acceptance gates still block merging this branch to main or publishing.
 
 ## 2026-09-17 — Device names, first-run setup and readable Android history
 
