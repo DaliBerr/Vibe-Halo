@@ -2,7 +2,7 @@ import { enroll, challenge, createSession } from "./auth";
 import { createPairing, claim, status, confirm } from "./pairing";
 import { registerPush, preferences } from "./push";
 import { updateProfile } from "./device-profile";
-import { Fault, authenticate, authorize, body, record, id, text, response, now, type Binding } from "./common";
+import { Fault, authenticate, authorize, body, record, id, text, response, now, sha256, type Binding } from "./common";
 export { Relay } from "./relay-do";
 function relayResponse(value: object, status = 200): Response {
   if ("relayError" in value && "relayStatus" in value) throw new Fault(String(value.relayError), Number(value.relayStatus));
@@ -13,7 +13,13 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url), route = url.pathname;
-      if (route === "/healthz" && request.method === "GET") return response({ service: "vibe-halo-relay", protocolVersion: 1 });
+      if (route === "/healthz" && request.method === "GET") return response({ service: "vibe-halo-relay", protocolVersion: 1, capacity: { registeredActivePcs: Number(env.MAX_PCS), mobilesPerPc: Number(env.MAX_BINDINGS_PER_PC) } });
+      // Cheap edge protection runs before database authentication. This is per-colo,
+      // not a global daily quota or a substitute for authoritative DB checks.
+      if (!(await env.INGRESS_LIMIT.limit({ key: request.headers.get("cf-connecting-ip") || "local" })).success) throw new Fault("rate_limited", 429);
+      const bearer = request.headers.get("authorization") || "";
+      if (/^Bearer [A-Za-z0-9_-]{40,100}$/.test(bearer)
+        && !(await env.DEVICE_LIMIT.limit({ key: await sha256(bearer) })).success) throw new Fault("rate_limited", 429);
       if (route === "/v1/enrollments" && request.method === "POST") return await enroll(request, env);
       if (route === "/v1/auth/challenge" && request.method === "POST") return await challenge(request, env);
       if (route === "/v1/auth/session" && request.method === "POST") return await createSession(request, env);
@@ -81,7 +87,9 @@ export default {
       }
       throw new Fault("not_found", 404);
     } catch (error) {
-      return response({ error: error instanceof Fault ? error.code : "request_failed" }, error instanceof Fault ? error.status : 500);
+      if (!(error instanceof Fault)) console.error(JSON.stringify({ code: "relay_dependency_failure" }));
+      else if ([429, 503].includes(error.status)) console.warn(JSON.stringify({ code: error.code, status: error.status }));
+      return response({ error: error instanceof Fault ? error.code : "service_unavailable" }, error instanceof Fault ? error.status : 503);
     }
   },
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {

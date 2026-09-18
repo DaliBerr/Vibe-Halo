@@ -3,17 +3,69 @@
   "name": "vibe-halo-relay",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-16",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": false,
-  "d1_databases": [{ "binding": "DB", "database_name": "vibe-halo-relay", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }],
-  "durable_objects": { "bindings": [{ "name": "RELAY", "class_name": "Relay" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Relay"] }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vibe-halo-relay",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RELAY",
+        "class_name": "Relay"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "Relay"
+      ]
+    }
+  ],
   "vars": {
     "RELAY_ORIGIN": "https://relay.example.invalid",
-    "MAX_PCS": "10",
-    "MAX_BINDINGS_PER_PC": "6",
+    "MAX_PCS": "100",
+    "MAX_BINDINGS_PER_PC": "2",
     "FCM_ENABLED": "false"
   },
-  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
-  "triggers": { "crons": ["17 * * * *"] }
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1,
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01
+    }
+  },
+  "triggers": {
+    "crons": [
+      "17 * * * *"
+    ]
+  },
+  "ratelimits": [
+    {
+      "name": "INGRESS_LIMIT",
+      "namespace_id": "61001",
+      "simple": {
+        "limit": 600,
+        "period": 60
+      }
+    },
+    {
+      "name": "DEVICE_LIMIT",
+      "namespace_id": "61002",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    }
+  ]
 }

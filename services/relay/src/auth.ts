@@ -54,7 +54,8 @@ export async function createSession(request: Request, env: Env): Promise<Respons
   const value = await signed(input.proof, JSON.parse(found.public_json).signKey, "device-session");
   if (canonical(value) !== canonical(JSON.parse(found.challenge_json))) throw new Fault("invalid_proof", 401);
   const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), n => n.toString(16).padStart(2, "0")).join("");
-  const expiresAt = now() + 15 * 60000;
+  // Keep immediate DB-backed revocation, but avoid synchronized renewal storms.
+  const expiresAt = now() + (60 * 60 + Math.floor(Math.random() * 15 * 60)) * 1000;
   const result = await env.DB.batch([
     env.DB.prepare("DELETE FROM device_sessions WHERE device_id=? AND expires_at<?").bind(found.device_id, now()),
     env.DB.prepare("INSERT INTO device_sessions(token_hash,device_id,expires_at) SELECT ?,?,? FROM auth_challenges WHERE id=? AND consumed=0 AND expires_at>? AND (SELECT COUNT(*) FROM device_sessions WHERE device_id=?)<5")

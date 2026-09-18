@@ -102,13 +102,57 @@ identities, not reconnecting registered devices. The old enrollment-code generat
 is removed; historical code rows are unused and expire through existing cleanup.
 The old ENROLLMENT_PEPPER secret is unused; it need not be rotated or distributed.
 
-Default capacity is 10 active PCs and 6 active phones per PC. Keep these limits
-small on free infrastructure. Use the Cloudflare dashboard to check D1 rows,
-Worker CPU, DO storage/duration, requests and logs before increasing them. The
-application does not change plans or buy capacity. API and WebSocket rate limits,
-24-hour journals, bounded retry queues and hourly cleanup bound common abuse, but
-are not a promise that every workload fits a free allowance. Public production
-CPU and hibernation billing require deployment measurement.
+Default admission capacity is **100 registered active PCs**, each with **2 active
+phone bindings**. These are identity/binding limits, not an entitlement to 100
+simultaneous high-throughput users. Revoking a PC or binding releases that slot.
+Existing identities still reconnect when registration closes or reaches capacity.
+Apply additive migration `0004_capacity_indexes.sql` before this deployment.
+
+### Free-tier capacity and overload behavior
+
+The relay retains one hibernating SQLite Durable Object per PC, routed by PC ID;
+no global relay object or paid Load Balancer is added. Each shard allows one live
+socket per device, at most 3 total. Session renewal is spread over 60–75 minutes,
+while business operations continue checking live revocation in D1. Identical event
+replays avoid event/outbox rewrites. Cleanup alarms follow actual deadlines and
+stop when no records or connections remain, instead of waking every ten minutes.
+
+- Edge guards: 600 requests/minute per IP and 120/minute per bearer hash, per
+  Cloudflare location. These cheap guards precede DB authentication; they are not
+  global usage accounting. Shared networks can still experience temporary limits.
+- Authoritative DB and shard budgets remain in place; rejected exhausted requests
+  do not keep incrementing persistent counters. 429/503 replies include Retry-After.
+- Push drains at most 4 jobs/alarm, 2 concurrently, with bounded retries and jitter.
+  Terminal outbox history is capped at 1,000 rows; live authorization remains checked.
+- Sampled logs/traces and content-free capacity/dependency/push-failure codes support
+  diagnosis. `/healthz` reports configured capacity and liveness only, not DB health.
+
+As checked on 2026-09-18, [Workers Free](https://developers.cloudflare.com/workers/platform/limits/)
+allows 100,000 incoming requests/day. [D1](https://developers.cloudflare.com/d1/platform/pricing/)
+and [SQLite DO storage](https://developers.cloudflare.com/durable-objects/platform/pricing/)
+each have 5 million rows read and 100,000 rows written/day. DO compute also has
+100,000 request units and 13,000 GB-s/day. Index writes, deletes and alarm writes
+count; these limits are account-wide and are not multiplied by 100 shards.
+
+The capacity setting is intended for notification-first, light phone usage. As a
+planning example, 100 PCs online 8 hours/day need roughly 800 session renewals at
+the minimum new TTL instead of 3,200. Two hundred phones foregrounded 5 minutes/day
+perform about 2,000 periodic refresh cycles; each cycle can involve multiple HTTP
+requests, pages and clock queries, with extra event-driven refreshes. This is a
+planning envelope, not a measured 100-device production guarantee. Monitor actual
+rows/CPU/duration and leave headroom; event size, retry rate and other Workers in
+the account matter. At 200 phones foregrounded all day, just one request every
+30 seconds is 576,000 requests/day, already exceeding Free before other calls.
+
+Before sustained growth, check Cloudflare's Workers/D1/DO usage and error rates.
+Investigate at 50% of a daily allowance; close new registration at 70% if projected
+use threatens the remaining allowance, using the existing operator CLI. Preserve
+existing bindings while diagnosing. Free-tier exhaustion or a regional/provider
+outage can still interrupt the cloud leg; LAN and native desktop handling remain
+independent. No plan upgrade, paid failover or quota-exhaustion SLA is implied.
+For sustained foreground/high-event workloads, reduce client polling or explicitly
+approve a paid plan after measurement. Application-level limits cannot prevent
+an attacker from consuming the Workers incoming-request allowance itself.
 
 For a synthetic public-relay emulator run, run `scripts/mobile-smoke-host.cjs`
 from the repository root with `VIBE_HALO_TEST=1` and

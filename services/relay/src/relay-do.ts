@@ -23,8 +23,8 @@ export class Relay extends DurableObject<Env> {
     if (!identity) return response({ error: "unauthorized" }, 401);
     await authorize(await sessionByHash(identity.tokenHash, this.env), identity.pcId, this.env);
     const existing = this.ctx.getWebSockets(identity.deviceId);
-    for (const socket of existing.slice(0, Math.max(0, existing.length - 1))) socket.close(4000, "connection_replaced");
-    if (this.ctx.getWebSockets().length >= 24) return response({ error: "capacity_exceeded" }, 429);
+    for (const socket of existing) socket.close(4000, "connection_replaced");
+    if (this.ctx.getWebSockets().filter(socket => socket.readyState === WebSocket.OPEN).length >= 1 + Number(this.env.MAX_BINDINGS_PER_PC)) return response({ error: "capacity_exceeded" }, 429);
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server, [identity.kind, identity.deviceId]);
@@ -66,13 +66,15 @@ export class Relay extends DurableObject<Env> {
   }
   private async rpc(work: () => Promise<object>): Promise<object> {
     try { return await work(); }
-    catch (error) { return { relayError: error instanceof Fault ? error.code : "request_failed", relayStatus: error instanceof Fault ? error.status : 500 }; }
+    catch (error) { return { relayError: error instanceof Fault ? error.code : "request_failed", relayStatus: error instanceof Fault ? error.status : 503 }; }
   }
   private budget(deviceId: string, operation: string, limit: number): void {
     const key = `${deviceId}:${operation}`;
     this.ctx.storage.sql.exec("DELETE FROM budgets WHERE window_end<?", now() - 60000);
-    const row = this.ctx.storage.sql.exec<{ attempts: number }>("INSERT INTO budgets(id,window_end,attempts) VALUES(?,?,1) ON CONFLICT(id) DO UPDATE SET attempts=CASE WHEN window_end<? THEN 1 ELSE attempts+1 END,window_end=CASE WHEN window_end<? THEN ? ELSE window_end END RETURNING attempts", key, now() + 60000, now(), now(), now() + 60000).one();
-    if (row.attempts > limit) throw new Fault("rate_limited", 429);
+    // Rejected messages must not consume another persistent write.
+    const current = this.ctx.storage.sql.exec<{ attempts: number; window_end: number }>("SELECT attempts,window_end FROM budgets WHERE id=?", key).toArray()[0];
+    if (current && current.window_end > now() && current.attempts >= limit) throw new Fault("rate_limited", 429);
+    this.ctx.storage.sql.exec("INSERT INTO budgets(id,window_end,attempts) VALUES(?,?,1) ON CONFLICT(id) DO UPDATE SET attempts=CASE WHEN window_end<=? THEN 1 ELSE attempts+1 END,window_end=CASE WHEN window_end<=? THEN ? ELSE window_end END", key, now() + 60000, now(), now(), now() + 60000);
   }
   async list(pcId: string, tokenHash: string, offset = 0): Promise<object> { return this.rpc(() => this.listInternal(pcId, tokenHash, offset)); }
   async submit(pcId: string, tokenHash: string, decisionId: string, envelope: string): Promise<object> { return this.rpc(() => this.submitInternal(pcId, tokenHash, decisionId, envelope)); }
@@ -107,7 +109,7 @@ export class Relay extends DurableObject<Env> {
     if (!binding || !["approvals.decide", "questions.answer"].some(scope => JSON.parse(binding.scopes_json).includes(scope))) throw new Fault("forbidden", 403);
     id(decisionId); text(envelope, 262144);
     const digest = await sha256(envelope);
-    this.ctx.storage.sql.exec("DELETE FROM receipts WHERE expires_at<?", now());
+    this.ctx.storage.sql.exec("DELETE FROM receipts WHERE expires_at<=?", now());
     const previous = this.ctx.storage.sql.exec<{ mobile_id: string; digest: string; envelope: string | null }>("SELECT mobile_id,digest,envelope FROM receipts WHERE decision_id=?", decisionId).toArray()[0];
     if (previous) {
       if (previous.mobile_id !== session.device.deviceId || previous.digest !== digest) throw new Fault("decision_conflict", 409);
@@ -213,6 +215,8 @@ export class Relay extends DurableObject<Env> {
       for (const recipient of JSON.parse(old.recipients)) if (!recipients.some(value => value.mobileId === recipient.mobileId)) recipients.push(recipient);
     }
     const summaryText = JSON.stringify(summary), recipientText = JSON.stringify(recipients);
+    // Reconnects replay cached revisions; identical delivery is already durable.
+    if (old?.revision === revision && old.summary === summaryText && old.recipients === recipientText) return;
     const bytes = new TextEncoder().encode(summaryText + recipientText).length;
     this.ctx.storage.sql.exec("INSERT INTO events(event_id,epoch,revision,summary,recipients,expires_at,bytes) VALUES(?,?,?,?,?,?,?) ON CONFLICT(event_id) DO UPDATE SET revision=excluded.revision,summary=excluded.summary,recipients=excluded.recipients,expires_at=excluded.expires_at,bytes=excluded.bytes",
       eventId, epoch, revision, summaryText, recipientText, now() + 86400000, bytes);
@@ -220,7 +224,7 @@ export class Relay extends DurableObject<Env> {
     if (summary.state === "pending" && (summary.actionable === true || summary.kind === "input") || summary.kind === "completion" || summary.kind === "plan") {
       const expiry = Math.min(Date.parse(String(summary.expiresAt)), now() + 3600000);
       for (const recipient of recipients) this.ctx.storage.sql.exec("INSERT OR IGNORE INTO push_jobs(id,event_id,mobile_id,revision,due_at,expires_at) VALUES(?,?,?,?,?,?)",
-        `${eventId}:${recipient.mobileId}:${revision}`, eventId, recipient.mobileId, revision, now() + 1500, expiry);
+        `${eventId}:${recipient.mobileId}:${revision}`, eventId, recipient.mobileId, revision, now() + 1500 + Math.floor(Math.random() * 500), expiry);
       this.ctx.storage.sql.exec("UPDATE push_jobs SET state='acknowledged' WHERE state='pending' AND id IN (SELECT id FROM notification_acks WHERE expires_at>?)", now());
     } else this.ctx.storage.sql.exec("UPDATE push_jobs SET state='cancelled' WHERE event_id=? AND state='pending'", eventId);
     this.prune();
@@ -228,39 +232,55 @@ export class Relay extends DurableObject<Env> {
     await this.notify({ type: "events.changed" });
   }
   private prune(): void {
-    this.ctx.storage.sql.exec("DELETE FROM receipts WHERE expires_at<?", now());
-    this.ctx.storage.sql.exec("DELETE FROM queries WHERE expires_at<?", now());
-    this.ctx.storage.sql.exec("DELETE FROM notification_acks WHERE expires_at<?", now());
+    this.ctx.storage.sql.exec("DELETE FROM receipts WHERE expires_at<=?", now());
+    this.ctx.storage.sql.exec("DELETE FROM queries WHERE expires_at<=?", now());
+    this.ctx.storage.sql.exec("DELETE FROM notification_acks WHERE expires_at<=?", now());
     this.ctx.storage.sql.exec("DELETE FROM notification_acks WHERE id IN (SELECT id FROM notification_acks ORDER BY rowid DESC LIMIT -1 OFFSET 3000)");
-    this.ctx.storage.sql.exec("DELETE FROM push_jobs WHERE expires_at<? OR event_id NOT IN (SELECT event_id FROM events)", now());
-    this.ctx.storage.sql.exec("DELETE FROM events WHERE expires_at<?", now());
+    this.ctx.storage.sql.exec("DELETE FROM push_jobs WHERE expires_at<=? OR event_id NOT IN (SELECT event_id FROM events)", now());
+    this.ctx.storage.sql.exec("DELETE FROM push_jobs WHERE id IN (SELECT id FROM push_jobs WHERE state!='pending' ORDER BY rowid DESC LIMIT -1 OFFSET 1000)");
+    this.ctx.storage.sql.exec("DELETE FROM events WHERE expires_at<=?", now());
     this.ctx.storage.sql.exec("DELETE FROM events WHERE event_id IN (SELECT event_id FROM events ORDER BY rowid DESC LIMIT -1 OFFSET 500)");
     while ((this.ctx.storage.sql.exec<{ n: number }>("SELECT COALESCE(SUM(bytes),0) AS n FROM events").one().n) > 10 * 1024 * 1024) {
       this.ctx.storage.sql.exec("DELETE FROM events WHERE rowid=(SELECT MIN(rowid) FROM events)");
     }
   }
   private async schedule(): Promise<void> {
-    const next = this.ctx.storage.sql.exec<{ t: number | null }>("SELECT MIN(due_at) AS t FROM push_jobs WHERE state='pending'").one().t;
-    await this.ctx.storage.setAlarm(Math.max(now() + 100, Math.min(next ?? now() + 600000, now() + 600000)));
+    const deadlines = [
+      "SELECT MIN(due_at) AS t FROM push_jobs WHERE state='pending'",
+      ...["events", "receipts", "queries", "notification_acks", "push_jobs"].map(table => `SELECT MIN(expires_at) AS t FROM ${table}`),
+      "SELECT MIN(window_end)+60000 AS t FROM budgets",
+    ].map(query => this.ctx.storage.sql.exec<{t:number|null}>(query).one().t ?? Infinity);
+    const expiries = this.ctx.getWebSockets().filter(socket => socket.readyState === WebSocket.OPEN)
+      .map(socket => (socket.deserializeAttachment() as SocketIdentity).expiresAt);
+    const target = Math.min(...deadlines, ...expiries);
+    const current = await this.ctx.storage.getAlarm();
+    if (!Number.isFinite(target)) { if (current !== null) await this.ctx.storage.deleteAlarm(); return; }
+    const due = Math.max(now() + 100, target);
+    // Never postpone already scheduled work, or rewrite it for every event.
+    if (current === null || due < current) await this.ctx.storage.setAlarm(due);
   }
+
   async alarm(): Promise<void> {
     this.prune();
     for (const socket of this.ctx.getWebSockets()) await this.live(socket);
-    const jobs = this.ctx.storage.sql.exec<{ id: string; mobile_id: string; attempts: number; summary: string }>("SELECT j.id,j.mobile_id,j.attempts,e.summary FROM push_jobs j JOIN events e ON e.event_id=j.event_id WHERE j.state='pending' AND j.due_at<=? AND j.expires_at>? AND j.revision=e.revision LIMIT 20", now(), now()).toArray();
-    for (const job of jobs) {
+    this.ctx.storage.sql.exec("DELETE FROM budgets WHERE window_end<=?", now() - 60000);
+    const jobs = this.ctx.storage.sql.exec<{ id: string; mobile_id: string; attempts: number; summary: string }>("SELECT j.id,j.mobile_id,j.attempts,e.summary FROM push_jobs j JOIN events e ON e.event_id=j.event_id WHERE j.state='pending' AND j.due_at<=? AND j.expires_at>? AND j.revision=e.revision ORDER BY j.due_at LIMIT 4", now(), now()).toArray();
+    // Bound upstream concurrency and stay below Free D1 subrequest limits.
+    const deliver = async (job: typeof jobs[number]) => {
       const summary = JSON.parse(job.summary);
       let retryDelay = 0;
       const result = await deliverPush(this.env, summary.pcId, job.mobile_id, summary, () => {
         const current = this.ctx.storage.sql.exec<{ revision: number; state: string }>("SELECT e.revision,j.state FROM events e JOIN push_jobs j ON j.event_id=e.event_id WHERE j.id=?", job.id).toArray()[0];
         return current?.revision === summary.eventRevision && current.state === "pending";
-      }, delay => { retryDelay = delay; });
+      }, delay => { retryDelay = delay; }).catch(() => { retryDelay = 60000; return "retry" as const; });
       const attempts = job.attempts + 1;
       const state = result === "retry" && attempts < 5 ? "pending" : result === "retry" ? "failed" : result;
+      if (state === "failed") console.warn(JSON.stringify({ code: "push_delivery_exhausted" }));
       const delay = Math.max(retryDelay, [1000, 5000, 30000, 60000, 300000][attempts - 1]) + Math.floor(Math.random() * 500);
       this.ctx.storage.sql.exec("UPDATE push_jobs SET state=?,attempts=?,due_at=? WHERE id=? AND state='pending'", state, attempts, now() + delay, job.id);
-    }
-    const count = this.ctx.storage.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM events").one().n;
-    if (count || this.ctx.getWebSockets().length) await this.schedule();
+    };
+    for (let offset = 0; offset < jobs.length; offset += 2) await Promise.all(jobs.slice(offset, offset + 2).map(deliver));
+    await this.schedule();
   }
   webSocketClose(socket: WebSocket): void { socket.close(); }
   webSocketError(socket: WebSocket): void { socket.close(); }

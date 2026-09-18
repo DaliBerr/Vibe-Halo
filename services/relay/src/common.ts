@@ -45,6 +45,7 @@ export async function body(request: Request, maxBytes = 16384): Promise<Record<s
 export function response(value: object, status = 200): Response {
   return Response.json({ requestId: crypto.randomUUID(), ...value }, { status, headers: {
     "cache-control": "no-store", "x-content-type-options": "nosniff",
+    ...([429, 503].includes(status) ? { "retry-after": "60" } : {}),
   } });
 }
 export function randomCode(): string {
@@ -82,8 +83,8 @@ export async function signed(jws: unknown, key: Jwk, purpose: string): Promise<R
 }
 export async function rate(request: Request, env: Env, lane: string, limit = 30): Promise<void> {
   const key = await hmac(`${lane}:${request.headers.get("cf-connecting-ip") || "local"}`, env.PAIRING_PEPPER);
-  const row = await env.DB.prepare("INSERT INTO rate_limits(id,expires_at,attempts) SELECT ?,?,1 WHERE EXISTS(SELECT 1 FROM rate_limits WHERE id=?) OR (SELECT COUNT(*) FROM rate_limits)<4096 ON CONFLICT(id) DO UPDATE SET attempts=CASE WHEN expires_at<? THEN 1 ELSE attempts+1 END,expires_at=CASE WHEN expires_at<? THEN ? ELSE expires_at END RETURNING attempts")
-    .bind(key, now() + 300000, key, now(), now(), now() + 300000).first<{ attempts: number }>();
+  const row = await env.DB.prepare("INSERT INTO rate_limits(id,expires_at,attempts) SELECT ?,?,1 WHERE EXISTS(SELECT 1 FROM rate_limits WHERE id=?) OR (SELECT COUNT(*) FROM rate_limits)<4096 ON CONFLICT(id) DO UPDATE SET attempts=CASE WHEN expires_at<? THEN 1 ELSE attempts+1 END,expires_at=CASE WHEN expires_at<? THEN ? ELSE expires_at END WHERE expires_at<? OR attempts<? RETURNING attempts")
+    .bind(key, now() + 300000, key, now(), now(), now() + 300000, now(), limit).first<{ attempts: number }>();
   if (!row || row.attempts > limit) throw new Fault("rate_limited", 429);
 }
 export async function sessionByHash(tokenHash: string, env: Env): Promise<Session> {

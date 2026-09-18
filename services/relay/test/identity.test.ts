@@ -1,4 +1,4 @@
-import { env, SELF, applyD1Migrations } from "cloudflare:test";
+import { env, SELF, applyD1Migrations, runInDurableObject } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, it, expect, vi } from "vitest";
 import { generateIdentity, publicDevice, sign, sha256, canonical } from "../../../packages/protocol/src/crypto.mjs";
 import { hmac } from "../src/common";
@@ -46,6 +46,85 @@ async function paired(existingRoot?: Awaited<ReturnType<typeof enrolled>>, exist
 }
 
 describe("device identity and pairing", () => {
+  it("admits 100 active PC identities and rejects the 101st without replacing existing identities", async () => {
+    const root = await enrolled();
+    const count = (await env.DB.prepare("SELECT COUNT(*) AS n FROM devices WHERE kind='pc' AND status='active'").first<{n:number}>())!.n;
+    const seeded = Array.from({length:100-count}, (_,i) => `pc_capacity_${i}`);
+    try {
+      for (let i=0;i<seeded.length;i+=20) await env.DB.batch(seeded.slice(i,i+20).map(key => env.DB.prepare("INSERT INTO devices(id,kind,public_json,created_at) VALUES(?,'pc','{}',?)").bind(key, Date.now())));
+      const pc = await generateIdentity("pc"), device = await publicDevice(pc);
+      const proof = await sign({protocolVersion:1,relayOrigin:origin,issuedAt:Date.now(),registrationId:crypto.randomUUID(),device},pc.signKey,"enrollment");
+      const rejected = await post("/v1/enrollments",{device,proof});
+      expect(rejected.status).toBe(503);
+      expect((await rejected.json<{error:string}>()).error).toBe("capacity_exceeded");
+      expect((await post("/v1/enrollments",root.request)).status).toBe(200);
+      expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM devices WHERE kind='pc' AND status='active'").first<{n:number}>())!.n).toBe(100);
+    } finally { for (const key of seeded) await env.DB.prepare("DELETE FROM devices WHERE id=?").bind(key).run(); }
+  });
+  it("allows two phones, rejects a third, and releases capacity after revocation", async () => {
+    const root = await enrolled();
+    // Creating a new offer cancels the previous pending offer, so confirm in sequence.
+    const one = await paired(root);
+    expect((await post(`/v1/pairings/${one.pairingId}/confirm`,{grant:one.grantJws},root.token)).status).toBe(201);
+    const two = await paired(root);
+    expect((await post(`/v1/pairings/${two.pairingId}/confirm`,{grant:two.grantJws},root.token)).status).toBe(201);
+    const offer = {protocolVersion:1,relayOrigin:origin,issuedAt:Date.now(),pairingId:crypto.randomUUID(),pc:root.publicPc,lanTlsPin:"A".repeat(43)+"=",scopes:["events.read"]};
+    expect((await post("/v1/pairings",{offer:await sign(offer,root.pc.signKey,"pairing-offer")},root.token)).status).toBe(429);
+    await SELF.fetch(origin+`/v1/bindings/${one.grant.bindingId}`,{method:"DELETE",headers:privateHeaders(root.token)});
+    const replacement = await paired(root);
+    expect((await post(`/v1/pairings/${replacement.pairingId}/confirm`,{grant:replacement.grantJws},root.token)).status).toBe(201);
+  });
+  it("spreads session renewals over 60–75 minutes and retains immediate revocation", async () => {
+    const root = await enrolled();
+    const row = await env.DB.prepare("SELECT expires_at FROM device_sessions WHERE token_hash=?").bind(await sha256(root.token)).first<{expires_at:number}>();
+    expect(row!.expires_at-Date.now()).toBeGreaterThan(59*60000);
+    expect(row!.expires_at-Date.now()).toBeLessThanOrEqual(75*60000);
+    await SELF.fetch(origin+"/v1/auth/session",{method:"DELETE",headers:privateHeaders(root.token)});
+    expect((await SELF.fetch(origin+"/v1/devices",{headers:privateHeaders(root.token)})).status).toBe(401);
+  });
+  it("idle shards stop alarms while stored deadlines schedule cleanup without perpetual polling", async () => {
+    const relay = env.RELAY.getByName("pc_alarm_test");
+    await runInDurableObject(relay, async (instance, state) => {
+      await instance.alarm(); expect(await state.storage.getAlarm()).toBeNull();
+      const expiry = Date.now()+3600000;
+      state.storage.sql.exec("INSERT INTO queries(request_id,mobile_id,digest,envelope,expires_at) VALUES('q','m','d',NULL,?)",expiry);
+      await instance.alarm(); expect(await state.storage.getAlarm()).toBe(expiry);
+      state.storage.sql.exec("DELETE FROM queries");
+      await instance.alarm(); expect(await state.storage.getAlarm()).toBeNull();
+    });
+  });
+  it("bounds each push alarm to four jobs and leaves the rest scheduled", async () => {
+    await runInDurableObject(env.RELAY.getByName("pc_push_batch"),async (instance,state) => {
+      const expiry=Date.now()+60000;
+      for(let i=0;i<5;i++) {
+        state.storage.sql.exec("INSERT INTO events(event_id,epoch,revision,summary,recipients,expires_at,bytes) VALUES(?,'epoch',1,?,'[]',?,1)",`event_${i}`,JSON.stringify({pcId:"pc_push_batch",eventRevision:1}),expiry);
+        state.storage.sql.exec("INSERT INTO push_jobs(id,event_id,mobile_id,revision,due_at,expires_at) VALUES(?,?,'mobile_test',1,?,?)",`job_${i}`,`event_${i}`,Date.now()-1,expiry);
+      }
+      await instance.alarm();
+      expect(state.storage.sql.exec<{n:number}>("SELECT COUNT(*) AS n FROM push_jobs WHERE state='pending'").one().n).toBe(1);
+      expect(await state.storage.getAlarm()).not.toBeNull();
+      await state.storage.deleteAlarm(); await instance.alarm();
+      expect(state.storage.sql.exec<{n:number}>("SELECT COUNT(*) AS n FROM push_jobs WHERE state='pending'").one().n).toBe(0);
+    });
+  });
+  it("rejects exhausted persistent limits without increasing their write counters",async () => {
+    const root=await enrolled(), key=await hmac("enrollment:local",env.PAIRING_PEPPER);
+    await env.DB.prepare("UPDATE rate_limits SET attempts=10 WHERE id=?").bind(key).run();
+    const rejected=await post("/v1/enrollments",root.request);
+    expect(rejected.status).toBe(429); expect(rejected.headers.get("retry-after")).toBe("60");
+    expect((await env.DB.prepare("SELECT attempts FROM rate_limits WHERE id=?").bind(key).first<{attempts:number}>())!.attempts).toBe(10);
+  });
+  it("replaces a device socket instead of retaining duplicate connections",async () => {
+    const root=await enrolled();
+    const connect=() => SELF.fetch(origin+`/v1/pcs/${root.pc.deviceId}/stream`,{headers:{...privateHeaders(root.token),upgrade:"websocket"}});
+    const a=await connect(); expect(a.status).toBe(101); a.webSocket!.accept();
+    const b=await connect(); expect(b.status).toBe(101); b.webSocket!.accept();
+    try {
+      await runInDurableObject(env.RELAY.getByName(root.pc.deviceId),async (_instance,state) => {
+        expect(state.getWebSockets().filter(socket=>socket.readyState===WebSocket.OPEN)).toHaveLength(1);
+      });
+    } finally {a.webSocket!.close();b.webSocket!.close();}
+  });
   it("syncs signed display names without replacing identity or grants and rejects replay/forgery", async () => {
     const pairedRoot = await paired();
     expect((await post(`/v1/pairings/${pairedRoot.pairingId}/confirm`, { grant: pairedRoot.grantJws }, pairedRoot.token)).status).toBe(201);
@@ -134,9 +213,9 @@ describe("device identity and pairing", () => {
     expect((await post(`/v1/pairings/${expired.pairingId}/confirm`, { grant: expired.grantJws }, expired.token)).status).toBe(410);
     expect((await post("/v1/pairings/claim", expired.claimPayload)).status).toBe(403);
   });
-  it("isolates two PCs and three phones and revokes only the selected relationship", async () => {
+  it("isolates two PCs and two phones and revokes only the selected relationship", async () => {
     const pcs = [await enrolled(), await enrolled()];
-    const phones = [await generateIdentity("mobile"), await generateIdentity("mobile"), await generateIdentity("mobile")];
+    const phones = [await generateIdentity("mobile"), await generateIdentity("mobile")];
     const bindings = [];
     for (const pc of pcs) for (const phone of phones) {
       const pair = await paired(pc, phone);
@@ -214,7 +293,7 @@ describe("device identity and pairing", () => {
   it("enforces the configured active-PC cap and bounded unauthenticated bodies", async () => {
     const capacity = Number(env.MAX_PCS);
     const count = (await env.DB.prepare("SELECT COUNT(*) AS n FROM devices WHERE kind='pc' AND status='active'").first<{ n: number }>())!.n;
-    for (let n = count; n < capacity - 1; n++) await enrolled();
+    for (let n = count; n < capacity - 1; n++) await env.DB.prepare("INSERT INTO devices(id,kind,public_json,created_at) VALUES(?,'pc','{}',?)").bind(`pc_race_${n}`,Date.now()).run();
     await env.DB.prepare("DELETE FROM rate_limits").run();
     const pc = await generateIdentity("pc"), device = await publicDevice(pc);
     const input = { device, proof: await sign({ protocolVersion: 1, relayOrigin: origin, issuedAt: Date.now(), registrationId: crypto.randomUUID(), device }, pc.signKey, "enrollment") };

@@ -1,8 +1,50 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-09-18 (0.6.0 published)
+Updated: 2026-09-18 (relay capacity and resilience)
 Current version: `0.6.0`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-09-18 — Relay capacity and resilience
+
+Owner requested 100 active PC admission slots, maximum 2 phones per PC, within
+Free-tier constraints. This changes the existing Worker, not the desktop/Android
+release. The 100 setting counts registered active identities, not concurrent
+foreground throughput. Notification-first light usage is the intended envelope;
+200 phones polling every 30 seconds all day exceed Workers Free by themselves.
+See REMOTE_SETUP for account-wide limits, budgeting assumptions and operator gates.
+No paid plan, Load Balancer or cross-account quota workaround is introduced.
+
+Retain PC-keyed hibernating DO shards. Replace duplicate device sockets, cap each
+shard at PC + 2 phones, jitter session renewal to 60–75 minutes while retaining DB
+revocation checks, avoid identical replay writes and idle 10-minute alarm loops.
+Drain 4 push jobs with concurrency 2; retain bounded jittered retries and cap
+terminal outbox rows. Edge guards run before DB auth; persistent limits stop
+writing once exhausted. 429/503 responses carry Retry-After. Add content-free
+operational error codes and sampled traces. Additive migration 0004 indexes hot
+D1 authentication/capacity paths without changing identities, grants or bindings.
+
+Local coverage includes 100-PC admission/racing final slot, 2-phone cap and slot
+reuse, longer-session revocation, duplicate socket replacement, idle/deadline
+alarms, bounded push batches and exhausted counters, plus existing cryptographic
+and cross-PC isolation tests. All 18 relay runtime tests passed, as did typecheck,
+dry-run packaging and the desktop suite (227 passed, 1 platform skip).
+
+Production Worker `vibe-halo-relay` now runs version
+`62b2944b-c2a1-4a5f-bc2c-132fec41c68b` with MAX_PCS=100 and
+MAX_BINDINGS_PER_PC=2. Exported the existing D1 database to an ignored local backup
+before applying additive migration 0004. Retained the relay origin, secrets,
+namespace and database. Public synthetic acceptance verified enrollment, two-phone
+binding, rejection of a third phone, capacity reuse after revocation, jittered
+session TTL and an authenticated WSS ping/pong. The synthetic PC was revoked;
+post-checks show 1 real active PC, no over-limit PC bindings, and both new indexes.
+Private backup and synthetic test files remain ignored, not in the repository.
+
+No desktop/Android binary rebuild or release tag is necessary for this server-only
+change; verification used local runtime tests plus the deployed public endpoint.
+The prior Worker version is `4a586e89-fd8b-4c55-b266-27f8d1f21747`; rollback also
+restores its older admission settings. Added indexes are compatible with old code.
+Account-wide usage remains workload-dependent; neither synthetic acceptance nor
+admission tests establish a measured 100-device production throughput SLA.
 
 ## 2026-09-18 — 0.6.0 published
 

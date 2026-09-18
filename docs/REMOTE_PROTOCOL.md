@@ -36,7 +36,7 @@ separately; the public API exposes no service-management operation.
 
 Device authentication uses a 60-second, one-consumption challenge containing
 nonce, device ID, signing key ID, origin and `device-session` purpose. The ES256
-proof signs the original challenge. Sessions last 15 minutes; 256-bit opaque
+proof signs the original challenge. Sessions last 60–75 minutes with per-session jitter; 256-bit opaque
 bearers live only in client memory and only their SHA-256 hashes live in D1.
 At most five active challenges and sessions are allowed per device. Re-authentication
 uses a fresh challenge after a lost session response. Foreground clients renew;
