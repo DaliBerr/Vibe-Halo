@@ -1,10 +1,10 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-09-18 (0.6.0 release preparation)
+Updated: 2026-09-18 (0.6.0 published)
 Current version: `0.6.0`
 Source directory: `C:\Tools\Clawd-island`
 
-## 2026-09-18 — 0.6.0 release preparation
+## 2026-09-18 — 0.6.0 published
 
 The owner explicitly requested a version bump, public README simplification,
 CI/CD and publication, superseding the earlier local-only delivery restriction.
@@ -25,9 +25,35 @@ Candidate CI exposed macOS runner hostnames longer than the 48-character device
 name limit. Corrected the rename test to expect the bounded system name; production
 name handling already enforced the limit.
 
-Release checks: root/protocol tests, local Android build/lint and signature
-verification, plus the exact release commit's cross-platform and mobile CI.
-Publish immutable `v0.6.0` and `preview-0.6.0` tags only after candidate checks pass.
+Published immutable `v0.6.0` and `preview-0.6.0` at code commit
+`7c50485d043fd5ae5f1893df0129a77ce29ed80e`, after fast-forwarding main.
+
+- Local checks: 227 desktop tests passed, 1 Windows platform skip; all 6 protocol
+  tests passed. Normal and update-enabled Windows package verification and NSIS
+  build passed. Android release build/lint and retained-key signing passed;
+  versionCode 2 / versionName 0.6.0 installed over the emulator app and launched.
+- Candidate [cross-platform CI](https://github.com/DaliBerr/Vibe-Halo/actions/runs/35352925218)
+  and [mobile/relay CI](https://github.com/DaliBerr/Vibe-Halo/actions/runs/35352937291) passed.
+  Initial macOS test failures were corrected before tagging; obsolete runs were cancelled.
+- [Windows stable publication](https://github.com/DaliBerr/Vibe-Halo/actions/runs/35353720548)
+  and [preview publication](https://github.com/DaliBerr/Vibe-Halo/actions/runs/35353719738) passed.
+  Main's repeated [cross-platform](https://github.com/DaliBerr/Vibe-Halo/actions/runs/35353715335)
+  and [mobile](https://github.com/DaliBerr/Vibe-Halo/actions/runs/35353715343) checks also passed.
+- [Stable release](https://github.com/DaliBerr/Vibe-Halo/releases/tag/v0.6.0) is Latest,
+  public and non-prerelease. It includes the installer, blockmap, latest.yml,
+  licenses, signed Android APK and checksums. The public Windows installer was
+  downloaded and its SHA-256, SHA-512, version and size matched published metadata.
+- [Cross-platform preview](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.0)
+  contains 7 installers/archives; all 7 published checksum entries match GitHub's
+  asset digests. It has no stable updater metadata.
+- Android APK SHA-256: `e09b18980973734e3063a36254d904cbcce35ae6e050231fef140c4a92995339`.
+  Its certificate SHA-256 remains
+  `4771d9bec52ebed7895873037cb67e97d369c52572f7bb45e4441117106d3106`.
+  No signing secrets or service-account files were committed or published.
+
+This post-publication record is documentation-only and does not change the tagged
+application. Remaining physical-device checks are listed above; no new relay
+migration or deployment was needed for this release.
 
 ## 2026-09-18 — Synced-event history parsing and pairing-first wizard
 
