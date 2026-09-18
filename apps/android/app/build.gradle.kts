@@ -13,8 +13,8 @@ android {
         applicationId = "com.vibe.halo.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val relayOrigin = providers.gradleProperty("relay.origin").orElse("https://vibe-halo-relay.z1593316231.workers.dev").get()
         require(relayOrigin.matches(Regex("https://[A-Za-z0-9.-]+(:[0-9]+)?"))) { "relay.origin must be an HTTPS origin" }

@@ -56,3 +56,19 @@ Configure `SIGNPATH_API_TOKEN` as a GitHub Actions secret. Never place the token
 3. Merge the verified release commit into `main` and create `v<version>` on that exact commit.
 4. Push the tag and monitor `.github/workflows/release.yml` through publication.
 5. Confirm that the Release is Latest, non-draft, non-prerelease, and includes the installer, blockmap, `latest.yml`, `SHA256SUMS.txt`, `LICENSE`, and `NOTICE.md`.
+
+## Android companion assets
+
+Keep Android `versionName` aligned with the desktop release and increment
+`versionCode` for every distributed Android update. Build the release variant
+with the intended Firebase client configuration, then sign it with the retained
+release keystore. Never commit the keystore, passwords or service-account keys.
+Verify the signing certificate against the previous APK before publication;
+changing the key or application ID prevents a normal upgrade preserving pairing.
+
+The mobile CI validates builds and lint; its unsigned/debug APKs are not the
+public download. Attach the locally verified, original-key-signed
+`Vibe-Halo-Mobile-<version>.apk` to the stable tag's release, clearly labeled as
+an Android preview. Publish its SHA-256 checksum alongside the existing desktop
+checksums without changing `latest.yml` or the installer blockmap. Keep remaining
+physical-device checks explicit in the release notes.

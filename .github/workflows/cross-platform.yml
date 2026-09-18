@@ -279,16 +279,10 @@ jobs:
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
           Cross-platform preview of Vibe Halo $version.
 
-          - Codex Approve for me requests stay with the native Auto-review guardian when exact current-turn context is available
-          - Conservative fallback keeps human approvals in Vibe Halo when Codex session context is missing or unrecognized
-          - Tray-only recent-event history in an independent, freely draggable side panel
-          - Expanded transparent shadow gutters so every edge fades naturally without clipping
-          - ZCode Plan-mode completion notifications and retained plan output
-          - Encrypted-at-rest history when Electron secure storage is available, with an explicit plaintext warning otherwise
-          - Approval, question, Codex native-answer, and plan details retained for 30 days or 200 events; ordinary completion notifications are excluded
-          - Stable, distinct accent colors and compact/expanded badges for all 19 registered clients
-          - Tightly framed small-size tray icon for improved notification-area legibility
-          - Transparent Halo terminal application icon across all platform packages
+          - Optional paired Android companion with encrypted notifications, approvals and readable history
+          - Editable device names, offline name synchronization and pairing-first mobile setup
+          - Structured history cards and notification/background-settings guidance
+          - Improved scaled-display Codex reminders and localized phone/watch notifications
           - Windows x64: NSIS installer
           - macOS 12+: separate Apple Silicon and Intel DMG/ZIP packages
           - Linux x64: AppImage and deb packages for common Ubuntu/Debian desktops

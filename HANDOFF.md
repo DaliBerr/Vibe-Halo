@@ -1,8 +1,29 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-09-18 (synced-event history parsing and pairing-first Android wizard)
-Current version: `0.5.9`
+Updated: 2026-09-18 (0.6.0 release preparation)
+Current version: `0.6.0`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-09-18 — 0.6.0 release preparation
+
+The owner explicitly requested a version bump, public README simplification,
+CI/CD and publication, superseding the earlier local-only delivery restriction.
+Desktop and Android version names are now 0.6.0; Android versionCode advances to 2
+and retains the existing release signing identity and application ID. No protocol
+version, device identity, pairing or history migration is introduced by this bump.
+
+The bilingual public READMEs are shortened to downloads, features, quick start,
+development entry points and license attribution. Detailed material lives in
+`docs/GUIDE.md` and `docs/GUIDE.zh-CN.md`; companion setup now describes the actual
+default relay behavior. Windows uses the stable release workflow; macOS/Linux
+remain previews, and the original-key-signed Android APK is labeled preview.
+Xiaomi background locking, vendor battery/autostart behavior and lock-screen
+phone/watch delivery still require physical-device acceptance. CI does not
+replace those checks. The owner has authorized publication with these boundaries.
+
+Release checks: root/protocol tests, local Android build/lint and signature
+verification, plus the exact release commit's cross-platform and mobile CI.
+Publish immutable `v0.6.0` and `preview-0.6.0` tags only after candidate checks pass.
 
 ## 2026-09-18 — Synced-event history parsing and pairing-first wizard
 

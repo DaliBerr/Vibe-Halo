@@ -1,10 +1,13 @@
 # Android companion: build, deploy and connect
 
-The desktop and Android sources implement an optional companion. A fresh desktop
-installation has both remote access and remote control disabled. There is no
-bundled public relay or Firebase project. Dated acceptance evidence and remaining
-device checks are in [HANDOFF.md](../HANDOFF.md); the [protocol](REMOTE_PROTOCOL.md)
-and [product decisions](REMOTE_DECISIONS.md) define the security boundary.
+The optional Android companion connects to a paired desktop over encrypted LAN
+or cloud transport. The desktop automatically connects to the default public
+relay; pairing and remote-control permissions still require explicit local
+authorization. Published companion APKs include notification-only Firebase
+configuration. Source/CI builds need their own Firebase configuration for FCM.
+Dated acceptance evidence and remaining device checks are in
+[HANDOFF.md](../HANDOFF.md); the [protocol](REMOTE_PROTOCOL.md) and
+[product decisions](REMOTE_DECISIONS.md) define the security boundary.
 
 ## Local build
 
@@ -18,7 +21,7 @@ npm ci
 npm test
 npm run test:protocol
 npm run build:dir
-npm run verify:package -- dist/win-unpacked/resources 0.5.9
+npm run verify:package -- dist/win-unpacked/resources 0.6.0
 
 cd services/relay
 npm ci

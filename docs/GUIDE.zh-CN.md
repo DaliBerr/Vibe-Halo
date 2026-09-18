@@ -1,0 +1,511 @@
+# 使用与开发指南
+
+[English](GUIDE.md) · [简体中文](GUIDE.zh-CN.md) · [README](../README.zh-CN.md)
+
+## 主要特性
+
+### 灵动岛交互
+
+- 紧凑态显示客户端、事件摘要和待处理数量，点击后展开完整内容。
+- 每个已注册客户端都有固定颜色和一至两个字符的徽标；紧凑态客户端标签与展开态徽标保持一致，独立状态点继续表示审批、等待输入或完成。
+- 托盘使用针对小尺寸优化并收紧边界的图标表示，使 Halo 标识在常见系统托盘缩放比例下仍然清晰。
+- 展开态展示命令、补丁、查询、说明、工作目录及经过边界限制的结构化参数。
+- 顶部中央按钮或 `Esc` 可收回紧凑态，不会关闭通知或对审批作出决定。
+- 操作区固定在底部；选项超过三个时，低频操作进入“更多”菜单。
+- 交互表单支持单选、多选和自由文本；最多 10 个问题、每题最多 20 个选项。
+- 原生浅色/深色外观、平滑尺寸动画、多显示器定位和高 DPI 约束。
+
+### 审批与通知
+
+- 允许一次、拒绝、交回客户端等选项只按客户端真实协议映射，不推导不存在的长期规则。
+- OpenCode 只有在原请求明确支持时才显示 `Always`。
+- 同一客户端的重复请求会去重，并把最终结果返回所有等待连接。
+- Windows 版 ZCode 3.10.1 会让原生审批界面与 Vibe Halo 同时等待；任一侧先作出明确决定后，另一侧立即取消，同一工具不会执行两次。旧版 ZCode 可能仍然优先等待 Hook。
+- 当 Vibe Halo 能精确匹配当前回合的审批者上下文时，Codex“帮我审批”请求会直接交给 Codex Auto-review，不进入灵动岛。如果这份版本相关的上下文缺失或无法读取，Vibe Halo 会保留现有岛内审批流程，避免漏掉真正需要人工处理的请求。
+- Codex 或 ZCode 在计划模式下结束一轮任务时，Vibe Halo 会显示专门的“计划已就绪”通知，并在可用时展示完整计划内容。
+- 完成通知默认显示 8 秒；新的提示或审批会优先展示并清理旧通知。
+- UI 优先级固定为：**审批/精确交互 > 等待输入 > 完成通知**。
+
+### 最近事件
+
+- 从托盘打开“最近事件”，会显示一个独立的 460 × 720 右侧面板；按住列表或详情页的顶部标题区即可拖到工作区任意位置。顶部实时灵动岛保持独立，并始终位于历史面板上方。
+- 列表可按全部、审批、问答、计划或来源客户端筛选。点击记录后在同一窗口进入只读详情，可分别复制命令、完整参数、回答、正文和工作目录。
+- 审批会保存允许、拒绝、交回客户端、超时、断线和关闭等所有结束结果；岛内精确回答与尽力解析的 Codex `request_user_input` 原生回答也会保存，无法兼容解析时明确标记回答不可用。
+- Codex 和 ZCode 的“计划已就绪”正文会保存；普通任务完成通知明确不进入历史。
+- 历史最多保留 30 天、200 条，文件上限 16 MiB。鼠标离开五秒后面板自动淡出；托盘是唯一入口。
+
+### 集成管理
+
+- 启动时按可执行文件或已初始化配置检测客户端，并对检测到的客户端增量安装或修复集成。
+- 首次修改每个客户端配置前独立备份；JSON、JSONC、TOML 和插件安装均保留第三方内容。
+- 尊重客户端的显式禁用设置，例如 Codex `hooks=false`；Vibe Halo 不会静默改回。
+- 托盘可逐项停用或重新启用客户端，也可重新扫描、修复全部或卸载全部集成。
+- 用户停用的客户端会记录 override，后续启动不会自动重装。
+
+### 更新
+
+- 只有官方 Windows 稳定构建才启用自动更新。默认稳定通道不签名，使用 GitHub Releases 和 SHA-512 完整性元数据；macOS/Linux 保持关闭。
+- 正式构建从 GitHub Releases 后台检查并下载稳定版本。
+- 下载完成后必须从托盘明确选择“重启并更新”；普通退出不会自动安装。
+- 更新前先关闭本地服务，把待处理审批和问题交回客户端原生流程。
+- 源码、本地构建和预览安装包有意禁用自动更新。
+
+## 客户端支持
+
+Vibe Halo 当前注册 19 个客户端。这里的“支持”表示仓库包含对应适配器和契约测试，不代表所有客户端都已经通过真实运行验收。
+
+> [!WARNING]
+> 当前只有 **Codex** 与 **ZCode** 在维护者环境完成了真实客户端触发、灵动岛交互和结果回传验证。其余 17 个客户端主要依据公开协议、旧仓库实现和自动契约测试完成适配，尚未进行完整实机验证，可能存在客户端版本差异、配置格式变化或响应协议 Bug。使用这些集成前请保留客户端原生审批入口，并通过托盘诊断确认状态。
+
+| 能力层级 | 客户端 | Vibe Halo 行为 |
+| --- | --- | --- |
+| 灵动岛审批 | Codex、ZCode、Qwen Code、Copilot CLI、Claude Code、CodeBuddy、Hermes、OpenCode | 显示客户端明确提供的审批选项，并编码为原生协议响应 |
+| 岛内精确回答 | ZCode `AskUserQuestion`、Claude/CodeBuddy Elicitation、Hermes clarify | 显示结构化表单，并把答案映射回客户端原协议 |
+| 原生审批提醒 | Kimi Code、Qoder、QoderWork | 提醒你回到客户端完成审批，不代替客户端作答 |
+| 完成/状态通知 | Gemini CLI、Antigravity、Cursor Agent、Kiro、CodeWhale、Pi、OpenClaw、Reasonix，以及上述客户端 | 在 `Stop` 或等价事件后显示完成通知；新提示清除同会话旧通知 |
+
+> [!NOTE]
+> Codex `request_user_input` 在普通/default、计划和未知模式下都会被识别，但仍然只有只读提醒。Vibe Halo 会使用短期内存中的 Hook 来源信息，尽量把提醒放到对应显示器并重新置顶，再监控 Codex session JSONL 判断请求是否结束；它不会向 session 文件写入答案，也不会绕过 Codex 原生回答界面。
+
+## 工作方式
+
+```mermaid
+flowchart LR
+    A["AI 编程客户端"] --> B["Command Hook / 插件 / 扩展"]
+    B --> C["127.0.0.1 + 启动令牌"]
+    C --> D["Agent Registry<br/>归一化与协议边界"]
+    D --> E["全局审批 FIFO"]
+    D --> F["输入提醒与完成通知"]
+    E --> G["顶部灵动岛"]
+    F --> G
+    G --> H["语义决定或结构化答案"]
+    H --> D
+    D --> B
+    B --> A
+    D --> J["有界本地历史"]
+    J --> K["托盘打开的右侧面板"]
+    I["Integration Manager"] -. "备份、增量安装、健康检查" .-> B
+```
+
+1. 客户端 Hook 或托管插件把事件转换为有界请求。
+2. Hook 从 `~/.vibe-halo/runtime.json` 读取当前进程的 loopback 端口和启动令牌。
+3. 主进程根据 `agentId` 选择适配器，归一化审批、交互问题或状态事件。
+4. 当前请求进入全局队列；Renderer 只收到展示需要的数据和稳定的 option ID。
+5. 用户选择后，主进程再次验证当前 ID、选项和答案，再由适配器编码为客户端协议。
+6. 任何一步无法安全完成时，返回该客户端认可的“无决定”结果，让原生流程接管。
+
+## 安装与配置
+
+### 使用发行版
+
+前往 [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases) 下载 Windows 稳定版或最新三平台预览版：
+
+| 平台 | 支持基线 | 通道与产物 |
+| --- | --- | --- |
+| Windows | Windows 10/11 x64 | 最新稳定版或预览版：`Vibe-Halo-Setup-<version>-x64.exe` |
+| macOS | macOS 12+，Apple Silicon 或 Intel | 三平台预览版：`Vibe-Halo-<version>-arm64.dmg` / `.zip`、`Vibe-Halo-<version>-x64.dmg` / `.zip` |
+| Linux | Ubuntu 22.04/24.04 或 Debian 12 x64 | 三平台预览版：`Vibe-Halo-<version>-x64.AppImage`、`Vibe-Halo-<version>-x64.deb` |
+
+其他 Linux 发行版可尝试 AppImage，但不属于首版保证范围。预览包有意不签名，请只从本仓库下载并核对发布页的 SHA-256。
+
+安装并启动后：
+
+1. Vibe Halo 常驻系统托盘；没有事件时不会显示主窗口。
+2. 应用扫描本机已安装或已有配置的受支持客户端，并增量写入自己的 Hook/插件记录。
+3. 打开托盘“客户端集成”检查检测和健康状态。
+4. 如果使用 Codex，请在 Codex 输入 `/hooks`，审核用户级 `~/.codex/hooks.json` 中 Vibe Halo 的 `PermissionRequest`、`Stop` 和 `UserPromptSubmit` 条目。
+5. 在客户端触发一次审批或完成事件，确认灵动岛能够出现并正确回传。
+
+Windows 安装器会根据系统显示语言自动选择英文或简体中文，不额外弹出语言选择框。应用启动后可独立切换语言，不会修改系统设置。
+
+> [!WARNING]
+> Codex 0.129.0 及后续版本要求用户亲自信任新增或变化的 command Hook。Vibe Halo 可以写入和修复配置，但不会绕过这个信任步骤。
+
+#### macOS 首次启动
+
+预览版仅带有保证 Apple Silicon 可靠启动所需的 ad-hoc 临时签名，未使用 Apple Developer ID 签名，也未公证。从 DMG 将应用拖入“应用程序”后，请在 Finder 中按住 Control 点击或右键 Vibe Halo，选择“打开”并确认一次。Vibe Halo 以 accessory 应用运行，不显示 Dock 图标，也不申请辅助功能或屏幕录制权限。
+
+#### Linux 窗口后端
+
+Vibe Halo 优先使用 X11。Wayland 会话只要存在 `DISPLAY` 就使用 XWayland，以保留窗口定位和展开动画；缺少 XWayland 时进入原生 Wayland 降级模式，诊断会明确提示定位、缩放和焦点能力受限。仅在确实需要强制原生模式时设置 `VIBE_HALO_NATIVE_WAYLAND=1`。
+
+### 从源码运行
+
+从源码运行适合贡献、调试集成或验证未发布功能。它同样会检测并增量修改真实客户端配置，因此请先阅读上面的集成行为。
+
+#### 前置条件
+
+- Windows x64、macOS 12+ arm64/x64 或 Linux x64；真实客户端人工验收仍以 Windows 为主。
+- [Node.js 24](https://nodejs.org/) 与 npm（与发布 CI 一致）。
+- Git。
+- 至少一个受支持客户端，用于真实集成测试；只运行自动测试时不需要。
+
+```powershell
+git clone https://github.com/DaliBerr/Vibe-Halo.git
+Set-Location Vibe-Halo
+
+# 严格按 lockfile 安装依赖
+npm ci
+
+# 先运行自动测试
+npm test
+
+# 启动 Electron 应用
+npm start
+```
+
+需要修改依赖时使用 `npm install` 并同步提交 `package-lock.json`；其他情况下优先使用 `npm ci` 保持可复现。
+
+## 日常使用
+
+应用默认跟随操作系统 UI 语言；可在托盘“语言”中即时切换，无需重启。
+
+### 灵动岛
+
+- **展开**：点击紧凑态。
+- **收起**：点击展开态顶部中央的小型灵动岛按钮，或按 `Esc`。
+- **关闭审批**：点击 `×` 不等于拒绝；Vibe Halo 返回无决定，让客户端原生流程继续。
+- **允许/拒绝**：只有当前请求的有效按钮会产生响应。
+- **复制内容**：展开后可复制主要内容，复制载荷有长度限制。
+- **查看完整参数**：使用折叠详情查看已净化的结构化输入。
+
+### 托盘菜单
+
+| 菜单项 | 作用 |
+| --- | --- |
+| `启用审批` | 全局控制岛内审批；关闭后审批交回客户端，完成通知仍可工作 |
+| `等待输入提醒` | 控制只读输入提醒和原生审批提醒 |
+| `最近事件` | 打开独立右侧历史面板，并显示当前保留数量 |
+| `记录最近事件` | 暂停或恢复后续历史采集，不删除已有记录 |
+| `开机启动` | 控制操作系统登录后启动 Vibe Halo |
+| `客户端集成` | 查看状态、逐项停用/启用、重新扫描、修复或卸载全部 |
+| `审核 Codex Hook…` | 提示在 Codex `/hooks` 中完成官方信任审核 |
+| `修复 Codex Hook` | 增量修复 Vibe Halo 管理的 Codex 配置 |
+| `诊断信息` | 查看服务、队列、集成验证、更新状态和日志路径 |
+| `语言` | 选择“跟随系统”、English 或“简体中文”；当前窗口和排队项目会立即刷新 |
+| `检查更新` | 仅在官方 Windows 稳定构建中出现 |
+
+### 移除集成
+
+可以从“客户端集成 → 卸载全部…”移除所有 Vibe Halo 管理项，或在源码目录执行：
+
+```shell
+npm start -- --uninstall-hooks
+```
+
+Windows NSIS 卸载程序也会调用相同清理流程。macOS 将应用拖入废纸篓无法执行集成清理，因此删除应用前必须先运行“卸载全部…”。Linux 删除 AppImage 或软件包前也建议先执行同一操作。遗留启动器会安全回退，但显式清理可以避免客户端留下失效 Hook。清理只删除 Vibe Halo 自己的 Hook/插件记录；第三方配置、首次备份以及应用用户数据会保留。
+
+## 安全与隐私
+
+- 本地 Hook 服务只监听 `127.0.0.1`，不绑定局域网或公网地址。
+- 每次启动生成新令牌；服务要求令牌，并限制单个请求最大为 256 KiB。
+- OpenCode reverse bridge 使用独立随机 bearer token、请求 ID、重放保护和 loopback 目标校验。
+- Renderer 启用 context isolation、sandbox，禁用 Node、导航和新窗口。
+- Renderer 不能访问客户端原始协议载荷、配置规则、bridge token 或更新器。
+- IPC 校验当前请求 ID、option ID、类型、答案数量和长度。
+- 日志不会记录启动令牌或完整命令内容；日志按大小轮换。
+- 应用没有遥测或用户账号系统。电脑默认自动连接手机伴侣服务，无需准入码；手机仍需配对，提交决定还需单独开启本地控制开关。主动关闭手机伴侣后会保持关闭。
+- 官方 Windows 稳定版只会为更新检查访问公开 GitHub Releases；源码、本地和预览构建不会启用更新器。
+- 客户端配置使用原子写入、首次备份和拥有者标记；显式禁用设置不会被自动覆盖。
+- 最近事件包含本机可见的命令、参数、路径、问题和回答。明显的结构化密码、token、secret 等字段会替换为 `[REDACTED]`，但用户主动写入命令字符串的秘密仍可能被保存。
+- 安全后端可用时，历史文件使用 Electron `safeStorage` 加密；安全加密不可用或 Linux 报告 `basic_text` 时允许明文保存，但面板会持续显示警告，首次打开前也会显示一次提示。
+- 关闭手机伴侣时，历史留在本机。授予 history.read 的已配对手机可以通过端到端加密通道按需读取历史。文件损坏或无法解密不会阻塞应用、审批或启动；原文件保持不覆盖，本次运行退回空的内存历史。
+
+运行时身份默认位于：
+
+```text
+%USERPROFILE%\.vibe-halo\runtime.json
+```
+
+应用设置、日志和集成备份位于 Electron `userData` 目录，典型 Windows 安装路径为：
+
+```text
+%APPDATA%\Vibe Halo\
+├── settings.json
+├── history.json
+├── logs\main.log
+└── integration-backups\
+```
+
+## 架构
+
+### 技术栈
+
+| 层级 | 技术 |
+| --- | --- |
+| 桌面运行时 | Electron 41、CommonJS、Node.js |
+| UI | 原生 HTML、CSS、JavaScript；一个实时灵动岛窗口加一个可选历史窗口 |
+| 本地通信 | Node HTTP、仅 loopback、每进程令牌 |
+| 平台集成 | `PlatformAdapter`、Windows `koffi`、POSIX 启动器、系统托盘 |
+| 打包 | x64 NSIS、arm64/x64 DMG 与 ZIP、x64 AppImage 与 deb |
+| 自动更新 | 官方 Windows 稳定通道（默认未签名，可选 SignPath）；macOS/Linux 关闭 |
+| 测试 | Node 内置 test runner |
+| 发布 | GitHub Actions、electron-builder、SignPath Foundation |
+
+桌面核心使用 Electron 和本地文件，不依赖前端框架。手机伴侣另有 Cloudflare Worker/D1 中继，详见[配置指南](REMOTE_SETUP.md)。
+
+### 目录结构
+
+```text
+.
+├── src/
+│   ├── main.js                  # Electron 生命周期、托盘与服务装配
+│   ├── platform-adapter.js      # 平台路径、稳定 Hook、开机启动、通知与窗口后端
+│   ├── agent-registry.js        # 19 个适配器、归一化、选项和决策编码
+│   ├── integration-manager.js   # 检测、备份、安装、健康、修复与卸载
+│   ├── server.js                # 带令牌的 127.0.0.1 HTTP 网关
+│   ├── approval-store.js        # 全局审批 FIFO、去重与连接生命周期
+│   ├── input-request-store.js   # 等待输入/原生审批提醒队列
+│   ├── completion-store.js      # 完成通知生命周期
+│   ├── codex-input-monitor.js   # 只读监控 Codex session JSONL
+│   ├── island-controller.js     # 实时灵动岛定位、优先级、IPC 与动画
+│   ├── history-store.js         # 有界的加密/明文最近事件持久化
+│   ├── history-events.js        # 审批、问答、原生回答与计划事件映射
+│   ├── history-window-controller.js # 隔离的右侧历史窗口与 IPC
+│   ├── history-preload.js       # 受限的历史 Renderer 桥接
+│   ├── update-manager.js        # 签名构建门控、检查、下载与显式安装
+│   ├── shutdown-coordinator.js  # 普通退出与更新共用的安全关闭顺序
+│   ├── renderer/                # 原生灵动岛 UI
+│   └── history-renderer/        # 原生只读历史 UI
+├── hooks/
+│   ├── vibe-halo-hook.js        # 自包含通用 command Hook
+│   └── integrations/            # Hermes、OpenCode、OpenClaw、Pi 托管资产
+├── test/                         # 协议、队列、安装器、IPC、窗口和发布测试
+├── scripts/                      # 签名暂存、更新元数据与发布配置工具
+├── docs/
+│   ├── assets/vibe-halo-demo.gif # README 动态演示
+│   └── RELEASING.md              # SignPath 与签名发布手册
+├── electron-builder.config.cjs   # Windows、macOS 与 Linux 打包配置
+├── README.md                     # 英文主文档
+├── README.zh-CN.md               # 简体中文文档
+├── LICENSE                       # AGPL-3.0-only
+└── NOTICE.md                     # 上游版权与二次开发说明
+```
+
+## 开发
+
+两端名称默认使用系统设备名称，可在本机修改并同步给已连接设备。手机首次启动按连接电脑、通知、
+后台锁定、省电设置的顺序一屏一步引导；配对必需，其余可稍后设置。返回时自动检查系统可提供的状态，
+无法读取的小米专有设置保留“未验证”。历史详情按标题与类别、来源、内容摘要、处理结果分卡片展示，
+最近同步事件和已有缓存也会解析后显示，不展示原始协议 JSON。
+
+可选 Android 手机伴侣已实现原生界面、设备配对、证书固定的局域网 HTTPS/WSS、
+可自托管的 Cloudflare 中继、加密审批/问答/历史与 FCM 提醒。电脑自动连接默认测试服务，无需准入码；
+服务管理使用独立工具，仍支持自建中继。手机连接需要配对和电脑确认。通知没有批准或回复按钮。构建与配置见
+[使用说明](REMOTE_SETUP.md)，产品选择见[决策记录](REMOTE_DECISIONS.md)，
+协议边界见[协议说明](REMOTE_PROTOCOL.md)。源码可用不等于公网推送、真机、手表
+和全部桌面平台已经验收。
+本次实际测试与剩余工作见[交接记录](../HANDOFF.md)。桌面测试运行 `npm test`，独立协议测试
+运行 `npm run test:protocol`；修改 schema 后运行 `npm run build:protocol`，将生成的校验器
+与 schema 一起提交。
+
+### 可用命令
+
+| 命令 | 说明 |
+| --- | --- |
+| `npm ci` | 按 lockfile 安装完全一致的依赖 |
+| `npm install` | 安装并允许更新 lockfile；仅在依赖变更时使用 |
+| `npm test` | 运行全部 Node 自动测试 |
+| `npm start` | 从源码启动 Electron 应用并扫描本机集成 |
+| `npm run build:dir` | 生成当前宿主平台的未安装目录 |
+| `npm run build` | 生成当前宿主平台的未签名安装包 |
+| `npm run build:win` | 生成 Windows x64 NSIS 包 |
+| `npm run build:mac:arm64` / `npm run build:mac:x64` | 在 macOS 生成 DMG 与 ZIP |
+| `npm run build:linux:x64` | 在 Linux 生成 x64 AppImage 与 deb |
+| `npm run build:prepackaged` | 从预打包目录生成 NSIS；主要供签名工作流使用 |
+| `npm run release:metadata` | 为已签名安装包重新生成 blockmap、哈希和 `latest.yml` |
+
+### 隔离冒烟运行
+
+普通 `npm start` 会扫描真实客户端配置。需要验证启动而不接触真实配置时，可以在一个新的 PowerShell 会话中临时重定向相关目录：
+
+```powershell
+$testRoot = Join-Path $PWD ".smoke"
+$env:USERPROFILE = Join-Path $testRoot "home"
+$env:APPDATA = Join-Path $testRoot "appdata"
+$env:LOCALAPPDATA = Join-Path $testRoot "localappdata"
+$env:CODEX_HOME = Join-Path $testRoot "codex"
+$env:VIBE_HALO_USER_DATA = Join-Path $testRoot "userdata"
+$env:VIBE_HALO_RUNTIME_DIR = Join-Path $testRoot "runtime"
+$env:VIBE_HALO_TEST = "1"
+
+npm start -- --smoke-test
+```
+
+`.smoke/` 已被 Git 忽略。关闭该 PowerShell 会话即可丢弃这些临时环境变量。
+
+### 开发原则
+
+- 保持 CommonJS 和原生 Renderer；窗口边界固定为一个实时灵动岛加一个仅从托盘打开的可选历史窗口。
+- 协议、队列、超时、IPC、窗口尺寸或配置安装行为变化必须补回归测试。
+- 不提交 `node_modules/`、`dist/`、`.smoke/`、日志、密钥或本机运行时数据。
+- 修改 Hook 命令路径后，运行“修复全部”，并在 Codex `/hooks` 中重新审核命令。
+- 关闭、错误和协议不确定性必须继续执行无决定回退。
+
+## 测试
+
+```powershell
+npm test
+```
+
+自动测试覆盖：
+
+- 19 个适配器的注册、能力、事件归一化和有界输出。
+- 各审批协议的允许、拒绝、无决定和结构化答案快照。
+- 跨客户端 FIFO、去重隔离、重复连接、超时、断线和 shutdown 回退。
+- loopback 认证、请求上限、非法 option ID、bridge token 和重放保护。
+- JSON、JSONC、TOML、插件安装的备份、幂等、第三方配置保留和安全卸载。
+- 设置迁移、自动检测、用户停用 override、诊断和更新状态。
+- Renderer IPC、动态按钮、问题表单、窗口尺寸、阴影边界、多屏定位与 X11 来源窗口匹配。
+- 历史保留/容量、加密与明文回退、损坏恢复、敏感字段清理、语义事件接线、隔离 IPC、筛选、详情、本地化、右侧定位、淡出计时和双窗口截图冒烟。
+- Windows/POSIX Hook mock-server 端到端、稳定启动器路径与离线回退。
+- 无签名/签名发布门控、公开更新配置、SignPath 暂存和最终字节元数据生成。
+
+Windows 的透明窗口、阴影、焦点、动画、多屏/DPI、真实客户端 Hook 回传、托盘、NSIS 卸载和真实 N→N+1 更新仍需人工验收。macOS/Linux 当前仅完成 CI 协议、打包、启动器与启动冒烟；真实客户端回传尚未实机验证。
+
+## 构建与发布
+
+### 本地构建
+
+```shell
+npm run build:dir
+npm run build
+```
+
+各平台输出：
+
+```text
+Windows: Vibe-Halo-Setup-<version>-x64.exe
+macOS:   Vibe-Halo-<version>-arm64|x64.dmg 与 .zip
+Linux:   Vibe-Halo-<version>-x64.AppImage 与 .deb
+```
+
+本地产物预期为未签名，并且 `autoUpdateEnabled=false`。不要把本地产物冒充正式更新发布。
+
+### 三平台预览版
+
+`preview-<version>` 标签会触发跨平台工作流：在 Windows 2025、macOS 15 arm64/Intel、Ubuntu 24.04 上测试；在 Windows 2025、两种 macOS 架构与 Ubuntu 22.04 上构建；最终把所有安装包和 `SHA256SUMS.txt` 发布为 GitHub Pre-release。该流程不会发布稳定更新元数据。
+
+### Windows 稳定版
+
+正式版本由 `v<version>` 标签触发 GitHub Actions。工作流会：
+
+1. 验证标签版本和提交属于 `main`。
+2. 安装依赖并运行完整测试。
+3. 构建启用更新的 Windows x64 NSIS 安装包。默认路线不签名；设置受保护的仓库变量 `VIBE_HALO_SIGNPATH_ENABLED=1` 后启用保留的 SignPath 流程。
+4. 从最终安装器字节重新生成 blockmap、SHA-256 和 `latest.yml`。
+5. 静默安装、验证已安装文件和更新配置、卸载，再发布为稳定 Latest GitHub Release。
+
+默认无签名发布步骤和可选 SignPath 配置见 [docs/RELEASING.md](RELEASING.md)。
+
+## 环境变量
+
+正常安装不需要手工配置环境变量。以下变量用于自定义客户端目录、测试或发布：
+
+| 变量 | 用途 |
+| --- | --- |
+| `CODEX_HOME` | 覆盖 Codex 配置和 session 根目录 |
+| `COPILOT_HOME` | 覆盖 Copilot CLI 配置目录 |
+| `OPENCLAW_STATE_DIR` | 覆盖 OpenClaw 状态目录 |
+| `VIBE_HALO_RUNTIME_DIR` | 覆盖 loopback runtime identity 目录 |
+| `VIBE_HALO_USER_DATA` | 覆盖 Electron `userData`；用于测试隔离 |
+| `VIBE_HALO_TEST=1` | 启用自动测试/冒烟模式，避免真实开机启动和更新 |
+| `VIBE_HALO_NATIVE_WAYLAND=1` | 强制使用原生 Wayland；窗口定位和动画可能降级 |
+| `VIBE_HALO_SCREENSHOT` | 在 demo 测试中保存窗口截图 |
+| `VIBE_HALO_AUTO_UPDATE=1` | 写入官方 Windows 稳定通道更新门控；仅供受保护发布构建使用 |
+| `VIBE_HALO_PUBLISHER_NAME` | 为可选 SignPath 路线指定完整 Authenticode 发布者 Subject |
+| `VIBE_HALO_EXTERNAL_SIGNING=1` | 启用 electron-builder 外部 SignPath 暂存脚本 |
+| `VIBE_HALO_SIGN_STAGE_DIR` | 外部签名工作流的暂存目录 |
+| `VIBE_HALO_SIGNED_ELEVATE` | 指向已签名的 NSIS elevation helper |
+| `VIBE_HALO_SIGNED_UNINSTALLER` | 指向已签名的 NSIS 卸载程序 |
+| `VIBE_HALO_RELEASE_DATE` | 为更新元数据提供可复现发布时间 |
+
+仓库变量 `VIBE_HALO_SIGNPATH_ENABLED=1` 会启用可选 SignPath 签名；缺省或 `0` 时稳定版保持未签名。签名变量只应由受保护的 CI 环境设置。SignPath API token 是 GitHub Actions secret，不属于应用环境变量，绝不能写入源码、日志或发布资产。
+
+## 常见问题
+
+### Vibe Halo 是 Vibe Island 的跨平台替代方案吗？
+
+Vibe Halo 在 Windows、macOS 与常见 x64 Linux 上提供类似的顶部审批与通知工作流，但它是独立维护的开源项目，并非 Vibe Island 的官方版本。只有在 AI 编程客户端需要支持的权限决定、提出支持的交互问题或完成任务时，它才会出现。
+
+### 不切回终端也能批准 Codex 权限吗？
+
+可以。受支持的 Codex `PermissionRequest` 事件可直接在权限审批弹窗中允许或拒绝。如果 Vibe Halo 无法安全返回决定，或者你关闭审批、等待超时，它会返回“无决定”，让 Codex 恢复原生审批流程。普通/default 与计划模式下的 Codex `request_user_input` 会尽量在对应显示器重新置顶提醒，但仍必须回到 Codex 作答。
+
+### Vibe Halo 支持 Claude Code 和 OpenCode 吗？
+
+仓库包含 Claude Code 与 OpenCode 的适配器、安装器和自动契约测试，但维护者环境目前只有 Codex 与 ZCode 完成了完整的真实客户端往返验证。请把 Claude Code、OpenCode 及其他未实测客户端视为预览支持，并保留它们的原生审批界面。
+
+## 故障排查
+
+### 灵动岛没有出现
+
+1. 确认托盘中显示“服务已运行”或客户端集成健康状态。
+2. 确认“启用审批”或“等待输入提醒”处于开启状态。
+3. 打开“客户端集成”，对目标客户端执行“重新扫描”或“修复全部”。
+4. 查看“诊断信息”，确认客户端是“健康”“需修复”还是“未检测”。
+5. 使用“诊断信息 → 打开日志目录”查看 `main.log`。
+
+### Codex 显示 Hook 待审核
+
+1. 在 Codex 输入 `/hooks`。
+2. 找到用户级 `~/.codex/hooks.json`。
+3. 审核并信任 Vibe Halo 的 `PermissionRequest`、`Stop` 和 `UserPromptSubmit`。
+4. 回到托盘执行“修复 Codex Hook”，再次检查诊断。
+
+### 客户端已检测但无法安装
+
+- 如果诊断显示“客户端禁用 Hook”，请先在客户端配置中明确启用；Vibe Halo 不会替你覆盖禁用值。
+- 如果客户端只有可执行文件、尚未初始化配置目录，请先运行该客户端一次。
+- 用户主动停用的集成不会自动恢复，需要在“客户端集成”子菜单重新勾选。
+- 客户端更新可能改变未稳定的 Hook 协议；请附上客户端版本和净化后的诊断信息提交 Issue。
+
+### 点击关闭后客户端仍在等待
+
+这是预期行为。关闭审批不会替你选择“拒绝”；Vibe Halo 返回无决定，客户端应恢复其原生审批流程。若原生界面没有恢复，请记录客户端版本和事件类型后报告问题。
+
+### 托盘中没有更新选项
+
+源码运行、本地打包和预览构建会有意禁用自动更新。只有使用 `VIBE_HALO_AUTO_UPDATE=1` 构建的官方 Windows 稳定版才显示更新控制；macOS/Linux 安装包始终关闭。
+
+## 已知边界
+
+- 发布目标为 Windows x64、macOS 12+ arm64/x64，以及 Ubuntu 22.04/24.04 或 Debian 12 x64。其他 Linux 仅通过 AppImage 尽力支持；不提供 Linux arm64、RPM、Snap、Flatpak 或 Mac App Store 包。
+- 原生 Wayland 无法保证同等的自由定位、缩放和聚焦能力；默认优先 XWayland，原生模式会在诊断中明确标记降级。
+- 应用和 Windows 安装器支持英文与简体中文；不支持的系统 locale 默认回退英文，也可手动选择简体中文。
+- 不包含上游 Clawd on Desk 的桌宠、动画主题、会话 Dashboard、终端聚焦、远程 SSH 或 PWA。可选 Android 伴侣使用独立实现的加密协议。
+- 桌面默认连接公共中继；手机需配对，远程控制需在电脑上明确授权。伴侣使用独立局域网监听器，原 Hook 服务仍只监听 127.0.0.1。
+- 不是所有客户端都公开稳定的审批或回答协议；不支持的能力只提醒或交回原客户端。
+- Codex `request_user_input` 不能在岛内回答。
+- ZCode 双入口审批依赖 ZCode 3.10.1 的原生界面与 Hook 并发等待行为。Vibe Halo 不调用 ZCode 私有 app-server API；旧版本可能仍然以 Hook 为优先入口。
+- Codex 当前没有在稳定的 `PermissionRequest` Hook 载荷中提供实际审批者。Auto-review 绕过因此只会有界、只读地查询精确当前回合；无法识别本地会话格式时会保守地继续显示灵动岛。
+- 状态型客户端只显示完成或注意事件，不展示持续工作动画。
+- 最近事件只保存在本机，但仍可能包含敏感内容；结构化可疑字段会清理，共享设备上仍应谨慎启用。普通任务完成通知永远不记录。
+- 当前只有 Windows 上的 Codex 与 ZCode 完成真实客户端端到端验证；macOS/Linux 和其他集成即使 CI 与契约测试通过，也可能存在尚未发现的兼容性 Bug。
+
+## 参与贡献
+
+欢迎提交 Bug、协议兼容性报告和聚焦于灵动岛体验的改进建议。
+
+1. 先在 [Issues](https://github.com/DaliBerr/Vibe-Halo/issues) 描述目标、客户端版本和可复现步骤。
+2. 从最新 `main` 创建单一职责分支。
+3. 保持第三方配置增量合并和无决定回退语义。
+4. 为行为变化补测试并运行 `npm test`。
+5. 涉及窗口、Hook 或打包时，在说明中记录对应宿主平台的人工或 CI 验收结果。
+
+请不要提交真实客户端配置、运行时令牌、完整命令日志或其他个人数据。
+
+## 上游、致谢与许可证
+
+Vibe Halo 派生自 [rullerzhou-afk/clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk)。感谢上游维护者和贡献者建立的多客户端 Hook、插件、审批传输与生命周期基础。
+
+与上游相比，本仓库进行的是产品方向明确的二次开发：
+
+- 从跨平台桌宠收敛为聚焦三平台的顶部灵动岛。
+- 删除桌宠美术、主题系统与动画状态机；可选 Android 手机伴侣独立于上游远程/移动端代码实现。
+- 保留并重构适合本地审批、结构化问答和完成通知的协议部分。
+- 强化全局 FIFO、Renderer 隔离、配置所有权、安全回退和签名更新链。
+
+本项目由 Vibe Halo 贡献者独立维护，与 Clawd on Desk 上游维护者、OpenAI、Anthropic 或其他客户端厂商没有官方隶属或背书关系。
+
+源代码按 [GNU Affero General Public License v3.0 only](../LICENSE)（`AGPL-3.0-only`）发布。再分发或部署修改版本时，请遵守 AGPL-3.0 的源代码提供义务，并保留 [NOTICE.md](../NOTICE.md) 中的上游版权与归属说明。
