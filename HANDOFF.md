@@ -1,8 +1,28 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-12 (phone Markdown and image snapshots)
-Current version: `0.6.0`
+Updated: 2026-10-12 (0.6.1 release preparation and owner acceptance)
+Current version: `0.6.1`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-10-12 — 0.6.1 release and owner acceptance
+
+The owner accepted phone Markdown/image viewing using the supplied Windows
+directory build and original-key-signed 0.6.0 test APK, then authorized a new
+public release. This is practical acceptance of that test setup; separate
+production LAN/cloud-path coverage, Xiaomi background delivery and non-Windows
+real-client checks are not implied by it.
+
+Preparing Windows stable and three-platform preview 0.6.1 plus the original-key
+Android companion (versionCode 3). Both endpoints need this update for image
+sync. Existing records are not backfilled. No relay redeployment is needed.
+Local release checks passed: npm ci; desktop 233 passed / one Windows platform
+skip; all 6 protocol tests; normal and update-enabled package verification;
+Windows NSIS plus regenerated blockmap/update metadata; Firebase-configured
+minified Android release and lint. The 0.6.1 APK has the same SHA-256 signing
+certificate as the prior 0.6.0 companion and passed alignment/version checks.
+Used separate Windows output directories because the owner's accepted test build
+remains running. Cross-platform CI and publication evidence will be recorded
+after completion.
 
 ## 2026-10-12 — Phone Markdown, Codex cards and encrypted image snapshots
 

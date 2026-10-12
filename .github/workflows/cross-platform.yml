@@ -279,6 +279,9 @@ jobs:
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
           Cross-platform preview of Vibe Halo $version.
 
+          - Phone records render Markdown and read-only Codex information cards
+          - New completion/plan records sync encrypted project-image snapshots with tap-to-open, zoom and pan
+          - Image sync requires updating both desktop and Android; old records are not backfilled
           - Optional paired Android companion with encrypted notifications, approvals and readable history
           - Editable device names, offline name synchronization and pairing-first mobile setup
           - Structured history cards and notification/background-settings guidance

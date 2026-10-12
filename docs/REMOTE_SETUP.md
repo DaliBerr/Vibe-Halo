@@ -21,7 +21,7 @@ npm ci
 npm test
 npm run test:protocol
 npm run build:dir
-npm run verify:package -- dist/win-unpacked/resources 0.6.0
+npm run verify:package -- dist/win-unpacked/resources 0.6.1
 
 cd services/relay
 npm ci
