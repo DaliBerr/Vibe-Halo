@@ -11,7 +11,9 @@ data class HistoryView(val title: String, val kind: String, val client: String, 
 
 object HistoryPresentation {
     private fun raw(value: JSONObject, key: String): String = (value.opt(key) as? String).orEmpty().trim()
-    private fun plain(value: String): String = value.takeUnless { it.startsWith("{") || it.startsWith("[") }.orEmpty()
+    private fun structured(value: String): Boolean = value.startsWith("{") || value.startsWith("[") &&
+        !Regex("^\\[[^\\n]*\\](?:\\(|\\[)").containsMatchIn(value)
+    private fun plain(value: String): String = value.takeUnless(::structured).orEmpty()
     private fun text(value: JSONObject, key: String, limit: Int = 600) = plain(raw(value, key)).take(limit)
     fun project(value: JSONObject) = text(value, "projectName", 120).ifBlank { text(value, "cwd").replace('\\', '/').trimEnd('/').substringAfterLast('/') }
     fun session(value: JSONObject) = text(value, "sessionLabel", 12).ifBlank { text(value, "sessionId", 12) }
@@ -28,7 +30,7 @@ object HistoryPresentation {
         val meta = value.optJSONObject("summary") ?: value
         val kind = text(meta, "kind")
         val inputText = raw(value, "toolInputText")
-        val structured = inputText.startsWith("{") || inputText.startsWith("[")
+        val structured = structured(inputText)
         val parsed = if (structured) runCatching { org.json.JSONTokener(inputText).nextValue() }.getOrNull() else null
         val input = value.optJSONObject("toolInput") ?: parsed as? JSONObject
         val fields = listOf("command" to "命令", "cmd" to "命令", "file_path" to "文件", "path" to "文件", "query" to "查询", "description" to "用途")

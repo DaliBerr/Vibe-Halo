@@ -1,8 +1,55 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-09-18 (relay capacity and resilience)
+Updated: 2026-10-12 (phone Markdown and image snapshots)
 Current version: `0.6.0`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-10-12 — Phone Markdown, Codex cards and encrypted image snapshots
+
+Android record bodies now render CommonMark plus tables and strikethrough with
+native Compose text (no WebView or HTML execution). Inline/fenced code, lists,
+headings, quotes and links are styled; local-file links retain readable labels.
+Standalone Codex inbox, code-comment, archive, created-thread, automation and
+follow-up directives become read-only cards. Fenced/inline examples stay literal.
+Fixed Markdown links at the start of a completion being mistaken for JSON.
+
+New completion/plan records capture up to four explicitly linked project-local
+raster images. The PC rejects URL/UNC/out-of-project references and symlink
+escapes, bounds source size/pixels, then snapshots a 480-pixel preview and a
+2048-pixel / 256 KiB maximum static full view. safeStorage-encrypted snapshots
+survive source removal and PC restart within the 24-hour / 16 MiB cache bounds.
+Existing authenticated query transports carry signed/encrypted 24 KiB chunks;
+record ownership, current local scope and event epoch are checked, and the phone
+validates chunk metadata, final hash, MIME and dimensions before decoding.
+Android uses an 8 MiB memory cache and supports tap-to-open, pinch/pan,
+double-tap, zoom/reset buttons and retry placeholders. This task explicitly does
+not backfill old records, fetch remote images or change approval authority.
+
+Verification on Windows / Android API 34 emulator:
+
+- Desktop: 233 passed, one existing Windows platform skip; protocol: all 6 passed.
+- Android: all 9 JVM tests passed; debug/test and minified unsigned release APKs
+  built, debug/release lint completed with zero errors (26/27 warnings).
+- 13 UI/history/onboarding instrumentation cases passed. The separate real
+  Electron-to-Android encrypted snapshot test passed through CompanionRepository,
+  including deleted originals and wrong digest/epoch rejection. The final rerun
+  of all three rich-content UI cases and the transfer case also passed.
+- Native Electron PNG/JPEG decode, resize and compression smoke passed; Windows
+  directory packaging and package verification passed. CommonMark/image-size
+  runtime dependencies and Android generated notices are included.
+- Visually inspected Chinese Markdown/Codex cards, preview/full-image views,
+  and dark/large-text fallback screenshots in ignored `.smoke/rich-*.png`.
+  Android ICU rejects unescaped closing braces in patterns accepted by the JVM;
+  fixed that compatibility issue after emulator testing exposed it.
+
+`scripts/media-image-smoke.cjs` and the opt-in local-only
+`scripts/mobile-media-smoke-host.cjs` / `MediaTransferTest` make the image checks
+repeatable; commands and bounds are documented in REMOTE_SETUP/REMOTE_PROTOCOL.
+The local endpoint exercises the encrypted cloud-query shape, not production
+Worker delivery. Physical-phone gestures/network acceptance, deployed cloud/LAN
+image delivery and non-Windows desktop codecs remain unverified. Both desktop
+and Android must be updated for images; no relay deployment, version bump,
+release signing, release tag or public release was performed.
 
 ## 2026-09-18 — Relay capacity and resilience
 

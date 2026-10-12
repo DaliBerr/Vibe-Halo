@@ -46,6 +46,9 @@ val copyProtocolAssets by tasks.registering(Copy::class) {
 tasks.named("preBuild") { dependsOn(copyProtocolAssets) }
 
 dependencies {
+    implementation(libs.commonmark)
+    implementation(libs.commonmark.tables)
+    implementation(libs.commonmark.strikethrough)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)

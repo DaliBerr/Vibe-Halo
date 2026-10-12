@@ -304,6 +304,37 @@ identity and revocation records, and deploy only protocol-compatible database
 migrations. Do not restore a pre-revocation database snapshot as an ordinary
 rollback. Do not remove or reset existing desktop history/integration settings.
 
+## Local Markdown and image checks
+
+Run `npx electron scripts/media-image-smoke.cjs` for the real Electron raster
+codecs and compression bounds. Android unit tests cover Markdown/directive
+parsing; `RichHistoryTest` covers native layout, dark/large text, image opening,
+zoom/reset and failure placeholders. `SetupAndHistoryTest` remains the history
+and onboarding regression suite.
+
+For the opt-in cross-runtime image test, start
+`npx electron scripts/mobile-media-smoke-host.cjs` in a separate local terminal.
+It creates a synthetic PC and a loopback-only endpoint on port 18787; it never
+contacts the public relay or changes production bindings. On Windows, launch
+background helpers hidden. Install the debug APK and test APK, then run:
+
+```sh
+adb reverse tcp:18787 tcp:18787
+adb push .smoke/media-e2e-config.json /data/local/tmp/media-e2e-config.json
+adb shell run-as com.vibe.halo.mobile.debug mkdir -p files
+adb shell run-as com.vibe.halo.mobile.debug cp /data/local/tmp/media-e2e-config.json files/media-e2e-config.json
+adb shell am instrument -w -r -e class com.vibe.halo.mobile.MediaTransferTest com.vibe.halo.mobile.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+This test uses the production Android repository, Keystore identity, signed PC
+binding and encrypted chunk queries, including source deletion and invalid digest /
+epoch rejection. It temporarily uses a synthetic debug-app account and restores
+its saved registry in `finally`. The fixture is ignored local data and must not be
+published. Stop the host with an authenticated POST to `/shutdown` using its
+`bridgeToken` from that local fixture, then remove the adb reverse mapping and
+the two device fixture copies. This local endpoint exercises the cloud-query
+shape, not the deployed Worker or physical-phone network behavior.
+
 ## Real-device acceptance
 
 Test a synthetic request before any real command. Record phone model/Android/GMS,

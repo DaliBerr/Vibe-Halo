@@ -9,6 +9,7 @@ import com.vibe.halo.mobile.security.Wire
 import com.vibe.halo.mobile.notifications.CompanionNotifications
 import com.vibe.halo.mobile.security.Wire.Companion.values
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +51,9 @@ class CompanionRepository(private val context: Context) {
     val updates = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private val pending = java.util.concurrent.ConcurrentHashMap<String, JSONObject>()
     private val clocks = java.util.concurrent.ConcurrentHashMap<String, PcClock>()
+    private val mediaCache = object : android.util.LruCache<String, ByteArray>(8 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: ByteArray) = value.size
+    }
     private var pairingOffer: JSONObject? = null
     private var confirmedGrant: JSONObject? = null
     private var loaded = false
@@ -344,6 +348,46 @@ class CompanionRepository(private val context: Context) {
         val details = mutable.value.historyDetails.toMutableMap(); details["$computerKey/$historyId"] = readable
         while (details.size > 200 || details.values.sumOf { it.toString().toByteArray().size } > 4 * 1024 * 1024) details.remove(details.keys.first())
         mutable.value = mutable.value.copy(historyDetails = details)
+    }
+    private fun mediaComputer(source: MediaSource): Computer {
+        require(source.kind in listOf("event", "history"))
+        val pc = mutable.value.computers.first { it.key == source.computerKey && it.state == "active" }
+        require(pc.permits(if (source.kind == "event") "events.read" else "history.read")) { "forbidden" }
+        return pc
+    }
+    suspend fun listMedia(source: MediaSource): List<RecordMedia> = withContext(Dispatchers.IO) { mutex.withLock {
+        val response = readQuery(mediaComputer(source), "media.list", source.fields())
+        require(response.getString("source") == source.kind && response.getString("sourceId") == source.id)
+        val list = response.getJSONArray("media"); require(list.length() <= 4)
+        (0 until list.length()).map { RecordMedia.parse(list.getJSONObject(it)) }.also { items -> require(items.map { it.id }.distinct().size == items.size) }
+    } }
+    suspend fun loadMedia(source: MediaSource, item: RecordMedia, full: Boolean): ByteArray = withContext(Dispatchers.IO) {
+        val variant = if (full) "full" else "preview"; val meta = if (full) item.full else item.preview
+        val pc = mutex.withLock { mediaComputer(source) }
+        val cacheKey = "${pc.key}/${pc.bindingId}/${pc.grant.getInt("revision")}/${source.kind}/${source.id}/${source.epoch}/${item.id}/$variant/${meta.sha256}"
+        mediaCache.get(cacheKey)?.let { return@withContext it }
+        val bytes = java.io.ByteArrayOutputStream(); var offset = 0
+        while (offset < meta.size) {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            val response = mutex.withLock {
+                val current = mediaComputer(source)
+                require(current.bindingId == pc.bindingId && current.grant.getInt("revision") == pc.grant.getInt("revision")) { "forbidden" }
+                readQuery(current, "media.read", source.fields().put("mediaId", item.id).put("variant", variant).put("offset", offset))
+            }
+            require(response.getString("source") == source.kind && response.getString("sourceId") == source.id)
+            val part = response.getJSONObject("media")
+            require(part.getString("id") == item.id && part.getString("variant") == variant && part.getInt("offset") == offset && part.getInt("size") == meta.size && part.getString("sha256") == meta.sha256)
+            val encoded = part.getString("data"); require(encoded.length <= 32768)
+            val chunk = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
+            require(chunk.size == minOf(24576, meta.size - offset))
+            bytes.write(chunk); offset += chunk.size
+            require(if (offset == meta.size) part.isNull("nextOffset") else part.getInt("nextOffset") == offset)
+        }
+        val result = bytes.toByteArray()
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(result).joinToString("") { "%02x".format(it) }
+        require(hash == meta.sha256)
+        mutex.withLock { mediaComputer(source); mediaCache.put(cacheKey, result) }
+        result
     }
     private fun readQuery(pc: Computer, type: String, fields: JSONObject): JSONObject {
         val account = account(pc.origin); val requestId = UUID.randomUUID().toString()

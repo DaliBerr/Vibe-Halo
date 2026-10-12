@@ -5,15 +5,17 @@ const path = require("node:path");
 const { WebSocket } = require("ws");
 const { DeviceCredentialStore } = require("./device-credential-store");
 const { EventJournal } = require("./event-journal");
+const { MediaStore } = require("./media-store");
 const { detail } = require("./event-projector");
 const { LanService, createTlsIdentity } = require("./lan-service");
 const { validate, safeTree } = require("../../packages/protocol");
 
 class RemoteService extends EventEmitter {
-  constructor({ userData, safeStorage, approvals, decisions, allowLocal = false, lanOptions }) {
+  constructor({ userData, safeStorage, approvals, decisions, allowLocal = false, lanOptions, processImage }) {
     super(); this.approvals = approvals; this.decisions = decisions; this.allowLocal = allowLocal; this.lanOptions = lanOptions;
     this.credentials = new DeviceCredentialStore({ filePath: path.join(userData, "mobile-device.enc.json"), safeStorage });
     this.journal = new EventJournal({ filePath: path.join(userData, "mobile-events.enc.json"), safeStorage });
+    this.media = new MediaStore({ filePath: path.join(userData, "mobile-media.enc"), safeStorage, processImage });
     this.status = "disabled"; this.enabled = false; this.serial = Promise.resolve(); this.generation = 0;
     this.sentRevisions = new Map();
     this.reminderSources = new Map();
@@ -36,7 +38,7 @@ class RemoteService extends EventEmitter {
       if (this.state) {
         await this.crypto.publicDevice(this.state.identity);
         await this.ensureProfile();
-        this.decisions.pcId = this.pcId; this.journal.load();
+        this.decisions.pcId = this.pcId; this.journal.load(); this.media.load();
         if (this.state.enrolled && this.state.enabled) await this.start();
       }
     } catch (error) { this.status = error.message; this.enabled = false; this.storageBlocked = true; }
@@ -322,7 +324,8 @@ class RemoteService extends EventEmitter {
       this.reminderSources.set(sourceKey, { eventId, sessionId: input.sessionId, agentId: input.agentId || "codex" });
       if (this.reminderSources.size > 500) this.reminderSources.delete(this.reminderSources.keys().next().value);
     }
-    this.journal.put(value); this.queuePublish(); return eventId;
+    if (this.journal.put(value) && ["completion", "plan"].includes(kind)) this.media.capture(`event:${eventId}`, content, input.cwd);
+    this.queuePublish(); return eventId;
   }
   resolveReminder(requestKey) {
     const source = this.reminderSources.get(requestKey); if (!source) return;
@@ -385,12 +388,25 @@ class RemoteService extends EventEmitter {
     if (query.protocolVersion !== 1 || query.requestId !== message.requestId || query.pcId !== this.pcId || query.mobileId !== binding.mobile.deviceId
       || query.bindingId !== binding.bindingId || query.bindingRevision !== binding.revision || query.relayOrigin !== this.state.relayOrigin
       || !Number.isSafeInteger(query.issuedAt) || (query.type !== "clock.read" && Math.abs(Date.now() - query.issuedAt) > 30000)
-      || !["clock.read", "history.list", "history.detail", "reminder.dismiss"].includes(query.type)) throw new Error("invalid_query");
+      || !["clock.read", "history.list", "history.detail", "reminder.dismiss", "media.list", "media.read"].includes(query.type)) throw new Error("invalid_query");
     if (binding.state !== "active") throw new Error("forbidden");
-    if (!binding.scopes.includes(query.type === "clock.read" ? "events.read" : query.type === "reminder.dismiss" ? "reminders.dismiss" : "history.read")) throw new Error("forbidden");
+    const mediaQuery = query.type === "media.list" || query.type === "media.read";
+    if (!binding.scopes.includes(query.type === "clock.read" || mediaQuery && query.source === "event" ? "events.read" : query.type === "reminder.dismiss" ? "reminders.dismiss" : "history.read")) throw new Error("forbidden");
     const output = { protocolVersion: 1, type: query.type === "clock.read" ? "clock.response" : "history.response", requestId: query.requestId, relayOrigin: this.state.relayOrigin,
       pcId: this.pcId, mobileId: binding.mobile.deviceId, bindingId: binding.bindingId, bindingRevision: binding.revision, records: [], nextOffset: null };
-    if (query.type === "clock.read") {
+    if (mediaQuery) {
+      if (!["event", "history"].includes(query.source) || typeof query.sourceId !== "string" || query.sourceId.length > 240) throw new Error("invalid_media_request");
+      this.journal.prune();
+      const source = query.source === "event" ? this.journal.events.get(query.sourceId) : this.historyStore?.get(query.sourceId);
+      if (!source || !["completion", "plan"].includes(source.summary?.kind || source.kind)
+        || query.source === "event" && source.summary.pcSessionEpoch !== query.pcSessionEpoch) throw new Error("media_unavailable");
+      const key = `${query.source}:${query.sourceId}`;
+      output.source = query.source; output.sourceId = query.sourceId;
+      if (query.type === "media.list") output.media = await this.media.list(key);
+      else output.media = this.media.read(key, query.mediaId, query.variant, query.offset);
+      // Capture can await disk work. Revocation/disable during that wait must take effect.
+      if (!this.enabled || binding.state !== "active" || binding.revision !== message.bindingRevision) throw new Error("forbidden");
+    } else if (query.type === "clock.read") {
       // The fresh request ID is the challenge; phone wall-clock skew must not
       // prevent calibration. No history or decision capability is exposed.
       output.pcTime = Date.now(); output.pcSessionEpoch = this.approvals.pcSessionEpoch;
@@ -441,6 +457,7 @@ class RemoteService extends EventEmitter {
     this.socket?.terminate(); this.socket = null; await this.lan?.stop(); this.lan = null;
     if (disable && this.state) { this.state.enabled = false; this.state.autoConnectDisabled = true; this.state.controlEnabled = false; this.save(); }
     if (this.state && !this.journal.damaged) this.journal.flush();
+    await this.media.close();
     this.status = "disabled"; this.emit("changed");
   }
 }

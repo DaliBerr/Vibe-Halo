@@ -290,6 +290,22 @@ can be deferred. Available system checks refresh automatically; unsupported vend
 settings remain unverified. History details use separate title/type, source, content
 and result cards, including for cached synced events, without raw protocol JSON.
 
+Phone record bodies render headings, emphasis, strikethrough, lists, quotes, inline/fenced
+code, tables and links. Standalone Codex `inbox-item`, `code-comment`, `archive-thread`,
+`created-thread`, `automation-update` and `codex-followup` directives become read-only
+cards; they never perform actions, and code examples stay literal. Web links can open;
+computer-file links keep their readable labels without opening local paths on the phone.
+
+New completion/plan records capture explicitly referenced project-local raster images
+from Markdown images and image-file links. Network URLs, paths outside the task project
+and symlink escapes are rejected. Limits: four images per record, 8 MiB / 16 million
+source pixels, 2048-pixel / 256 KiB compressed full views, and a 16 MiB encrypted PC
+cache lasting up to 24 hours. The paired encrypted channel loads previews when opening
+details and full views on tap. Pinch, pan, double-tap and zoom buttons are supported.
+The PC must be online for uncached reads; Android keeps an 8 MiB memory cache. Missing
+images do not block text. No old-record backfill or remote-image fetching occurs. Both
+desktop and phone need updating; no relay deployment is required.
+
 The optional Android companion now has native phone UI, device pairing, pinned LAN
 HTTPS/WSS, a self-hosted Cloudflare relay, encrypted approvals/forms/history and
 FCM reminder support. The local preview automatically connects to the default test

@@ -57,7 +57,7 @@ import kotlinx.coroutines.launch
             !introComplete || setup -> SetupScreen(!introComplete, state.computers.any { it.state == "active" }, { pairing = true }, onDone = {
                 introComplete = true; setup = false; prefs.edit().putBoolean("complete", true).apply()
             }, pairingContent = { PairingScreen(state, repo, Modifier, embedded = true) {} })
-            historySelection != null -> HistoryDetailScreen(state, historySelection!!) { historySelection = null }
+            historySelection != null -> HistoryDetailScreen(state, historySelection!!, repo) { historySelection = null }
             event != null -> EventScreen(event, state, repo, Modifier) { selected = null }
             else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

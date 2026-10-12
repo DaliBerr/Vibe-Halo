@@ -16,7 +16,8 @@ LICENSE, this NOTICE, and generated THIRD_PARTY_NOTICES.txt containing the exact
 resolved runtime dependency coordinates, POM licensing/attribution and bundled
 archive notices. Important runtime components include AndroidX/Compose, Kotlin,
 kotlinx.coroutines, OkHttp/Okio, Nimbus JOSE + JWT, Firebase Messaging and
-WorkManager (their respective upstream licenses apply). Node cryptography uses
+WorkManager and commonmark-java (their respective upstream licenses apply). Desktop
+image references use commonmark (BSD-2-Clause) and image-size (MIT). Node cryptography uses
 jose; LAN transport uses ws, bonjour-service and @peculiar/x509. Lockfiles and the
 Android version catalog identify versions; generated notices identify transitive
 Android artifacts. Source and modifications: https://github.com/DaliBerr/Vibe-Halo

@@ -707,7 +707,10 @@ function startApplication() {
     remote.historyStore = history;
     remote.inputRequests = inputRequests;
     const appendHistory = record => {
-      if (record && settings.get("historyEnabled")) history.append(record);
+      if (record && settings.get("historyEnabled")) {
+        const saved = history.append(record);
+        if (remote.enabled && saved?.kind === "plan") remote.media.capture(`history:${saved.id}`, saved.content, saved.cwd);
+      }
     };
     approvals.on("finalized", event => appendHistory(approvalHistoryRecord(event)));
     inputRequests.on("finalized", event => appendHistory(inputHistoryRecord(event)));

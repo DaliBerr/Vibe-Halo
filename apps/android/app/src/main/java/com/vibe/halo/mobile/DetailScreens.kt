@@ -45,6 +45,10 @@ import org.json.JSONObject
     }
 }
 @Composable fun EventScreen(event: RemoteEvent, state: CompanionState, repo: CompanionRepository, modifier: Modifier, back: () -> Unit) {
+    if (event.summary.optString("kind") in listOf("completion", "plan")) {
+        HistoryDetailScreen(state, "event:${event.key}", repo, back)
+        return
+    }
     val scope = rememberCoroutineScope(); val answers = remember(event.key, event.summary.optLong("eventRevision")) { mutableStateMapOf<String, List<String>>() }
     var tick by remember { mutableLongStateOf(0) }; LaunchedEffect(event.key) { while (true) { delay(1000); tick++ } }
     val active = tick.let { repo.actionable(event) } && !state.busy

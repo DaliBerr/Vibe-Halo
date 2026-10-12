@@ -37,6 +37,32 @@ async function registrationFixture(t) {
   return f;
 }
 
+test("image queries bind snapshots to the record, PC epoch, current local grants and encrypted response", async t => {
+  const { remote, directory, approvals } = await fixture(t), c = remote.crypto, mobile = await c.generateIdentity("mobile");
+  const binding = { bindingId: crypto.randomUUID(), revision: 1, state: "active", mobile, scopes: ["events.read"] };
+  remote.state.bindings.push(binding);
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64");
+  fs.writeFileSync(path.join(directory, "sample.png"), png);
+  const part = { width: 1, height: 1, mime: "image/png", size: png.length, sha256: crypto.createHash("sha256").update(png).digest("hex"), data: png.toString("base64") };
+  remote.media.processImage = () => ({ preview: part, full: part });
+  const sourceId = remote.recordReminder({ agentId: "codex", output: "![预览](sample.png)", cwd: directory }, "completion");
+  async function query(type, fields = {}) {
+    const requestId = crypto.randomUUID();
+    const value = { protocolVersion: 1, type, requestId, pcId: remote.pcId, mobileId: mobile.deviceId, bindingId: binding.bindingId, bindingRevision: binding.revision,
+      relayOrigin: remote.state.relayOrigin, issuedAt: Date.now(), source: "event", sourceId, pcSessionEpoch: approvals.pcSessionEpoch, ...fields };
+    const message = { requestId, mobileId: mobile.deviceId, bindingId: binding.bindingId, bindingRevision: binding.revision, envelope: await c.seal(value, mobile.signKey, remote.state.identity.encryptionKey, "read-request") };
+    return c.open(await remote.receiveQuery(message), mobile.encryptionKey, remote.state.identity.signKey, "read-response");
+  }
+  const list = await query("media.list"); assert.equal(list.media.length, 1); assert.equal(list.media[0].full.data, undefined);
+  const read = await query("media.read", { mediaId: list.media[0].id, variant: "full", offset: 0 }); assert.equal(read.media.data, part.data);
+  await assert.rejects(query("media.list", { pcSessionEpoch: crypto.randomUUID() }), /media_unavailable/);
+  await assert.rejects(query("media.read", { mediaId: "sample.png", variant: "full", offset: 0 }), /media_unavailable/);
+  await assert.rejects(query("media.list", { source: "history" }), /forbidden/);
+  binding.scopes = ["history.read"]; await assert.rejects(query("media.list"), /forbidden/);
+  binding.scopes = ["events.read"]; binding.state = "revoked"; await assert.rejects(query("media.list"), /forbidden/);
+  binding.state = "active"; remote.journal.events.delete(sourceId); await assert.rejects(query("media.list"), /media_unavailable/);
+});
+
 test("offline rename survives restart without changing identity or signed grants", async t => {
   const { remote } = await fixture(t);
   remote.state.identity.name = "我的电脑"; remote.state.enrolled = true;

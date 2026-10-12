@@ -8,6 +8,12 @@ import java.util.Locale
 object UiLanguage {
     var mode by mutableStateOf("system")
     private val english = mapOf(
+        "图片" to "Image", "查看图片" to "View image", "点击查看大图" to "View full image", "图片大图" to "Full image",
+        "图片暂不可用，请确认电脑在线且图片已同步。" to "Image unavailable. Check that the computer is online and the image has synced.",
+        "正在加载图片…" to "Loading image…", "图片加载失败" to "Image could not be loaded", "重置" to "Reset",
+        "双指缩放，拖动查看；双击可放大或还原。" to "Pinch to zoom, drag to pan; double-tap to zoom or reset.",
+        "任务摘要" to "Task summary", "代码批注" to "Code comment", "归档标记" to "Archive marker", "关联会话" to "Related chat",
+        "后续建议" to "Suggested follow-up", "自动化记录" to "Automation record", "仅展示记录，请在 Codex 中操作。" to "Read-only record. Continue in Codex.",
         "标题与类别" to "Title and type", "来源" to "Source", "内容摘要" to "Summary", "处理结果" to "Result",
         "审批" to "Approval", "问答" to "Question", "回到电脑处理" to "Continue on computer", "计划" to "Plan", "任务完成" to "Completion", "事件" to "Event",
         "项目" to "Project", "会话" to "Session", "命令" to "Command", "文件" to "File", "查询" to "Query", "用途" to "Purpose",

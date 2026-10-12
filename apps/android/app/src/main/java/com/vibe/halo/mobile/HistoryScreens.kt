@@ -7,6 +7,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,7 +30,8 @@ private fun heading(view: HistoryView) = view.title.ifBlank { tr(historyKind(vie
         val context = listOf(view.project, view.session).filter { it.isNotBlank() }.joinToString(" · ")
         if (context.isNotBlank()) Text(context, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         val content = view.questions.firstOrNull()?.question ?: view.fields.firstOrNull()?.second ?: view.excerpt
-        if (content.isNotBlank() && content != view.title) Text(content.take(600), Modifier.padding(bottom = 8.dp), fontSize = 14.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        val preview = remember(content, view.client) { RichContent.plain(RichContent.parse(content, view.client.equals("codex", true))).take(600) }
+        if (preview.isNotBlank() && preview != view.title) Text(preview, Modifier.padding(bottom = 8.dp), fontSize = 14.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
         Text(listOf(tr(historyKind(view.kind)), tr(view.result), displayTime(view.time)).filter { it.isNotBlank() }.joinToString(" · "), fontSize = 12.sp)
     }
 }
@@ -54,7 +56,7 @@ private fun heading(view: HistoryView) = view.title.ifBlank { tr(historyKind(vie
     }
 }
 
-@Composable fun HistoryDetailScreen(state: CompanionState, key: String, onBack: () -> Unit) {
+@Composable fun HistoryDetailScreen(state: CompanionState, key: String, repo: CompanionRepository? = null, onBack: () -> Unit) {
     val event = if (key.startsWith("event:")) state.events.find { it.key == key.removePrefix("event:") } else null
     val item = state.history.find { "${it.computerKey}/${it.record.optString("id")}" == key }
     val loaded = state.historyDetails[key]
@@ -79,7 +81,17 @@ private fun heading(view: HistoryView) = view.title.ifBlank { tr(historyKind(vie
                 Spacer(Modifier.height(12.dp))
             } else if (view.fields.isNotEmpty()) view.fields.forEach { (label, value) ->
                 Text(tr(label), fontSize = 12.sp); Text(value, fontSize = 15.sp); Spacer(Modifier.height(8.dp))
-            } else Text(view.excerpt.ifBlank { tr(if (view.unavailable) "内容暂无法解析" else "未提供内容摘要") }, fontSize = 15.sp)
+            } else {
+                val body = view.excerpt.ifBlank { tr(if (view.unavailable) "内容暂无法解析" else "未提供内容摘要") }
+                val isCodex = view.client.equals("codex", true)
+                MarkdownContent(body, isCodex)
+                val references = remember(body, isCodex) { RichContent.imageReferences(RichContent.parse(body, isCodex)) }
+                if (repo != null && pc != null && pc.state == "active" && references.isNotEmpty() && view.kind in listOf("completion", "plan")) {
+                    val source = if (event != null) MediaSource(pc.key, "event", event.summary.getString("eventId"), event.summary.getString("pcSessionEpoch"))
+                        else MediaSource(pc.key, "history", item!!.record.getString("id"))
+                    RecordImages(repo, source, references)
+                }
+            }
             if (view.shortened) Text(tr("内容已截取。"), fontSize = 12.sp)
             if (view.unavailable && (view.questions.isNotEmpty() || view.fields.isNotEmpty() || view.excerpt.isNotBlank())) Text(tr("记录不完整，当前仅显示可读部分。"), fontSize = 12.sp)
         }

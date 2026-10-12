@@ -239,3 +239,37 @@ projected in v2. Legacy requests retain their response shape; `resolvedAt` now
 uses the stored `finalizedAt`. New Android clients convert valid legacy JSON in
 memory and show a summary/incomplete notice for malformed or truncated records.
 This presentation change does not change active decision context requirements.
+
+## Record image snapshots
+
+`media.list` and `media.read` use the existing signed/encrypted `read-request` /
+`read-response` query channel, with `history.response` as the response type. They
+do not extend event schemas or expose attachments in push payloads. Both carry
+`source` (`event` or `history`) and `sourceId`; event sources also carry the exact
+`pcSessionEpoch`. The PC requires the record to still exist, its kind to be
+completion/plan, and the current local binding to hold `events.read` or
+`history.read`, respectively. Permission is rechecked after asynchronous capture.
+
+The list response echoes source/sourceId and adds `media` (at most four items).
+Each item contains an opaque UUID `id`, the Markdown `reference`, and `preview` /
+`full` descriptors: `{width, height, mime, size, sha256}`. Only snapshots captured
+when a new record arrives are eligible. The request never supplies a file path.
+The PC resolves explicit local raster references inside that task's canonical
+project directory, rejects network/UNC and escaping symlinks, limits source size
+and pixels, and re-encodes static images with Electron. There is no historical
+backfill or arbitrary-file read endpoint.
+
+`media.read` additionally supplies `mediaId`, `variant` (`preview` or `full`) and
+byte `offset` (a multiple of 24576). Its `media` response is
+`{id, variant, offset, size, sha256, data, nextOffset}`, where data is Base64 for at
+most 24 KiB and nextOffset is null at EOF. Each signed payload remains below
+64 KiB and every transport envelope below 256 KiB. Android checks identity,
+source, offset, size, per-variant digest and final SHA-256 before decoding, then
+checks raster dimensions/MIME against the authenticated descriptor. Full views
+are capped at 2048 pixels per edge and 256 KiB; previews at 480 pixels / 48 KiB.
+
+PC snapshots persist through safeStorage encryption in `mobile-media.enc`, with
+24-hour retention, 100-record and 16 MiB serialized-cache bounds. Corrupt caches
+remain untouched. Android caches at most 8 MiB in memory, keyed by computer,
+binding revision, record source/epoch and image digest. Image loading is read-only
+and does not enable remote control. Existing relay query quotas still apply.
