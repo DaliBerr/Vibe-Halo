@@ -1,6 +1,6 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-12 (0.6.1 release preparation and owner acceptance)
+Updated: 2026-10-12 (0.6.1 publication and owner acceptance)
 Current version: `0.6.1`
 Source directory: `C:\Tools\Clawd-island`
 
@@ -12,7 +12,7 @@ public release. This is practical acceptance of that test setup; separate
 production LAN/cloud-path coverage, Xiaomi background delivery and non-Windows
 real-client checks are not implied by it.
 
-Preparing Windows stable and three-platform preview 0.6.1 plus the original-key
+Published Windows stable and three-platform preview 0.6.1 plus the original-key
 Android companion (versionCode 3). Both endpoints need this update for image
 sync. Existing records are not backfilled. No relay redeployment is needed.
 Local release checks passed: npm ci; desktop 233 passed / one Windows platform
@@ -21,8 +21,26 @@ Windows NSIS plus regenerated blockmap/update metadata; Firebase-configured
 minified Android release and lint. The 0.6.1 APK has the same SHA-256 signing
 certificate as the prior 0.6.0 companion and passed alignment/version checks.
 Used separate Windows output directories because the owner's accepted test build
-remains running. Cross-platform CI and publication evidence will be recorded
-after completion.
+remains running.
+
+Both immutable tags point to release commit
+`fa90655ef4d865036b898e1bad2f38030b2cba88`. Cross-platform and companion checks
+passed on the release branch and main. Stable run `38259801192` passed update
+configuration and silent install/uninstall checks, then published
+[v0.6.1](https://github.com/DaliBerr/Vibe-Halo/releases/tag/v0.6.1) as non-draft,
+non-prerelease Latest. The original-key APK, bilingual notes and mobile checksum
+were attached without changing the desktop installer, blockmap or latest.yml.
+Preview run `38259800932` published
+[preview-0.6.1](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.1)
+with Windows x64, macOS arm64/x64 DMG/ZIP and Linux x64 AppImage/deb.
+
+Public verification matched all four stable and seven preview checksum entries
+to GitHub asset digests. Downloaded the stable installer and checked its SHA-256,
+SHA-512 and size against the published manifest/update metadata; downloaded the
+APK and confirmed it equals the locally signed bytes. Downloaded LICENSE/NOTICE
+matched source text (checkout line-ending differences normalized). The previous
+public 0.6.0 APK signing certificate also matches 0.6.1. Preview has no update
+metadata and remains a pre-release; Latest still resolves to stable v0.6.1.
 
 ## 2026-10-12 — Phone Markdown, Codex cards and encrypted image snapshots
 
