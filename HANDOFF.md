@@ -1,8 +1,38 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-21 (notification fixes and encrypted previews; unreleased)
-Current version: `0.6.1`
+Updated: 2026-10-21 (0.6.2 release preparation and production relay rollout)
+Current version: `0.6.2`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-10-21 — 0.6.2 relay rollout and release preparation
+
+The owner authorized production deployment and desktop/Android publication for
+physical watch acceptance. The relay was deployed to the existing production
+Worker as version `bec0dd7c-6823-43ea-a0d7-83ef3db5a121`; existing D1/DO resources,
+secrets, bindings and registration limits were retained, with no schema migration.
+The preceding Worker version was `62b2944b-c2a1-4a5f-bc2c-132fec41c68b`.
+
+Production checks passed for health, signed synthetic PC/mobile pairing,
+`data-v1` preference negotiation, invalid-delivery rejection, authenticated WSS,
+event replay deduplication and LAN acknowledgement. No real phone push token was
+used. The synthetic binding and PC were revoked afterward; the first test cleanup
+attempt hit the expected loss of mobile authority after binding revocation and
+was completed separately. This check does not prove physical FCM/watch delivery.
+
+Desktop and Android versions are 0.6.2; Android versionCode is 4. The minified
+release APK includes the existing Firebase project configuration and retains the
+0.6.1 signing certificate. Signature, package/version and ZIP alignment checks
+passed. Local desktop tests passed (236 plus one platform skip), protocol tests
+passed (6), relay runtime tests passed (19), TypeScript/dry-run packaging passed,
+and Windows stable directory-package/update configuration verification passed.
+Android release build and lint passed; prior notification emulator regressions
+are recorded below. Public tag workflows and uploaded-asset verification follow
+this preparation commit and must be checked before claiming publication complete.
+
+Users must update both desktop and Android, then open Android online once so it
+advertises the new delivery mode. Existing pairing can be retained. Physical
+background FCM, LAN/cloud overlap, watch vibration count and readable previews
+remain owner acceptance checks after upgrading.
 
 ## 2026-10-21 — Suggestion filtering, shared notification deduplication and previews
 
