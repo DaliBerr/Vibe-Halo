@@ -1,8 +1,55 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-12 (0.6.1 publication and owner acceptance)
+Updated: 2026-10-21 (notification fixes and encrypted previews; unreleased)
 Current version: `0.6.1`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-10-21 — Suggestion filtering, shared notification deduplication and previews
+
+The owner's repeated watch alerts correlated with a normal Codex completion
+followed by a separate `{"suggestion": ...}` completion in the local encrypted
+journal. Exact single-field suggestion string/null responses are now excluded
+before completion delivery and session-reminder clearing. The filter is Codex-only;
+prose, fenced examples and multi-field JSON remain visible. A genuine result with
+the identical one-field shape cannot be distinguished with the available hook
+metadata and is also filtered. No hook command/trust changes are needed.
+
+Updated Android clients advertise `data-v1` delivery on opening online. The relay
+then uses high-priority data-only FCM, so both cloud and LAN pass through one
+synchronized notification publisher and persistent event deduplication. Revisions,
+retries, dismissal and process restart cannot create a second alert for a retained
+event marker. Legacy auto-display cards are recognized; old clients keep their
+previous push contract. Up to 1,000 markers are retained with individual eviction.
+
+Phone/watch titles identify the client. Short task/project, tool-operation and
+question previews use recipient-encrypted, signed envelopes with a separate
+signature purpose and exact event/binding metadata checks. Common inline credential
+patterns are masked; previews are not plaintext in relay storage or FCM. LAN
+derives previews from verified encrypted details. Both paths retain private,
+read-only notifications and existing PC decision authority.
+
+Verification on Windows and the local Android emulator:
+
+- Desktop suite: 236 passed, one existing Windows platform skip; protocol: 6 passed.
+- Relay: 19 runtime tests passed, including capability negotiation, data-only
+  payloads, bounded ciphertext, recipient isolation, event replay and LAN ack;
+  TypeScript check and dry-run Worker packaging passed.
+- Android: JVM tests passed; debug/test and minified unsigned release APKs built;
+  debug/release lint reported zero errors (26/27 warnings).
+- All 6 NotificationSafetyTest cases passed on the emulator, including concurrent
+  delivery, revision/dismissal replay, legacy Firebase cards, preview text and
+  binding/signature/event validation. NotificationPersistenceTest passed in two
+  separate processes with an explicit force-stop between seed and replay.
+- Windows directory build and packaged-resource verification passed under
+  `dist/notification-preview/win-unpacked` (ignored).
+
+Source changes only: no version bump, public release, production relay deployment,
+installed desktop replacement, or phone update. Rollout needs the compatible relay,
+desktop and APK, followed by opening the phone app online once. No database migration
+or re-pairing is needed. Production background FCM, physical phone/watch vibration
+count and vendor background restrictions remain owner/device acceptance gates;
+emulator tests do not establish those delivery guarantees. Already in-flight legacy
+auto-display pushes cannot be intercepted by the new app-level deduplication.
 
 ## 2026-10-12 — 0.6.1 release and owner acceptance
 

@@ -87,7 +87,42 @@ UTF-8 byte budgets apply before parsing or during bounded stream reads. Details
 reserve space for the encrypted wrapper. Oversized, truncated, redacted or incomplete
 approval context becomes read-only; data is never truncated into a valid decision.
 Sensitive fields are recursively sanitized. Commands, paths, question text and
-answers are not in relay summaries, push payloads, logs or plaintext caches.
+answers are not in plaintext relay summaries, push payloads, logs or caches.
+
+### Notification previews and delivery
+
+Updated phones advertise `delivery: "data-v1"` in notification preferences.
+The relay sends high-priority, data-only FCM messages for these phones so LAN and
+background/foreground FCM all use the same synchronized, persistent Android
+event deduplication. Distinct events are not collapsed by PC. Old phones retain
+notification-plus-data delivery until they advertise the capability.
+
+PC `event.upsert` optionally includes `notificationPreviews`, with one
+`{ mobileId, envelope }` per recipient. Older relays ignore this optional top-level
+field. The envelope is an ES256-signed, ECDH-ES/A256GCM-encrypted message with
+purpose `notification-preview`, capped at 3,000 ASCII characters. Its plaintext
+binds protocol version, relay origin, PC/mobile IDs, binding ID/revision, event
+ID/revision, PC epoch, kind and expiry. `preview` contains client display name
+(40 code points), project/session label (60), and a plain-text excerpt (160).
+Common inline credential patterns are redacted; this is not an exhaustive secret
+detector. Task content remains encrypted through the relay and FCM.
+
+The relay retains previews only alongside their authorized event recipient and
+passes only that phone's ciphertext. Data messages contain bounded routing
+metadata, agent ID, expiry and optional ciphertext; oversized previews fall back
+to client/kind text. The phone verifies the current local binding, recipient,
+signature purpose and exact metadata before displaying an excerpt. Decryption
+uses local keys and does not wait for network access. LAN uses already verified
+event details to produce the same style of excerpt. Notifications remain
+read-only, private on the lock screen, and mirror to watches through the OS.
+
+Android records one alert per PC/event, independent of revision, before returning
+from notification handling. It retains up to 1,000 event markers across process
+restarts, evicting oldest markers individually. Dismissed/resolved events do not
+reappear on retry. Existing legacy Firebase cards are recognized by tag, and
+new local cards share Firebase's notification ID. An already in-flight legacy
+auto-display push cannot be intercepted by app deduplication; opening the updated
+phone app online once switches subsequent cloud delivery to `data-v1`.
 
 Messages use ES256 JWS first, then ECDH-ES/A256GCM compact JWE. JWS protected headers
 are only `alg`, `kid`, `typ=vh1:<purpose>`. JWE headers are only `alg`, `enc`, `kid`,
@@ -185,23 +220,26 @@ remote desktop endpoint exists.
 
 ## Notifications and privacy
 
-The Worker sends FCM HTTP v1 `notification + data`. Body/title are short generic
-reminders in the phone app's selected language. Data is restricted to version, PC/epoch/event IDs, revision
-and kind, with no authorization, token, command or answer. Requests use HIGH
-priority, completions NORMAL; TTL never exceeds event expiry and is capped at
+The Worker negotiates FCM HTTP v1 delivery as described under notification previews
+above. Updated phones receive HIGH-priority data-only messages and construct
+localized, client-labeled notifications with locally decrypted excerpts. Old phones
+retain generic `notification + data`, six routing fields, HIGH-priority requests
+and NORMAL-priority completions. TTL never exceeds event expiry and is capped at
 10 minutes. Stable channels are approvals, questions, completions and
-connection_status. Tagging by PC/event collapses duplicates. Notifications only
+connection_status. Persistent PC/event markers suppress repeated alerts. Notifications only
 open an explicit immutable app intent with bounded PC/epoch/event IDs; there are
 no decision actions, RemoteInput, full-screen intents or watch receivers.
 
-A foreground notification coordinator checks local preferences, system permission
-and channel importance, records bounded revisions, and clears terminal events.
+A shared foreground/background notification coordinator checks local preferences,
+system permission and channel importance, records bounded event markers, and
+clears terminal events.
 A signed LAN acknowledgment means `notification_posted` or `suppressed_by_user`;
 only the owning phone's verified current acknowledgment suppresses its cloud job.
-It is not proof of user/watch delivery. Background FCM auto-display remains managed
-by the Android SDK; local foreground contextual-action settings cannot override
-all system-generated behavior. Late background reminders may still appear, but
-opening them cannot restore old authority.
+It is not proof of user/watch delivery. Legacy background FCM auto-display remains
+managed by the Android SDK. Updated phones process pushes locally without waiting
+for a network request, following Firebase's [data message](https://firebase.google.com/docs/cloud-messaging/customize-messages/set-message-type)
+and [priority guidance](https://firebase.google.com/docs/cloud-messaging/android-message-priority).
+Late reminders cannot restore old authority when opened.
 
 Push tokens are encrypted in D1 with independent AES-256-GCM and device-ID AAD.
 Token rotation/preferences/revocations retry on foreground sync; token rotation
@@ -215,7 +253,9 @@ ECDH private-key compromise, and timing/adapter metadata remains visible to rela
 
 Notification preferences may include `locale: "zh-CN" | "en-US"`, authenticated by
 the paired phone and protected by the existing monotonic revision. Notification
-copy uses this locale; the bounded six-field FCM routing data is unchanged.
+copy uses this locale for legacy auto-display; updated phones use their current
+local app language. The optional `delivery: "data-v1"` field selects unified
+app-managed delivery and encrypted preview support.
 
 ## Display profiles and readable history
 

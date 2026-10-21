@@ -7,6 +7,7 @@ const { DeviceCredentialStore } = require("./device-credential-store");
 const { EventJournal } = require("./event-journal");
 const { MediaStore } = require("./media-store");
 const { detail } = require("./event-projector");
+const { notificationPreview } = require("./notification-preview");
 const { LanService, createTlsIdentity } = require("./lan-service");
 const { validate, safeTree } = require("../../packages/protocol");
 
@@ -361,12 +362,25 @@ class RemoteService extends EventEmitter {
     }
     return { events, nextOffset: offset + consumed < values.length ? offset + consumed : null, desktopOnline: true, snapshotVersion: `${this.journal.sequence}:${values.length}` };
   }
+  async encryptNotification(value, binding) {
+    const { eventId, eventRevision, pcSessionEpoch, kind, expiresAt } = value.summary;
+    const envelope = await this.crypto.seal({ protocolVersion: 1, relayOrigin: this.state.relayOrigin,
+      pcId: this.pcId, mobileId: binding.mobile.deviceId, bindingId: binding.bindingId, bindingRevision: binding.revision,
+      eventId, eventRevision, pcSessionEpoch, kind, expiresAt, preview: notificationPreview(value),
+    }, this.state.identity.signKey, binding.mobile.encryptionKey, "notification-preview");
+    // Leave room for routing metadata within FCM's 4096-byte data budget.
+    return envelope.length <= 3000 ? envelope : undefined;
+  }
   async publishAll(force = false) {
     if (!this.enabled || this.socket?.readyState !== WebSocket.OPEN) return;
     for (const value of this.journal.list()) for (const binding of this.state.bindings.filter(value => value.state === "active" && value.scopes.includes("events.read"))) {
       const key = `${binding.bindingId}:${value.summary.eventId}`, revision = `${binding.revision}:${value.summary.eventRevision}`;
       if ((!force || value.summary.state !== "pending") && this.sentRevisions.get(key) === revision) continue;
-      if (!this.send({ type: "event.upsert", summary: value.summary, recipients: [{ mobileId: binding.mobile.deviceId, envelope: await this.encryptEvent(value, binding) }] })) return;
+      const preview = await this.encryptNotification(value, binding);
+      if (!this.send({ type: "event.upsert", summary: value.summary,
+        recipients: [{ mobileId: binding.mobile.deviceId, envelope: await this.encryptEvent(value, binding) }],
+        notificationPreviews: preview ? [{ mobileId: binding.mobile.deviceId, envelope: preview }] : [],
+      })) return;
       this.sentRevisions.set(key, revision);
       if (this.sentRevisions.size > 3200) this.sentRevisions.delete(this.sentRevisions.keys().next().value);
     }

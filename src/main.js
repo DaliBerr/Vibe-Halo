@@ -658,13 +658,13 @@ function startApplication() {
       return;
     }
     if (data.event !== "Stop") return;
-    remote?.resolveSessionReminders(agentId, sessionId);
     const remoteCompletion = completionFromStop(data, descriptor, sessionId);
-    if (remoteCompletion) remote?.recordReminder(remoteCompletion, remoteCompletion.completionKind === "plan" ? "plan" : "completion");
+    if (!remoteCompletion) return;
+    remote?.resolveSessionReminders(agentId, sessionId);
+    remote?.recordReminder(remoteCompletion, remoteCompletion.completionKind === "plan" ? "plan" : "completion");
     inputRequests.clearSession(sessionId, "session-stopped", agentId);
     if (approvals.size > 0 || inputRequests.size > 0) return;
-    const completion = completionFromStop(data, descriptor, sessionId);
-    if (completion) completions.show(completion);
+    completions.show(remoteCompletion);
   }
 
   app.on("second-instance", () => {

@@ -199,12 +199,21 @@ export class Relay extends DurableObject<Env> {
     const revision = Number(summary.eventRevision);
     const eventId = id(summary.eventId), epoch = id(summary.pcSessionEpoch);
     if (!Array.isArray(value.recipients) || value.recipients.length > Number(this.env.MAX_BINDINGS_PER_PC)) throw new Fault("invalid_recipients");
-    const recipients: { mobileId: string; envelope: string }[] = [];
+    const previews = value.notificationPreviews === undefined ? [] : value.notificationPreviews;
+    if (!Array.isArray(previews) || previews.length > Number(this.env.MAX_BINDINGS_PER_PC)) throw new Fault("invalid_recipients");
+    const previewMap = new Map<string, string>();
+    for (const raw of previews) {
+      const preview = record(raw, ["mobileId", "envelope"]);
+      const mobileId = id(preview.mobileId);
+      if (previewMap.has(mobileId)) throw new Fault("invalid_recipients");
+      previewMap.set(mobileId, text(preview.envelope, 3000));
+    }
+    const recipients: { mobileId: string; envelope: string; preview?: string }[] = [];
     for (const raw of value.recipients) {
       const recipient = record(raw, ["mobileId", "envelope"]);
       const mobileId = id(recipient.mobileId), envelope = text(recipient.envelope, 262144);
       const binding = await this.env.DB.prepare("SELECT scopes_json FROM bindings WHERE pc_id=? AND mobile_id=? AND state='active'").bind(pcId, mobileId).first<{ scopes_json: string }>();
-      if (binding && JSON.parse(binding.scopes_json).includes("events.read") && !recipients.some(value => value.mobileId === mobileId)) recipients.push({ mobileId, envelope });
+      if (binding && JSON.parse(binding.scopes_json).includes("events.read") && !recipients.some(value => value.mobileId === mobileId)) recipients.push({ mobileId, envelope, ...(previewMap.has(mobileId) ? { preview: previewMap.get(mobileId) } : {}) });
     }
     await authorize(session, pcId, this.env);
     const old = this.ctx.storage.sql.exec<{ revision: number; epoch: string; summary: string; recipients: string }>("SELECT revision,epoch,summary,recipients FROM events WHERE event_id=?", eventId).toArray()[0];
@@ -264,15 +273,17 @@ export class Relay extends DurableObject<Env> {
     this.prune();
     for (const socket of this.ctx.getWebSockets()) await this.live(socket);
     this.ctx.storage.sql.exec("DELETE FROM budgets WHERE window_end<=?", now() - 60000);
-    const jobs = this.ctx.storage.sql.exec<{ id: string; mobile_id: string; attempts: number; summary: string }>("SELECT j.id,j.mobile_id,j.attempts,e.summary FROM push_jobs j JOIN events e ON e.event_id=j.event_id WHERE j.state='pending' AND j.due_at<=? AND j.expires_at>? AND j.revision=e.revision ORDER BY j.due_at LIMIT 4", now(), now()).toArray();
+    const jobs = this.ctx.storage.sql.exec<{ id: string; mobile_id: string; attempts: number; summary: string; recipients: string }>("SELECT j.id,j.mobile_id,j.attempts,e.summary,e.recipients FROM push_jobs j JOIN events e ON e.event_id=j.event_id WHERE j.state='pending' AND j.due_at<=? AND j.expires_at>? AND j.revision=e.revision ORDER BY j.due_at LIMIT 4", now(), now()).toArray();
     // Bound upstream concurrency and stay below Free D1 subrequest limits.
     const deliver = async (job: typeof jobs[number]) => {
       const summary = JSON.parse(job.summary);
+      const recipients: { mobileId: string; preview?: string }[] = JSON.parse(job.recipients);
+      const preview = recipients.find(value => value.mobileId === job.mobile_id)?.preview;
       let retryDelay = 0;
       const result = await deliverPush(this.env, summary.pcId, job.mobile_id, summary, () => {
         const current = this.ctx.storage.sql.exec<{ revision: number; state: string }>("SELECT e.revision,j.state FROM events e JOIN push_jobs j ON j.event_id=e.event_id WHERE j.id=?", job.id).toArray()[0];
         return current?.revision === summary.eventRevision && current.state === "pending";
-      }, delay => { retryDelay = delay; }).catch(() => { retryDelay = 60000; return "retry" as const; });
+      }, delay => { retryDelay = delay; }, preview).catch(() => { retryDelay = 60000; return "retry" as const; });
       const attempts = job.attempts + 1;
       const state = result === "retry" && attempts < 5 ? "pending" : result === "retry" ? "failed" : result;
       if (state === "failed") console.warn(JSON.stringify({ code: "push_delivery_exhausted" }));

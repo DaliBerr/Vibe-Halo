@@ -202,8 +202,10 @@ pairs and registers it without logging it, then exits so a separate background
 notification check can run outside instrumentation. It deliberately leaves the
 test binding active; the caller must revoke that synthetic PC after the check.
 Check the system notification record/visible notification, not only an HTTP 200.
-FCM auto-displayed reminders use a different notification ID from foreground
+Legacy FCM auto-displayed reminders may use a different ID from old foreground
 reminders; terminal reconciliation cancels all active IDs with the event's tag.
+Updated phones use data-only FCM and the same persistent event deduplication as
+LAN. Open the updated app online once to register this delivery capability.
 
 ## Notification language and meaning
 
@@ -211,8 +213,21 @@ Phone/watch notifications follow the Android app language (including system mode
 Install the updated APK and open it while online once to sync this preference;
 offline changes are retained for retry. Legacy clients with no language preference
 receive Chinese. Push text distinguishes approval, an in-app answer, a choice/input
-requiring the original computer client, plan ready, and task completed. It includes
-no command or question contents. Watches mirror the phone's single-language text.
+requiring the original computer client, plan ready, and task completed. Updated
+phones include client names. Updated desktop/relay/phone combinations show a short project
+label and task result, tool operation, or question excerpt. Preview content is
+signed and encrypted for the paired phone, and decrypted locally before display;
+it is not plaintext in FCM. Common inline credentials are masked. Watches mirror
+the phone's single-language text, subject to device notification privacy settings.
+
+For the notification upgrade, deploy the compatible relay, update the desktop
+and phone, and open the phone app once while online. No re-pairing or database
+migration is required. Old phones retain generic cloud notifications; old
+desktops provide client/kind fallback without excerpts. Codex Desktop's exact
+single-field `{"suggestion": ...}` follow-up responses are excluded from desktop
+and remote completion events. Normal prose, fenced examples and multi-field JSON
+remain notifications. As the hook does not expose a reliable internal-task flag,
+a genuine Codex answer with that exact one-field shape is also excluded.
 
 ## Connect and use
 

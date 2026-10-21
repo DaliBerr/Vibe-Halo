@@ -7,6 +7,7 @@ import com.vibe.halo.mobile.security.DeviceCrypto
 import com.vibe.halo.mobile.security.SecureStore
 import com.vibe.halo.mobile.security.Wire
 import com.vibe.halo.mobile.notifications.CompanionNotifications
+import com.vibe.halo.mobile.notifications.NotificationPreview
 import com.vibe.halo.mobile.security.Wire.Companion.values
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -465,17 +466,17 @@ class CompanionRepository(private val context: Context) {
         if (mutable.value.computers.none { it.origin == account.origin && it.state == "active" }) return
         val locale = com.vibe.halo.mobile.UiLanguage.resolvedLocale()
         val activePcs = mutable.value.computers.filter { it.origin == account.origin && it.state == "active" }
-        if (activePcs.any { saved.optJSONObject("notificationLocales")?.optString(it.pcId) != locale || saved.optJSONObject("pendingPreferences")?.has(it.pcId) == true }) account.store.update { latest ->
+        if (activePcs.any { saved.optJSONObject("notificationDeliveries")?.optString(it.pcId) != "data-v1" || saved.optJSONObject("notificationLocales")?.optString(it.pcId) != locale || saved.optJSONObject("pendingPreferences")?.has(it.pcId) == true }) account.store.update { latest ->
             val pending = latest.optJSONObject("pendingPreferences") ?: JSONObject()
             val syncedLocales = latest.optJSONObject("notificationLocales") ?: JSONObject()
             val revisions = latest.optJSONObject("notificationPreferenceRevisions") ?: JSONObject()
             for (pc in activePcs) {
-                if (syncedLocales.optString(pc.pcId) != locale || pending.has(pc.pcId)) {
+                if (latest.optJSONObject("notificationDeliveries")?.optString(pc.pcId) != "data-v1" || syncedLocales.optString(pc.pcId) != locale || pending.has(pc.pcId)) {
                     val pref = pending.optJSONObject(pc.pcId) ?: JSONObject()
                         .put("enabled", !context.getSharedPreferences("notification-preferences", Context.MODE_PRIVATE).getBoolean("${pc.pcId}:muted", false))
                         .put("approvals", true).put("questions", true).put("completions", true)
                     val revision = maxOf(System.currentTimeMillis(), revisions.optLong(pc.pcId) + 1, pref.optLong("revision") + 1)
-                    pref.put("locale", locale).put("revision", revision)
+                    pref.put("locale", locale).put("revision", revision).put("delivery", "data-v1")
                     pending.put(pc.pcId, pref); revisions.put(pc.pcId, revision)
                 }
             }
@@ -488,6 +489,8 @@ class CompanionRepository(private val context: Context) {
                 it.optJSONObject("pendingPreferences")?.remove(pcId)
                 val locales = it.optJSONObject("notificationLocales") ?: JSONObject()
                 locales.put(pcId, locale); it.put("notificationLocales", locales)
+                val deliveries = it.optJSONObject("notificationDeliveries") ?: JSONObject()
+                deliveries.put(pcId, "data-v1"); it.put("notificationDeliveries", deliveries)
             }
         }
         val token = registry.read().optString("pushToken")
@@ -528,8 +531,10 @@ class CompanionRepository(private val context: Context) {
         if (Instant.parse(summary.getString("expiresAt")).toEpochMilli() <= System.currentTimeMillis()) return
         if (summary.getString("kind") in listOf("approval", "question") && !summary.getBoolean("actionable")) return
         if (summary.getString("kind") == "input" && summary.getString("state") != "pending") return
-        val data = listOf("protocolVersion", "pcId", "pcSessionEpoch", "eventId", "eventRevision", "kind").associateWith { summary.get(it).toString() }
-        val status = CompanionNotifications.show(context, data)
+        val event = mutable.value.events.find { it.computerKey == pc.key && it.summary.getString("eventId") == summary.getString("eventId") } ?: return
+        if (event.summary.getLong("eventRevision") != summary.getLong("eventRevision")) return
+        val data = listOf("protocolVersion", "pcId", "pcSessionEpoch", "eventId", "eventRevision", "kind", "agentId", "expiresAt").associateWith { summary.get(it).toString() }
+        val status = CompanionNotifications.show(context, data, NotificationPreview.fromDetail(event.detail))
         if (status !in listOf("notification_posted", "suppressed_by_user")) return
         val ack = JSONObject().put("protocolVersion", 1).put("pcId", pc.pcId).put("mobileId", account.crypto.publicDevice.getString("deviceId"))
             .put("bindingId", pc.bindingId).put("bindingRevision", pc.grant.getInt("revision")).put("pcSessionEpoch", summary.getString("pcSessionEpoch"))

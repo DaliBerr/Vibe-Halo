@@ -5,6 +5,18 @@ const path = require("path");
 const PERMISSION_MODES = new Set(["default", "acceptEdits", "plan", "dontAsk", "bypassPermissions"]);
 const PLAN_READY_AGENTS = new Set(["codex", "zcode"]);
 
+// Codex Desktop's follow-up generator also emits Stop. Match its complete
+// single-field response, never prose/code examples or arbitrary JSON results.
+function isCodexSuggestion(output) {
+  if (typeof output !== "string" || output.length > 6000) return false;
+  try {
+    const value = JSON.parse(output);
+    return value !== null && !Array.isArray(value) && typeof value === "object"
+      && Object.keys(value).length === 1 && Object.hasOwn(value, "suggestion")
+      && (typeof value.suggestion === "string" || value.suggestion === null);
+  } catch { return false; }
+}
+
 function permissionMode(value) {
   const mode = typeof value === "string" ? value.trim() : "";
   return PERMISSION_MODES.has(mode) ? mode : "";
@@ -16,6 +28,7 @@ function completionFromStop(data, descriptor, sessionId) {
   const agentName = descriptor.name || "Codex";
   const cwd = typeof data.cwd === "string" ? data.cwd : "";
   const output = typeof data.assistant_last_output === "string" ? data.assistant_last_output : "";
+  if (agentId === "codex" && isCodexSuggestion(output)) return null;
   const planReady = PLAN_READY_AGENTS.has(agentId)
     && permissionMode(data.permission_mode ?? data.permissionMode) === "plan";
   return {
@@ -39,4 +52,4 @@ function completionFromStop(data, descriptor, sessionId) {
   };
 }
 
-module.exports = { PLAN_READY_AGENTS, completionFromStop, permissionMode };
+module.exports = { PLAN_READY_AGENTS, completionFromStop, permissionMode, isCodexSuggestion };

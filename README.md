@@ -28,6 +28,7 @@ Windows packages may show an unknown-publisher warning. Preview desktop packages
 - Structured answers where the client exposes an exact answer protocol; Codex questions remain reminders to answer in Codex.
 - Completion notifications and optional tray-opened recent-event history.
 - Paired Android notifications, explicitly authorized remote control, readable history cards and editable device names.
+- Phone/watch notifications show the client and a short task preview; updated phones deduplicate LAN/cloud delivery, and Codex follow-up suggestions no longer trigger completion alerts.
 - Markdown and Codex cards in phone records; encrypted project-image snapshots from new completion/plan records, with tap-to-zoom viewing.
 - English/Chinese UI with system light/dark appearance.
 

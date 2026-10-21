@@ -6,6 +6,18 @@ const { completionFromStop, permissionMode } = require("../src/completion-event"
 
 const codex = { id: "codex", name: "Codex" };
 
+test("Codex follow-up suggestions never become task or plan completion notifications", () => {
+  for (const suggestion of ["Next step", "", null, "转义\\\"与换行\n下一步"]) {
+    for (const permission_mode of ["default", "plan"]) {
+      assert.equal(completionFromStop({ event: "Stop", permission_mode, assistant_last_output: JSON.stringify({ suggestion }) }, codex, "same-session"), null);
+    }
+  }
+  for (const output of ['{"suggestion":"result","count":1}', '```json\n{"suggestion":"example"}\n```', 'The suggestion is ready.', '{"suggestion":42}', '{"suggestion":', '[{"suggestion":"result"}]']) {
+    assert.ok(completionFromStop({ event: "Stop", assistant_last_output: output }, codex, "same-session"));
+  }
+  assert.ok(completionFromStop({ event: "Stop", assistant_last_output: '{"suggestion":"result"}' }, { id: "claude-code", name: "Claude Code" }, "other-client"));
+});
+
 test("maps a Codex plan-mode Stop to a dedicated plan-ready completion", () => {
   const completion = completionFromStop({
     event: "Stop",

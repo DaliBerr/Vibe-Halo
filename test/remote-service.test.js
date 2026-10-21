@@ -37,6 +37,26 @@ async function registrationFixture(t) {
   return f;
 }
 
+test("notification previews are bounded, recipient encrypted and bound to the exact event", async t => {
+  const { remote } = await fixture(t), c = remote.crypto;
+  const mobile = await c.generateIdentity("mobile"), other = await c.generateIdentity("mobile");
+  const binding = { bindingId: crypto.randomUUID(), revision: 3, mobile: await c.publicDevice(mobile) };
+  const eventId = remote.recordReminder({ agentId: "codex", title: "测试项目", output: "已修复提醒。".repeat(100) }, "completion");
+  const value = remote.journal.events.get(eventId);
+  const envelope = await remote.encryptNotification(value, binding);
+  assert.ok(envelope.length <= 3000);
+  assert.ok(!envelope.includes("已修复"));
+  const decoded = await c.open(envelope, mobile.encryptionKey, remote.state.identity.signKey, "notification-preview");
+  assert.equal(decoded.eventId, eventId);
+  assert.equal(decoded.mobileId, mobile.deviceId);
+  assert.equal(decoded.bindingRevision, 3);
+  assert.equal(decoded.preview.agent, "Codex");
+  assert.equal(decoded.preview.context, "测试项目");
+  assert.ok([...decoded.preview.text].length <= 160);
+  await assert.rejects(c.open(envelope, other.encryptionKey, remote.state.identity.signKey, "notification-preview"));
+  await assert.rejects(c.open(envelope, mobile.encryptionKey, remote.state.identity.signKey, "message"));
+});
+
 test("image queries bind snapshots to the record, PC epoch, current local grants and encrypted response", async t => {
   const { remote, directory, approvals } = await fixture(t), c = remote.crypto, mobile = await c.generateIdentity("mobile");
   const binding = { bindingId: crypto.randomUUID(), revision: 1, state: "active", mobile, scopes: ["events.read"] };

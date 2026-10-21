@@ -36,7 +36,8 @@ export async function registerPush(request: Request, env: Env, session: Session)
 export async function preferences(request: Request, env: Env, session: Session, pcId: string): Promise<Response> {
   await authorize(session, pcId, env);
   if (session.device.kind !== "mobile") throw new Fault("forbidden", 403);
-  const input = record(await body(request), ["enabled", "approvals", "questions", "completions", "revision", "locale"]);
+  const input = record(await body(request), ["enabled", "approvals", "questions", "completions", "revision", "locale", "delivery"]);
+  if (input.delivery !== undefined && input.delivery !== "data-v1") throw new Fault("invalid_preferences");
   if (input.locale !== undefined && input.locale !== "zh-CN" && input.locale !== "en-US") throw new Fault("invalid_preferences");
   for (const key of ["enabled", "approvals", "questions", "completions"]) if (typeof input[key] !== "boolean") throw new Fault("invalid_preferences");
   if (!Number.isSafeInteger(input.revision) || Number(input.revision) < 1) throw new Fault("invalid_revision");
@@ -75,7 +76,7 @@ export function notificationCopy(kind: unknown, locale: unknown) {
   return { title: value[english ? 2 : 0], body: value[english ? 3 : 1] };
 }
 
-export async function deliverPush(env: Env, pcId: string, mobileId: string, summary: Record<string, unknown>, current = () => true, retryAfter = (_milliseconds: number) => {}): Promise<"sent" | "skip" | "retry"> {
+export async function deliverPush(env: Env, pcId: string, mobileId: string, summary: Record<string, unknown>, current = () => true, retryAfter = (_milliseconds: number) => {}, preview?: string): Promise<"sent" | "skip" | "retry"> {
   if (String(env.FCM_ENABLED) !== "true") return "skip";
   const binding = await env.DB.prepare("SELECT b.id FROM bindings b JOIN spaces s ON s.pc_id=b.pc_id JOIN devices d ON d.id=b.pc_id WHERE b.pc_id=? AND b.mobile_id=? AND b.state='active' AND s.status='active' AND d.status='active'").bind(pcId, mobileId).first();
   if (!binding) return "skip";
@@ -93,13 +94,24 @@ export async function deliverPush(env: Env, pcId: string, mobileId: string, summ
     if (!current() || Date.parse(String(summary.expiresAt)) <= now()) return "skip";
     const stillBound = await env.DB.prepare("SELECT id FROM bindings WHERE pc_id=? AND mobile_id=? AND state='active'").bind(pcId, mobileId).first();
     if (!stillBound || !current()) return "skip";
+    const data: Record<string, string> = { protocolVersion: "1", pcId, pcSessionEpoch: String(summary.pcSessionEpoch), eventId: String(summary.eventId), eventRevision: String(summary.eventRevision), kind: String(summary.kind) };
+    const appDelivery = pref.delivery === "data-v1";
+    if (appDelivery) {
+      data.agentId = typeof summary.agentId === "string" ? summary.agentId.slice(0, 80) : "";
+      data.expiresAt = String(summary.expiresAt);
+      if (preview && preview.length <= 3000) data.preview = preview;
+      if (new TextEncoder().encode(JSON.stringify(data)).length > 3900) delete data.preview;
+    }
     const result = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(env.FCM_PROJECT_ID)}/messages:send`, {
       method: "POST", signal: AbortSignal.timeout(8000), headers: { authorization: `Bearer ${access}`, "content-type": "application/json" },
       body: JSON.stringify({ message: { token,
-        notification: notificationCopy(summary.kind, pref.locale),
-        data: { protocolVersion: "1", pcId, pcSessionEpoch: String(summary.pcSessionEpoch), eventId: String(summary.eventId), eventRevision: String(summary.eventRevision), kind: String(summary.kind) },
-        android: { priority: category === "completions" ? "NORMAL" : "HIGH", ttl: `${ttl}s`, collapse_key: pcId,
-          notification: { channel_id: category, tag: `${pcId}/${summary.eventId}`, visibility: "PRIVATE", default_sound: true } } } }),
+        ...(appDelivery ? {} : { notification: notificationCopy(summary.kind, pref.locale) }), data,
+        android: appDelivery
+          // Every data message becomes a visible notification immediately, with
+          // local decryption only. Do not collapse distinct events on one PC.
+          ? { priority: "HIGH", ttl: `${ttl}s` }
+          : { priority: category === "completions" ? "NORMAL" : "HIGH", ttl: `${ttl}s`, collapse_key: pcId,
+            notification: { channel_id: category, tag: `${pcId}/${summary.eventId}`, visibility: "PRIVATE", default_sound: true } } } }),
     });
     if (result.ok) return "sent";
     const retryHeader = result.headers.get("retry-after");

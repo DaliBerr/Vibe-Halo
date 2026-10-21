@@ -251,6 +251,36 @@ describe("device identity and pairing", () => {
       expect(received.some(value => value.type === "error" && value.error === "unauthorized")).toBe(true);
     } finally { socket.close(); }
   });
+  it("retains only the recipient's encrypted preview and deduplicates event replays and LAN acknowledgements", async () => {
+    const pair = await paired(); await post(`/v1/pairings/${pair.pairingId}/confirm`, { grant: pair.grantJws }, pair.token);
+    const response = await SELF.fetch(origin + `/v1/pcs/${pair.pc.deviceId}/stream`, { headers: { ...privateHeaders(pair.token), upgrade: "websocket" } });
+    const socket = response.webSocket!; socket.accept();
+    const summary = { protocolVersion: 1, pcId: pair.pc.deviceId, pcSessionEpoch: crypto.randomUUID(), eventId: crypto.randomUUID(), streamSeq: 1, eventRevision: 1,
+      kind: "completion", agentId: "codex", createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 120000).toISOString(), state: "resolved", actionable: false, pendingCount: 0, summaryKey: "remote.completed" };
+    const event = { type: "event.upsert", summary, recipients: [{ mobileId: pair.mobile.deviceId, envelope: "encrypted.event.detail" }],
+      notificationPreviews: [{ mobileId: pair.mobile.deviceId, envelope: "encrypted.phone.preview" }, { mobileId: "mobile_unbound", envelope: "unbound.preview" }] };
+    try {
+      socket.send(JSON.stringify(event));
+      await vi.waitFor(async () => {
+        await runInDurableObject(env.RELAY.getByName(pair.pc.deviceId), async (_instance, state) => {
+          const rows = state.storage.sql.exec<{ recipients: string }>("SELECT recipients FROM events WHERE event_id=?", summary.eventId).toArray();
+          expect(rows).toHaveLength(1);
+          expect(JSON.parse(rows[0].recipients)).toEqual([{ mobileId: pair.mobile.deviceId, envelope: "encrypted.event.detail", preview: "encrypted.phone.preview" }]);
+        });
+      });
+      socket.send(JSON.stringify(event));
+      socket.send(JSON.stringify({ type: "notification.ack", eventId: summary.eventId, mobileId: pair.mobile.deviceId, eventRevision: 1, status: "notification_posted" }));
+      await vi.waitFor(async () => {
+        await runInDurableObject(env.RELAY.getByName(pair.pc.deviceId), async (_instance, state) => {
+          const jobs = state.storage.sql.exec<{ state: string }>("SELECT state FROM push_jobs WHERE event_id=?", summary.eventId).toArray();
+          expect(jobs).toEqual([{ state: "acknowledged" }]);
+        });
+      });
+      const mobileToken = await login(pair.mobile);
+      const page = await (await SELF.fetch(origin + `/v1/pcs/${pair.pc.deviceId}/events`, { headers: privateHeaders(mobileToken) })).json<{ events: object[] }>();
+      expect(page.events).toEqual([{ summary, envelope: "encrypted.event.detail" }]);
+    } finally { socket.close(); }
+  });
   it("encrypts push tokens and sends only short visible notifications with bounded retry states", async () => {
     const pair = await paired(); await post(`/v1/pairings/${pair.pairingId}/confirm`, { grant: pair.grantJws }, pair.token);
     const key = await generateKeyPair("RS256", { extractable: true });
@@ -284,6 +314,21 @@ describe("device identity and pairing", () => {
         expect(notificationCopy(kind, "zh-CN").title).toMatch(/[\u4e00-\u9fff]/);
       }
       expect(JSON.stringify(messages[0]).length).toBeLessThan(2048);
+      expect((await SELF.fetch(preferencesUrl, { method: "PUT", headers: privateHeaders(mobileToken), body: JSON.stringify({ ...prefs, revision: prefs.revision + 1, delivery: "unknown" }) })).status).toBe(400);
+      expect((await SELF.fetch(preferencesUrl, { method: "PUT", headers: privateHeaders(mobileToken), body: JSON.stringify({ ...prefs, revision: prefs.revision + 2, delivery: "data-v1" }) })).status).toBe(200);
+      for (const kind of ["approval", "question", "input", "plan", "completion"]) {
+        expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, { ...summary, agentId: "codex", kind }, () => true, () => {}, "signed.encrypted.preview")).toBe("sent");
+        const message = messages.at(-1)!.message;
+        expect(message.notification).toBeUndefined();
+        expect(message.android.notification).toBeUndefined();
+        expect(message.android.collapse_key).toBeUndefined();
+        expect(message.android.priority).toBe("HIGH");
+        expect(message.data.agentId).toBe("codex");
+        expect(message.data.preview).toBe("signed.encrypted.preview");
+        expect(new TextEncoder().encode(JSON.stringify(message.data)).length).toBeLessThan(4096);
+      }
+      expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, summary, () => true, () => {}, "x".repeat(3001))).toBe("sent");
+      expect(messages.at(-1)!.message.data.preview).toBeUndefined();
       status = 503; expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, summary)).toBe("retry");
       status = 429; expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, summary)).toBe("retry");
       status = 404; expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, summary)).toBe("skip");
