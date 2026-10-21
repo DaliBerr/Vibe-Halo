@@ -1,10 +1,10 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-21 (0.6.2 release preparation and production relay rollout)
+Updated: 2026-10-21 (0.6.2 published and production relay deployed)
 Current version: `0.6.2`
 Source directory: `C:\Tools\Clawd-island`
 
-## 2026-10-21 — 0.6.2 relay rollout and release preparation
+## 2026-10-21 — 0.6.2 relay rollout and publication
 
 The owner authorized production deployment and desktop/Android publication for
 physical watch acceptance. The relay was deployed to the existing production
@@ -25,9 +25,20 @@ release APK includes the existing Firebase project configuration and retains the
 passed. Local desktop tests passed (236 plus one platform skip), protocol tests
 passed (6), relay runtime tests passed (19), TypeScript/dry-run packaging passed,
 and Windows stable directory-package/update configuration verification passed.
-Android release build and lint passed; prior notification emulator regressions
-are recorded below. Public tag workflows and uploaded-asset verification follow
-this preparation commit and must be checked before claiming publication complete.
+Android release build and lint passed (zero errors, 27 warnings); prior notification
+emulator regressions are recorded below.
+
+Published `v0.6.2` (Windows stable plus original-key Android APK) and
+`preview-0.6.2` (seven desktop preview packages), both at release commit `80e491d`.
+Stable workflow `39684465823`, preview workflow `39684465694` and main mobile
+checks `39684456828` passed. Redundant branch/main desktop checks and branch mobile
+checks for the same commit were cancelled to free runners; tag and main mobile
+checks were retained. Windows CI verified packaged resources and a silent
+install/uninstall. Public stable assets were downloaded and checked against
+SHA-256/SHA-512/update metadata; the APK matches the locally signed artifact,
+LICENSE/NOTICE match source, and GitHub latest resolves to `v0.6.2`. All seven
+preview checksums match their GitHub asset digests. Existing installed desktop
+and physical phone were left for the owner to upgrade.
 
 Users must update both desktop and Android, then open Android online once so it
 advertises the new delivery mode. Existing pairing can be retained. Physical
