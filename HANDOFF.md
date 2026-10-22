@@ -1,19 +1,48 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-22 (0.6.3 release preparation)
+Updated: 2026-10-22 (0.6.3 desktop and Android published)
 Current version: `0.6.3`
 Source directory: `C:\Tools\Clawd-island`
 
-## 2026-10-22 — 0.6.3 release preparation
+## 2026-10-22 — 0.6.3 desktop and Android publication
 
-The owner authorized publishing desktop and Android together. Version 0.6.3
-includes the verified chat-title fix and revised phone status layout described
-below. Android versionCode is 5 and must retain the original signing certificate
-and production Firebase configuration. Windows follows the existing stable
-update channel; macOS/Linux follow the existing preview channel. No relay
-redeployment, database migration or re-pairing is required. Previously synced
-titles are not backfilled. Release-specific verification and publication results
-will be recorded after the release gates pass.
+The owner authorized publishing desktop and Android together. Published
+`v0.6.3` (Windows stable plus original-key Android APK) and `preview-0.6.3`
+(seven desktop preview packages), both at verified release commit `c10773b`.
+This includes the chat-title fix and revised phone status layout described below.
+Android versionCode is 5; the minified APK retains the original signing
+certificate and production Firebase configuration. Windows follows the existing
+stable update channel; macOS/Linux follow the existing preview channel.
+
+Release-branch cross-platform run `39757433340` and mobile/relay run
+`39757433335` passed before merging the exact commit. Stable publication run
+`39758317600` and preview publication run `39758316821` passed. Redundant feature
+and main checks were cancelled to free runners; the verified release-branch and
+tag runs were retained. Windows CI verified update configuration and performed
+a silent install/uninstall before publication.
+
+Local release checks passed: `npm ci`; desktop tests (239 passed, one existing
+Windows skip); all six protocol tests; normal and update-enabled package
+verification; NSIS plus regenerated blockmap/update metadata. The production
+Firebase Android release build and lint passed (zero errors, 27 existing
+warnings). The signed APK passed original-certificate comparison against the
+public 0.6.2 APK, package/version checks and ZIP alignment. Its intended Firebase
+values, default relay origin, LICENSE, NOTICE and third-party notices were
+verified in the artifact. The preceding 17 emulator UI regressions and final
+four-case header/card rerun are recorded in the implementation entry below.
+
+Public verification matched all four stable checksum entries and seven preview
+checksum entries to GitHub asset digests. The downloaded stable installer matches
+SHA-256/SHA-512/update metadata; the downloaded APK equals the locally signed
+artifact. Published LICENSE/NOTICE match source, GitHub Latest resolves to
+`v0.6.3`, and preview remains a prerelease without update metadata. Bilingual
+stable notes explain the title fix, status layout and two-endpoint upgrade.
+
+Update both desktop and Android to 0.6.3. No relay redeployment, database
+migration or re-pairing is required; previously synced titles are not backfilled.
+The installed desktop and physical phone remain for the owner to upgrade.
+Physical phone fonts, background delivery and watch behavior remain device
+acceptance checks.
 
 ## 2026-10-22 — Codex chat titles and phone record status layout
 
