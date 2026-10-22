@@ -12,6 +12,8 @@ const { RemoteService } = require("../src/remote/remote-service");
 const { detail, contextDigest } = require("../src/remote/event-projector");
 const { EventJournal } = require("../src/remote/event-journal");
 const { createTlsIdentity } = require("../src/remote/lan-service");
+const { buildBody } = require("../hooks/vibe-halo-hook");
+const { completionFromStop } = require("../src/completion-event");
 
 function safeStorage() {
   const key = crypto.randomBytes(32);
@@ -55,6 +57,29 @@ test("notification previews are bounded, recipient encrypted and bound to the ex
   assert.ok([...decoded.preview.text].length <= 160);
   await assert.rejects(c.open(envelope, other.encryptionKey, remote.state.identity.signKey, "notification-preview"));
   await assert.rejects(c.open(envelope, mobile.encryptionKey, remote.state.identity.signKey, "message"));
+});
+
+test("a Codex chat title reaches the mobile record and encrypted notification preview", async t => {
+  const { remote, directory } = await fixture(t);
+  const previousHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = directory;
+  try {
+    fs.writeFileSync(path.join(directory, "session_index.jsonl"), JSON.stringify({ id: "report", thread_name: "查找报告撰写模板" }));
+    const body = buildBody({ hook_event_name: "Stop", session_id: "report", cwd: "/codex/c-users-test-desktop-document-student", assistant_last_output: "报告模板已找到。" });
+    const completion = completionFromStop(body, { id: "codex", name: "Codex" }, body.session_id);
+    const eventId = remote.recordReminder(completion, "completion");
+    const value = remote.journal.events.get(eventId);
+    assert.equal(value.description, "查找报告撰写模板");
+    assert.equal(value.toolInputText, "报告模板已找到。");
+    const mobile = await remote.crypto.generateIdentity("mobile");
+    const binding = { bindingId: crypto.randomUUID(), revision: 1, mobile: await remote.crypto.publicDevice(mobile) };
+    const encrypted = await remote.encryptNotification(value, binding);
+    const decoded = await remote.crypto.open(encrypted, mobile.encryptionKey, remote.state.identity.signKey, "notification-preview");
+    assert.equal(decoded.preview.context, "查找报告撰写模板");
+  } finally {
+    if (previousHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousHome;
+  }
 });
 
 test("image queries bind snapshots to the record, PC epoch, current local grants and encrypted response", async t => {

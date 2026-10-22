@@ -1,16 +1,24 @@
 package com.vibe.halo.mobile
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vibe.halo.mobile.data.*
@@ -20,19 +28,23 @@ import java.time.format.DateTimeFormatter
 
 fun eventTime(value: String): String = runCatching { displayTime(Instant.parse(value).toEpochMilli()) }.getOrDefault("")
 private fun displayTime(value: Long): String = if (value <= 0) "" else DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(value))
-fun historyKind(kind: String) = when(kind) { "approval" -> "审批"; "question" -> "问答"; "input" -> "回到电脑处理"; "plan" -> "计划"; "completion" -> "任务完成"; else -> "事件" }
+fun historyKind(kind: String) = when(kind) { "approval" -> "审批"; "question" -> "问答"; "input" -> "回到电脑处理"; "plan" -> "计划"; "completion" -> "任务"; else -> "事件" }
 private fun heading(view: HistoryView) = view.title.ifBlank { tr(historyKind(view.kind)) }
 
 @Composable fun HistorySummaryCard(view: HistoryView, computer: String, onClick: () -> Unit) {
     HaloCard(Modifier.clickable(onClick = onClick)) {
-        Text(listOf(view.client, computer).filter { it.isNotBlank() }.joinToString(" · "), fontSize = 12.sp)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(listOf(view.client, computer).filter { it.isNotBlank() }.joinToString(" · "), Modifier.weight(1f), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.width(12.dp))
+            HistoryStatusMarker(view)
+        }
         Text(heading(view), Modifier.padding(vertical = 8.dp), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
         val context = listOf(view.project, view.session).filter { it.isNotBlank() }.joinToString(" · ")
         if (context.isNotBlank()) Text(context, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         val content = view.questions.firstOrNull()?.question ?: view.fields.firstOrNull()?.second ?: view.excerpt
         val preview = remember(content, view.client) { RichContent.plain(RichContent.parse(content, view.client.equals("codex", true))).take(600) }
         if (preview.isNotBlank() && preview != view.title) Text(preview, Modifier.padding(bottom = 8.dp), fontSize = 14.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-        Text(listOf(tr(historyKind(view.kind)), tr(view.result), displayTime(view.time)).filter { it.isNotBlank() }.joinToString(" · "), fontSize = 12.sp)
+        Text(listOf(tr(historyKind(view.kind)), displayTime(view.time)).filter { it.isNotBlank() }.joinToString(" · "), fontSize = 12.sp)
     }
 }
 
@@ -56,6 +68,35 @@ private fun heading(view: HistoryView) = view.title.ifBlank { tr(historyKind(vie
     }
 }
 
+@Composable private fun historyStatusColors(tone: HistoryStatusTone): Pair<Color, Color> {
+    val dark = isSystemInDarkTheme()
+    return when (tone) {
+        HistoryStatusTone.Success -> if (dark) Color(0xff163b2a) to Color(0xff9edbb3) else Color(0xffe3f3e8) to Color(0xff21603d)
+        HistoryStatusTone.Warning -> if (dark) Color(0xff493617) to Color(0xffffd48a) else Color(0xfffff0d5) to Color(0xff805000)
+        HistoryStatusTone.Error -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+        HistoryStatusTone.Neutral -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+@Composable private fun HistoryStatusMarker(view: HistoryView) {
+    val status = HistoryPresentation.status(view)
+    val foreground = if (status.tone == HistoryStatusTone.Error) MaterialTheme.colorScheme.error else historyStatusColors(status.tone).second
+    Row(Modifier.widthIn(max = 160.dp).testTag("history-card-status"), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(6.dp).background(foreground, CircleShape))
+        Spacer(Modifier.width(5.dp))
+        Text(tr(status.label), color = foreground, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable private fun HistoryStatusBadge(view: HistoryView) {
+    val status = HistoryPresentation.status(view)
+    val (background, foreground) = historyStatusColors(status.tone)
+    Surface(modifier = Modifier.widthIn(max = 160.dp).testTag("history-status"), shape = RoundedCornerShape(50), color = background,
+        contentColor = foreground, border = BorderStroke(1.dp, foreground.copy(alpha = 0.18f))) {
+        Text(tr(status.label), Modifier.padding(horizontal = 12.dp, vertical = 6.dp), fontSize = 12.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
 @Composable fun HistoryDetailScreen(state: CompanionState, key: String, repo: CompanionRepository? = null, onBack: () -> Unit) {
     val event = if (key.startsWith("event:")) state.events.find { it.key == key.removePrefix("event:") } else null
     val item = state.history.find { "${it.computerKey}/${it.record.optString("id")}" == key }
@@ -64,10 +105,12 @@ private fun heading(view: HistoryView) = view.title.ifBlank { tr(historyKind(vie
     val pc = state.computers.find { it.key == (item?.computerKey ?: event?.computerKey) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
         TextButton(onClick = onBack) { Text(tr("← 返回")) }
-        Text(tr("记录详情"), fontSize = 26.sp, modifier = Modifier.padding(bottom = 20.dp))
-        DetailCard("标题与类别") {
-            Text(heading(view), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Text(tr(historyKind(view.kind)), fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+        Text(heading(view), Modifier.fillMaxWidth().testTag("history-title").padding(top = 12.dp), fontSize = 25.sp, lineHeight = 33.sp, fontWeight = FontWeight.SemiBold)
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (view.kind != "completion") {
+                Text(tr(historyKind(view.kind)), Modifier.weight(1f, fill = false).padding(end = 10.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+            }
+            HistoryStatusBadge(view)
         }
         DetailCard("来源") {
             Text(listOf(pc?.name ?: tr("电脑"), view.client).filter { it.isNotBlank() }.joinToString(" · "))

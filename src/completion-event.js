@@ -31,17 +31,15 @@ function completionFromStop(data, descriptor, sessionId) {
   if (agentId === "codex" && isCodexSuggestion(output)) return null;
   const planReady = PLAN_READY_AGENTS.has(agentId)
     && permissionMode(data.permission_mode ?? data.permissionMode) === "plan";
+  const sessionTitle = typeof data.session_title === "string" ? data.session_title.trim() : "";
+  const title = sessionTitle || (planReady ? "" : (cwd ? path.basename(cwd) : ""));
   return {
     sessionId,
     agentId,
     agentName,
     completionKind: planReady ? "plan" : "task",
-    title: planReady
-      ? ""
-      : (typeof data.session_title === "string" && data.session_title.trim()
-        ? data.session_title.trim()
-        : (cwd ? path.basename(cwd) : "")),
-    titleKey: planReady ? "fallback.agentPlanReadyTitle" : (cwd ? "" : "fallback.completionTitle"),
+    title,
+    titleKey: title ? "" : (planReady ? "fallback.agentPlanReadyTitle" : "fallback.completionTitle"),
     titleParams: { agentName },
     output,
     outputKey: output ? "" : (planReady ? "fallback.agentPlanReadyContent" : "fallback.taskCompleted"),

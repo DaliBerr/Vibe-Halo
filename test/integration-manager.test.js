@@ -187,6 +187,7 @@ test("does not bypass explicit ZCode or Qwen hook disabling", () => {
 
 test("detects initialized client homes and creates nested hook configs", () => {
   const { home, manager } = fixture();
+  manager.executableDetected = () => false; // Exercise config discovery independently of locally installed clients.
   fs.mkdirSync(path.join(home, ".copilot"), { recursive: true });
   const detection = manager.detect("copilot-cli", { force: true });
   assert.equal(detection.detected, true);

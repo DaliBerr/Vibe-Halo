@@ -1,8 +1,62 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-21 (0.6.2 published and production relay deployed)
+Updated: 2026-10-22 (Codex chat titles and phone record status layout; source only)
 Current version: `0.6.2`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-10-22 — Codex chat titles and phone record status layout
+
+Codex completion titles previously came only from the transcript's initial
+`session_meta`, which can lack the Desktop chat name. The project-directory
+fallback then exposed generated workspace folder names as record titles. Stop
+hooks now prefer an explicit payload title, then the exact session's latest
+nonempty `thread_name` in the bounded (2 MiB tail) local `session_index.jsonl`,
+then transcript metadata. Other clients do not read the Codex index. Missing,
+malformed or unreadable indexes retain the existing fail-open fallback. Named
+plans also retain their chat title; localization no longer overwrites an explicit
+title when `cwd` is absent. Hook commands and approval trust are unchanged.
+
+Phone details now lead with the actual title, without the generic Record details
+heading or Title and type card. Per the owner's revised layout, the compact
+rounded status badge replaces the completion category text directly below the
+title. List cards show a matching colored dot and short status label: green for
+completion/allowed/answered, red for explicit failure/rejection/disconnection,
+amber for pending/timeout, and neutral for closed/native handling. Completion
+cards use Task as their category so an explicitly failed record is not described
+as a successful completion. Explicit `failed`/`error` history outcomes are shown
+as failures; assistant prose is never used to guess success or failure. Existing
+Stop events still mean the client finished its turn, not independently verified
+task success. No network schema or decision authority changes are involved.
+
+Existing synced event titles are not backfilled: their stored DTOs do not retain
+the source session ID needed for a reliable rename. New records require the
+updated desktop; the new layout requires the updated Android app. The relay does
+not need redeployment, and pairing can be retained. This is a source change only:
+no version bump, tag, public release, installed desktop replacement or physical
+phone update.
+
+Verification:
+
+- Desktop: 239 passed, one existing Windows platform skip; protocol: 6 passed.
+  The title regression covers newest exact-session matching, renames, malformed
+  and partial lines, bounded reads, missing files, other-client isolation,
+  localization, mobile records and encrypted notification previews. An existing
+  config-discovery test now isolates executable detection from host-installed
+  clients; its first run otherwise selected the local Copilot executable.
+- Windows directory packaging and packaged-resource verification passed under
+  `dist/history-title/win-unpacked`; its unpacked hook independently resolved the
+  owner-referenced chat's expected title from the real local index.
+- Android: 9 JVM tests and all 17 selected history/setup/rich-content emulator
+  cases passed. The four new header/card cases cover badge placement below the
+  title, status semantics, list markers, and English dark mode at 200% font size.
+  All four were rerun successfully after the final short-English-label polish.
+  Debug/test APKs and the minified unsigned release APK built; debug/release lint
+  finished with zero errors and the existing 26/27 warnings respectively.
+  App-window screenshots avoid an unrelated emulator System UI ANR overlay;
+  final header/list screenshots are retained under ignored `.smoke/`.
+
+Physical phone appearance, vendor fonts and an installed two-endpoint upgrade
+remain owner acceptance checks; emulator results do not replace those checks.
 
 ## 2026-10-21 — 0.6.2 relay rollout and publication
 

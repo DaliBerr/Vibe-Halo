@@ -86,7 +86,10 @@ class SetupAndHistoryTest {
         assertEquals("任务已完成", view.result); assertEquals("已修复历史记录，测试通过。", view.excerpt)
         assertFalse(HistoryPresentation.preview(detail).contains("protocolVersion"))
         rule.activity.setContent { HaloTheme { HistoryDetailScreen(CompanionState(events = listOf(event)), "event:fixture") {} } }
-        rule.onNodeWithText("标题与类别").assertIsDisplayed()
+        rule.onNodeWithText("界面修改完成").assertIsDisplayed()
+        rule.onNodeWithText("已完成").assertIsDisplayed()
+        rule.onAllNodesWithText("记录详情").assertCountEquals(0)
+        rule.onAllNodesWithText("标题与类别").assertCountEquals(0)
         rule.onNodeWithText("已修复历史记录，测试通过。").performScrollTo().assertIsDisplayed()
         rule.onAllNodesWithText("protocolVersion", substring = true).assertCountEquals(0)
         rule.onAllNodesWithText("evt_private_internal", substring = true).assertCountEquals(0)

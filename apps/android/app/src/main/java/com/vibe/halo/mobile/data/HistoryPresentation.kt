@@ -9,7 +9,21 @@ data class HistoryView(val title: String, val kind: String, val client: String, 
     val excerpt: String, val fields: List<Pair<String, String>>, val questions: List<HistoryQuestion>, val result: String,
     val time: Long, val shortened: Boolean, val unavailable: Boolean)
 
+enum class HistoryStatusTone { Success, Warning, Error, Neutral }
+data class HistoryStatus(val label: String, val tone: HistoryStatusTone)
+
 object HistoryPresentation {
+    fun status(view: HistoryView): HistoryStatus = when (view.result) {
+        "任务已完成" -> HistoryStatus("已完成", HistoryStatusTone.Success)
+        "计划已准备好" -> HistoryStatus("已就绪", HistoryStatusTone.Success)
+        "已允许", "已回答" -> HistoryStatus(view.result, HistoryStatusTone.Success)
+        "待处理", "已超时" -> HistoryStatus(view.result, HistoryStatusTone.Warning)
+        "已拒绝" -> HistoryStatus(view.result, HistoryStatusTone.Error)
+        "失败" -> HistoryStatus(view.result, HistoryStatusTone.Error)
+        "连接已断开" -> HistoryStatus("已断开", HistoryStatusTone.Error)
+        "已交回客户端" -> HistoryStatus("客户端处理", HistoryStatusTone.Neutral)
+        else -> HistoryStatus(view.result, HistoryStatusTone.Neutral)
+    }
     private fun raw(value: JSONObject, key: String): String = (value.opt(key) as? String).orEmpty().trim()
     private fun structured(value: String): Boolean = value.startsWith("{") || value.startsWith("[") &&
         !Regex("^\\[[^\\n]*\\](?:\\(|\\[)").containsMatchIn(value)
@@ -50,6 +64,7 @@ object HistoryPresentation {
         val excerpt = body.ifBlank { if (questions.isEmpty() && fields.isEmpty()) text(value, "description", 2400) else "" }
         val result = when (raw(value, "outcome").ifBlank { raw(meta, "state") }) {
             "allow", "once", "always" -> "已允许"; "deny", "reject" -> "已拒绝"; "submit", "answered" -> "已回答"
+            "failed", "error" -> "失败"
             "timeout", "expired" -> "已超时"; "disconnected" -> "连接已断开"; "dismissed", "closed" -> "已关闭"
             "native", "fallback" -> "已交回客户端"; "pending" -> "待处理"
             else -> when(kind) { "completion" -> "任务已完成"; "plan" -> "计划已准备好"; else -> "已结束" }

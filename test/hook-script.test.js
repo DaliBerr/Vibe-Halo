@@ -13,6 +13,7 @@ const {
   parseEventArg,
   normalizePermissionMode,
   readCodexTurnApprovalContext,
+  readCodexSessionTitle,
   sanitizePermissionResponse,
   shouldDeferCodexAutoReview,
 } = require("../hooks/vibe-halo-hook");
@@ -96,6 +97,41 @@ test("forwards documented permission modes and bounded plan output", () => {
   assert.equal(normalizePermissionMode("unknown"), "");
   const invalid = buildBody({ hook_event_name: "Stop", session_id: "bad", permission_mode: "unknown" });
   assert.equal(Object.hasOwn(invalid, "permission_mode"), false);
+});
+
+test("Codex titles use the exact session's newest readable index entry", () => {
+  const transcriptPath = writeTranscript(JSON.stringify({ type: "session_meta", payload: { title: "Old transcript title" } }));
+  const home = path.dirname(transcriptPath);
+  const index = path.join(home, "session_index.jsonl");
+  fs.writeFileSync(index, [
+    "x".repeat(2 * 1024 * 1024),
+    JSON.stringify({ id: "report", thread_name: "Old title" }),
+    JSON.stringify({ id: "report-other", thread_name: "Wrong session" }),
+    "{malformed",
+    JSON.stringify({ id: "report", thread_name: "查找报告撰写模板\n" }),
+    JSON.stringify({ id: "report", thread_name: " " }),
+    '{"id":"report","thread_name":"partial',
+  ].join("\n"));
+  assert.equal(readCodexSessionTitle("codex:report", home), "查找报告撰写模板");
+  assert.equal(readCodexSessionTitle("report-other", home), "Wrong session");
+  assert.equal(readCodexSessionTitle("report-missing", home), "");
+  const previousHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = home;
+  try {
+    const payload = { hook_event_name: "Stop", session_id: "report", transcript_path: transcriptPath, assistant_last_output: "Done" };
+    assert.equal(buildBody(payload).session_title, "查找报告撰写模板");
+    assert.equal(buildBody({ ...payload, session_title: "Explicit title" }).session_title, "Explicit title");
+    assert.equal(buildBody(payload, "zcode").session_title, "Old transcript title");
+    fs.writeFileSync(index, JSON.stringify({ id: "report", thread_name: "x".repeat(300) }));
+    assert.equal(buildBody(payload).session_title.length, 240);
+    fs.unlinkSync(index);
+    assert.equal(buildBody(payload).session_title, "Old transcript title");
+    assert.equal(buildBody({ ...payload, transcript_path: "missing" }).session_title, "");
+    assert.equal(buildBody({ ...payload, hook_event_name: "PermissionRequest", tool_name: "Bash" }).session_title, undefined);
+  } finally {
+    if (previousHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousHome;
+  }
 });
 
 test("defers only the matching Codex auto-review approval policies", () => {

@@ -16,6 +16,7 @@ const PERMISSION_TIMEOUT_MS = 130_000;
 const EVENT_TIMEOUT_MS = 2_000;
 const STDIN_LIMIT = 1024 * 1024;
 const CODEX_TURN_CONTEXT_LIMIT = 2 * 1024 * 1024;
+const CODEX_TITLE_INDEX_LIMIT = 2 * 1024 * 1024;
 const AGENT_IDS = new Set([
   "codex", "zcode", "qwen-code", "copilot-cli", "claude-code", "codebuddy",
   "gemini-cli", "antigravity", "cursor-agent", "kiro", "kimi-code", "codewhale",
@@ -143,6 +144,35 @@ function classifyRole(payload, meta) {
   ).toLowerCase();
   if (!raw || raw === "root" || raw === "main" || raw === "primary") return "main";
   return "subagent";
+}
+
+// Desktop titles can be renamed after session_meta was written. Read only the
+// bounded tail of the local index, matching the exact session, newest first.
+function readCodexSessionTitle(sessionId, codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex")) {
+  const id = cleanText(sessionId, 240).replace(/^codex:/, "");
+  if (!id || id === "unknown") return "";
+  let fd;
+  try {
+    fd = fs.openSync(path.join(codexHome, "session_index.jsonl"), "r");
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile()) return "";
+    const start = Math.max(0, stat.size - CODEX_TITLE_INDEX_LIMIT);
+    const buffer = Buffer.alloc(Math.min(stat.size, CODEX_TITLE_INDEX_LIMIT));
+    const count = fs.readSync(fd, buffer, 0, buffer.length, start);
+    const lines = buffer.subarray(0, count).toString("utf8").split(/\r?\n/);
+    if (start > 0) lines.shift();
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      try {
+        const item = JSON.parse(lines[i]);
+        if (item?.id !== id) continue;
+        const title = cleanText(item.thread_name, 240);
+        if (title) return title;
+      } catch {}
+    }
+  } catch {} finally {
+    if (fd !== undefined) { try { fs.closeSync(fd); } catch {} }
+  }
+  return "";
 }
 
 function collectPidChain() {
@@ -353,7 +383,9 @@ function buildBody(payload, agentId = "codex") {
         || payload?.assistant_output,
       6000,
     ) || extractAssistantOutput(payload?.transcript_path);
-    body.session_title = cleanText(meta?.thread_name || meta?.title, 240);
+    body.session_title = cleanText(payload?.session_title || payload?.sessionTitle, 240)
+      || (agentId === "codex" ? readCodexSessionTitle(body.session_id) : "")
+      || cleanText(meta?.thread_name || meta?.title, 240);
   }
   return body;
 }
@@ -478,6 +510,7 @@ module.exports = {
   parseAgentId,
   parseEventArg,
   readCodexTurnApprovalContext,
+  readCodexSessionTitle,
   sanitizePermissionResponse,
   shouldDeferCodexAutoReview,
   run,

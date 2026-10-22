@@ -30,6 +30,7 @@ Windows packages may show an unknown-publisher warning. Preview desktop packages
 - Paired Android notifications, explicitly authorized remote control, readable history cards and editable device names.
 - Phone/watch notifications show the client and a short task preview; updated phones deduplicate LAN/cloud delivery, and Codex follow-up suggestions no longer trigger completion alerts.
 - Markdown and Codex cards in phone records; encrypted project-image snapshots from new completion/plan records, with tap-to-zoom viewing.
+- Codex completion/plan titles use the local chat-name index when available. Phone record details show a compact colored status badge below the title; list cards show a matching status dot and short label.
 - English/Chinese UI with system light/dark appearance.
 
 The registry includes 19 integrations with different capabilities. See the [client support table](docs/GUIDE.md#client-support).

@@ -6,6 +6,21 @@ const { completionFromStop, permissionMode } = require("../src/completion-event"
 
 const codex = { id: "codex", name: "Codex" };
 
+test("completion titles preserve chat names through localization and remote delivery", () => {
+  for (const permission_mode of ["default", "plan"]) {
+    for (const cwd of ["", "C:/Users/test/Documents/c-users-test-desktop-document-student"]) {
+      const completion = completionFromStop({ event: "Stop", session_title: " 查找报告撰写模板 ", cwd, permission_mode }, codex, "codex:report");
+      assert.equal(completion.title, "查找报告撰写模板");
+      assert.equal(completion.titleKey, "");
+      assert.equal(completion.completionKind, permission_mode === "plan" ? "plan" : "task");
+    }
+  }
+  const fallback = completionFromStop({ event: "Stop", cwd: "/repo/demo" }, codex, "codex:report");
+  assert.equal(fallback.title, "demo");
+  assert.equal(fallback.titleKey, "");
+  assert.equal(completionFromStop({ event: "Stop" }, codex, "codex:report").titleKey, "fallback.completionTitle");
+});
+
 test("Codex follow-up suggestions never become task or plan completion notifications", () => {
   for (const suggestion of ["Next step", "", null, "转义\\\"与换行\n下一步"]) {
     for (const permission_mode of ["default", "plan"]) {
