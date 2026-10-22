@@ -6,7 +6,7 @@
 
 为 AI 编程客户端提供桌面灵动岛：处理支持的审批和问答，接收待处理提醒与任务完成通知。可选 Android 伴侣支持配对通知、审批和历史记录。
 
-![Version](https://img.shields.io/badge/version-0.6.2-6d7cff)
+![Version](https://img.shields.io/badge/version-0.6.3-6d7cff)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
 ![Vibe Halo 审批界面](docs/assets/vibe-halo-demo.gif)
@@ -16,9 +16,9 @@
 | 平台 | 安装包 | 状态 |
 | --- | --- | --- |
 | Windows x64 | [NSIS 安装程序](https://github.com/DaliBerr/Vibe-Halo/releases/latest) | 稳定版；确认重启后安装更新 |
-| macOS 12+ | [Apple Silicon / Intel DMG、ZIP](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.2) | 预览版；仅临时签名，未经公证 |
-| Linux x64 | [AppImage、deb](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.2) | 预览版 |
-| Android 8+ | [原签名伴侣 APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.2/Vibe-Halo-Mobile-0.6.2.apk) | 预览版；小米后台设置仍需真机验证 |
+| macOS 12+ | [Apple Silicon / Intel DMG、ZIP](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | 预览版；仅临时签名，未经公证 |
+| Linux x64 | [AppImage、deb](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | 预览版 |
+| Android 8+ | [原签名伴侣 APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.3/Vibe-Halo-Mobile-0.6.3.apk) | 预览版；小米后台设置仍需真机验证 |
 
 Windows 可能提示未知发布者。桌面预览版不启用自动更新。Codex、ZCode 已在 Windows 上完成真实客户端验证；macOS/Linux 目前有 CI 打包和启动检查，其他集成仍可能存在客户端兼容问题。
 

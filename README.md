@@ -6,7 +6,7 @@
 
 A desktop Dynamic Island for AI coding clients: handle supported approvals and questions, and see when a task needs attention or finishes. An optional Android companion brings paired notifications, approvals and history to your phone.
 
-![Version](https://img.shields.io/badge/version-0.6.2-6d7cff)
+![Version](https://img.shields.io/badge/version-0.6.3-6d7cff)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
 ![Vibe Halo displaying an approval request](docs/assets/vibe-halo-demo.gif)
@@ -16,9 +16,9 @@ A desktop Dynamic Island for AI coding clients: handle supported approvals and q
 | Platform | Package | Status |
 | --- | --- | --- |
 | Windows x64 | [NSIS installer](https://github.com/DaliBerr/Vibe-Halo/releases/latest) | Stable; explicit-restart updates |
-| macOS 12+ | [Apple Silicon / Intel DMG and ZIP](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.2) | Preview; ad-hoc signed, not notarized |
-| Linux x64 | [AppImage / deb](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.2) | Preview |
-| Android 8+ | [Signed companion APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.2/Vibe-Halo-Mobile-0.6.2.apk) | Preview; Xiaomi background settings need device verification |
+| macOS 12+ | [Apple Silicon / Intel DMG and ZIP](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | Preview; ad-hoc signed, not notarized |
+| Linux x64 | [AppImage / deb](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | Preview |
+| Android 8+ | [Signed companion APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.3/Vibe-Halo-Mobile-0.6.3.apk) | Preview; Xiaomi background settings need device verification |
 
 Windows packages may show an unknown-publisher warning. Preview desktop packages have automatic updates disabled. Codex and ZCode have real-client coverage on Windows; macOS/Linux have CI packaging and smoke coverage. Other integrations remain subject to client compatibility.
 

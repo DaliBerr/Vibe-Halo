@@ -279,10 +279,10 @@ jobs:
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
           Cross-platform preview of Vibe Halo $version.
 
-          - Codex suggestion-only results no longer generate completion notifications
-          - Updated Android clients deduplicate LAN/cloud notifications through one persistent event record
-          - Phone/watch alerts show client names and encrypted task, operation or question previews
-          - Update desktop and Android together, then open Android online once to enable the new push delivery mode
+          - Codex completion and plan records use chat names instead of generated workspace-folder names when the local index is available
+          - Phone detail pages show a compact colored status badge directly below the title
+          - History list cards show colored status dots and short labels for easier scanning
+          - Update desktop and Android together; existing pairing is retained and older synced titles are not backfilled
           - Optional paired Android companion with encrypted notifications, approvals and readable history
           - Editable device names, offline name synchronization and pairing-first mobile setup
           - Structured history cards and notification/background-settings guidance

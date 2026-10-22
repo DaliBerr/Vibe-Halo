@@ -1,8 +1,19 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-22 (Codex chat titles and phone record status layout; source only)
-Current version: `0.6.2`
+Updated: 2026-10-22 (0.6.3 release preparation)
+Current version: `0.6.3`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-10-22 — 0.6.3 release preparation
+
+The owner authorized publishing desktop and Android together. Version 0.6.3
+includes the verified chat-title fix and revised phone status layout described
+below. Android versionCode is 5 and must retain the original signing certificate
+and production Firebase configuration. Windows follows the existing stable
+update channel; macOS/Linux follow the existing preview channel. No relay
+redeployment, database migration or re-pairing is required. Previously synced
+titles are not backfilled. Release-specific verification and publication results
+will be recorded after the release gates pass.
 
 ## 2026-10-22 — Codex chat titles and phone record status layout
 
