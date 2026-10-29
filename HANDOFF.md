@@ -1,6 +1,6 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-29 (0.6.5 Windows release prepared)
+Updated: 2026-10-29 (0.6.5 Windows desktop published)
 Current version: `0.6.5` (desktop); `0.6.3` (Android and macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
 
@@ -8,14 +8,25 @@ Source directory: `C:\Tools\Clawd-island`
 
 The owner authorized publishing the verified notification delay fix as a stable
 release. Version 0.6.5 includes implementation `52c0d4f` and version/documentation
-updates only. The stable `v0.6.5` workflow must complete its dependency install,
-desktop tests, update-enabled packaging, metadata generation and silent
-install/uninstall checks before publication is considered successful.
+updates only. Published `v0.6.5` at `aa34fe0`. Stable workflow `40947794871`
+passed dependency install, desktop tests, update-enabled packaging, metadata
+generation and silent install/uninstall checks. Implementation cross-platform
+run `40947398172` and mobile/relay run `40947398098` also passed.
 The implementation's local desktop suite passed (252 pass, one existing skip),
 and all six protocol tests passed on the release version. The four real phone
 samples and owner acceptance are documented below. Existing Android 0.6.3
 remains compatible; no APK release or re-pairing is required for this fix.
 No macOS/Linux preview tag is part of this Windows release.
+
+Downloaded all six public release assets and checked their GitHub SHA-256
+digests, the three SHA256SUMS entries, and the installer's SHA-512, size, version
+and filename against `latest.yml`. GitHub Latest resolves to non-draft,
+non-prerelease `v0.6.5`. Bilingual release notes explain the Windows fix and
+continued Android 0.6.3 compatibility. Redundant same-code branch/main preview
+runs were cancelled; the retained implementation checks and stable release
+checks passed. The owner's installed desktop was not upgraded during this
+publication task; the previously launched optimized diagnostic build remains
+available, and normal stable installation/update is a separate step.
 
 ## 2026-10-29 — Notification timing and verified Windows delay fix
 
