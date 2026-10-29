@@ -185,11 +185,34 @@ class PlatformAdapter {
   executableDetected(descriptor) {
     const names = descriptor?.executableNames || [];
     if (this.platform === "win32") {
-      for (const name of names) {
-        try {
-          const result = this.spawnSync("where.exe", [name], { encoding: "utf8", windowsHide: true, timeout: 1000 });
-          if (result.status === 0 && String(result.stdout || "").trim()) return true;
-        } catch {}
+      // Tray refresh runs on Electron's main thread. Spawning where.exe for
+      // every integration stalls notification timers for seconds on Windows.
+      const envValue = key => Object.entries(this.env).find(([name]) => name.toLowerCase() === key)?.[1] || "";
+      const directories = [process.cwd(), ...String(envValue("path")).split(";")]
+        .map(value => value.trim().replace(/^"(.*)"$/, "$1")).filter(Boolean);
+      const extensions = String(envValue("pathext") || ".COM;.EXE;.BAT;.CMD").split(";")
+        .filter(value => /^\.[a-z0-9]+$/i.test(value));
+      const cacheKey = JSON.stringify(directories);
+      if (!this.windowsPathListing || this.windowsPathListing.key !== cacheKey || Date.now() - this.windowsPathListing.at >= 1000) {
+        const files = new Map();
+        for (const directory of directories) {
+          try {
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              if (entry.isFile() || entry.isSymbolicLink()) {
+                const key = entry.name.toLowerCase();
+                if (!files.has(key)) files.set(key, path.join(directory, entry.name));
+              }
+            }
+          } catch {}
+        }
+        this.windowsPathListing = { key: cacheKey, at: Date.now(), files };
+      }
+      for (const name of names.filter(value => /^[A-Za-z0-9._+-]+$/.test(value))) {
+        const candidates = [name, ...extensions.map(extension => name + extension)];
+        for (const candidate of candidates) {
+          const file = this.windowsPathListing.files.get(candidate.toLowerCase());
+          try { if (file && fs.statSync(file).isFile()) return true; } catch {}
+        }
       }
     } else {
       for (const name of names.filter(value => !String(value).toLowerCase().endsWith(".exe"))) {

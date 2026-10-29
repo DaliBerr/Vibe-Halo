@@ -534,7 +534,7 @@ class CompanionRepository(private val context: Context) {
         val event = mutable.value.events.find { it.computerKey == pc.key && it.summary.getString("eventId") == summary.getString("eventId") } ?: return
         if (event.summary.getLong("eventRevision") != summary.getLong("eventRevision")) return
         val data = listOf("protocolVersion", "pcId", "pcSessionEpoch", "eventId", "eventRevision", "kind", "agentId", "expiresAt").associateWith { summary.get(it).toString() }
-        val status = CompanionNotifications.show(context, data, NotificationPreview.fromDetail(event.detail))
+        val status = CompanionNotifications.show(context, data, NotificationPreview.fromDetail(event.detail), "lan")
         if (status !in listOf("notification_posted", "suppressed_by_user")) return
         val ack = JSONObject().put("protocolVersion", 1).put("pcId", pc.pcId).put("mobileId", account.crypto.publicDevice.getString("deviceId"))
             .put("bindingId", pc.bindingId).put("bindingRevision", pc.grant.getInt("revision")).put("pcSessionEpoch", summary.getString("pcSessionEpoch"))

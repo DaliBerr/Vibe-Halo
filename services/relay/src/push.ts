@@ -1,3 +1,4 @@
+import { notificationTiming } from "./notification-timing";
 import { importPKCS8, SignJWT } from "jose";
 import { Fault, body, record, text, response, now, authorize, type Session } from "./common";
 
@@ -90,7 +91,9 @@ export async function deliverPush(env: Env, pcId: string, mobileId: string, summ
     const token = await decryptToken(row.ciphertext, mobileId, env);
     const ttl = Math.max(0, Math.min(600, Math.floor((Date.parse(String(summary.expiresAt)) - now()) / 1000)));
     if (!ttl) return "skip";
+    const authStart = performance.now();
     const access = await accessToken(env);
+    notificationTiming("relay_auth_ready", summary.eventId, summary.eventRevision, performance.now() - authStart);
     if (!current() || Date.parse(String(summary.expiresAt)) <= now()) return "skip";
     const stillBound = await env.DB.prepare("SELECT id FROM bindings WHERE pc_id=? AND mobile_id=? AND state='active'").bind(pcId, mobileId).first();
     if (!stillBound || !current()) return "skip";
@@ -102,6 +105,8 @@ export async function deliverPush(env: Env, pcId: string, mobileId: string, summ
       if (preview && preview.length <= 3000) data.preview = preview;
       if (new TextEncoder().encode(JSON.stringify(data)).length > 3900) delete data.preview;
     }
+    const sendStart = performance.now();
+    notificationTiming("relay_fcm_start", summary.eventId, summary.eventRevision);
     const result = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(env.FCM_PROJECT_ID)}/messages:send`, {
       method: "POST", signal: AbortSignal.timeout(8000), headers: { authorization: `Bearer ${access}`, "content-type": "application/json" },
       body: JSON.stringify({ message: { token,
@@ -113,6 +118,7 @@ export async function deliverPush(env: Env, pcId: string, mobileId: string, summ
           : { priority: category === "completions" ? "NORMAL" : "HIGH", ttl: `${ttl}s`, collapse_key: pcId,
             notification: { channel_id: category, tag: `${pcId}/${summary.eventId}`, visibility: "PRIVATE", default_sound: true } } } }),
     });
+    notificationTiming(result.ok ? "relay_fcm_accepted" : "relay_fcm_failed", summary.eventId, summary.eventRevision, performance.now() - sendStart);
     if (result.ok) return "sent";
     const retryHeader = result.headers.get("retry-after");
     if (retryHeader) {

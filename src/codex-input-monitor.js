@@ -342,6 +342,7 @@ class CodexInputMonitor {
         expectedQuestionCount: asynchronous ? argumentsData.questions.length : questions.length,
         collaborationMode: tracked.collaborationMode,
         createdAt,
+        detectedAtMs: this.now(),
         expiresAt: createdAt + this.recoveryMaxAgeMs,
         notified: false,
       });

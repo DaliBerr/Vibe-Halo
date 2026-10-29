@@ -362,3 +362,49 @@ and respects disabling notification mirroring for this app. Delayed background
 FCM may still display an old reminder; opening it must show current read-only
 state. Neither FCM acceptance nor a local `notify()` call proves the user/watch
 actually saw a message.
+# Notification timing diagnostics
+
+Diagnostic builds emit `notification_timing` records containing only an event
+identifier, revision, stage, host and timestamps/durations. They do not include
+question text, device identifiers, push tokens, notification previews or errors.
+Desktop records use the existing bounded, rotating `main.log`; Android uses the
+bounded system logcat buffer under `VibeHaloTiming`; relay records use structured
+Worker console logs and the deployment's existing retention/sampling policy.
+Logging failures do not block notification delivery.
+
+Collect all three logs during a short test with a single paired phone. Use a live
+Wrangler tail with the production configuration to avoid gaps from stored-log
+sampling, and `adb logcat -v epoch VibeHaloTiming:I '*:S'` for the phone. Install
+the signed diagnostic APK with `adb install -r` to preserve pairing; do not
+uninstall or clear app data. Both desktop and relay must also run instrumented
+code. Keep captures in ignored `.smoke/`, not in Git.
+
+Start tail before testing and keep it running while normally quitting the desktop
+after the test: Cloudflare buffers WebSocket handler logs until the connection
+closes ([known issue](https://developers.cloudflare.com/durable-objects/platform/known-issues/)).
+An empty live tail during an open connection does not prove missing instrumentation.
+
+Run `node scripts/analyze-notification-timing.js <desktop.log> <relay.jsonl>
+<android.log>` (on one line) to correlate records by event ID. Revisions,
+retries and multiple recipients can produce repeated stages; do not pair them
+blindly or treat a missing sampled stage as a delivery failure.
+
+- Desktop: `desktop_event_ready` carries the source JSONL timestamp and monitor
+  detection time when available; `desktop_publish_start` and
+  `desktop_socket_queued` bracket encryption and the local socket send.
+- Relay: `relay_event_stored`, `relay_push_due`, `relay_auth_ready`,
+  `relay_fcm_start`, `relay_fcm_accepted`/`relay_fcm_failed` and the final
+  `relay_push_sent`/`relay_push_skip`/`relay_push_retry` identify processing stages.
+- Android: `android_fcm_received`, `android_decrypted`, `android_show_start`,
+  `android_notify_returned` and `android_result_*` distinguish receipt, local
+  decryption, suppression/deduplication and OS notification submission. LAN
+  notifications mark `transport: lan` at the show stage.
+
+`elapsedMs` is measured locally with monotonic clocks. Wall timestamps across
+hosts are correlation hints, **not measured network latency** without clock
+calibration. The Codex JSONL timestamp is not a measurement of when its UI
+rendered the question. FCM acceptance is not phone receipt, and Android
+`notify()` returning is not proof of banner appearance or watch delivery.
+Use several foreground/background samples before changing delay settings.
+The initial instrumentation deliberately preserves the existing notification
+timers, including the relay's 1.5–2 second LAN-ack grace period.

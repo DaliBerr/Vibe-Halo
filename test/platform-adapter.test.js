@@ -19,6 +19,21 @@ const {
 } = require("../src/platform-adapter");
 
 const roots = [];
+test("Windows executable detection handles quoted PATH, PATHEXT and case without spawning processes", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-halo-path-"));
+  roots.push(root);
+  fs.writeFileSync(path.join(root, "Example.CMD"), "@echo off");
+  fs.mkdirSync(path.join(root, "directory.EXE"));
+  const adapter = createPlatformAdapter({ platform: "win32", env: { Path: `\"${root}\"`, PATHEXT: ".EXE;.CMD" },
+    spawnSync() { throw new Error("Executable discovery must not spawn on the main thread"); } });
+  assert.equal(adapter.executableDetected({ executableNames: ["example"] }), true);
+  assert.equal(adapter.executableDetected({ executableNames: ["EXAMPLE.cmd"] }), true);
+  assert.equal(adapter.executableDetected({ executableNames: ["directory"] }), false);
+  assert.equal(adapter.executableDetected({ executableNames: ["missing"] }), false);
+  assert.equal(adapter.executableDetected({ executableNames: ["../Example.CMD"] }), false);
+  adapter.env.Path = path.join(root, "absent");
+  assert.equal(adapter.executableDetected({ executableNames: ["example"] }), false);
+});
 test.afterEach(() => {
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });

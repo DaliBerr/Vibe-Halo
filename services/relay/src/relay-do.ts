@@ -1,3 +1,4 @@
+import { notificationTiming } from "./notification-timing";
 import { DurableObject } from "cloudflare:workers";
 import { Fault, response, sessionByHash, authorize, record, id, text, now, sha256, type Session } from "./common";
 import { validate, safeTree } from "../../../packages/protocol/src/index.js";
@@ -194,6 +195,7 @@ export class Relay extends DurableObject<Env> {
     }
   }
   private async upsert(pcId: string, session: Session, value: Record<string, unknown>): Promise<void> {
+    const timingStart = performance.now();
     const summary = record(value.summary);
     if (summary.pcId !== pcId || !validate("eventSummary", summary).ok) throw new Fault("invalid_event");
     const revision = Number(summary.eventRevision);
@@ -236,6 +238,7 @@ export class Relay extends DurableObject<Env> {
         `${eventId}:${recipient.mobileId}:${revision}`, eventId, recipient.mobileId, revision, now() + 1500 + Math.floor(Math.random() * 500), expiry);
       this.ctx.storage.sql.exec("UPDATE push_jobs SET state='acknowledged' WHERE state='pending' AND id IN (SELECT id FROM notification_acks WHERE expires_at>?)", now());
     } else this.ctx.storage.sql.exec("UPDATE push_jobs SET state='cancelled' WHERE event_id=? AND state='pending'", eventId);
+    notificationTiming("relay_event_stored", eventId, revision, performance.now() - timingStart);
     this.prune();
     await this.schedule();
     await this.notify({ type: "events.changed" });
@@ -276,7 +279,9 @@ export class Relay extends DurableObject<Env> {
     const jobs = this.ctx.storage.sql.exec<{ id: string; mobile_id: string; attempts: number; summary: string; recipients: string }>("SELECT j.id,j.mobile_id,j.attempts,e.summary,e.recipients FROM push_jobs j JOIN events e ON e.event_id=j.event_id WHERE j.state='pending' AND j.due_at<=? AND j.expires_at>? AND j.revision=e.revision ORDER BY j.due_at LIMIT 4", now(), now()).toArray();
     // Bound upstream concurrency and stay below Free D1 subrequest limits.
     const deliver = async (job: typeof jobs[number]) => {
+      const timingStart = performance.now();
       const summary = JSON.parse(job.summary);
+      notificationTiming("relay_push_due", summary.eventId, summary.eventRevision);
       const recipients: { mobileId: string; preview?: string }[] = JSON.parse(job.recipients);
       const preview = recipients.find(value => value.mobileId === job.mobile_id)?.preview;
       let retryDelay = 0;
@@ -284,6 +289,7 @@ export class Relay extends DurableObject<Env> {
         const current = this.ctx.storage.sql.exec<{ revision: number; state: string }>("SELECT e.revision,j.state FROM events e JOIN push_jobs j ON j.event_id=e.event_id WHERE j.id=?", job.id).toArray()[0];
         return current?.revision === summary.eventRevision && current.state === "pending";
       }, delay => { retryDelay = delay; }, preview).catch(() => { retryDelay = 60000; return "retry" as const; });
+      notificationTiming(`relay_push_${result}`, summary.eventId, summary.eventRevision, performance.now() - timingStart);
       const attempts = job.attempts + 1;
       const state = result === "retry" && attempts < 5 ? "pending" : result === "retry" ? "failed" : result;
       if (state === "failed") console.warn(JSON.stringify({ code: "push_delivery_exhausted" }));

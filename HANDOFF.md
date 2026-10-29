@@ -4,6 +4,56 @@ Updated: 2026-10-29 (0.6.4 Windows desktop published)
 Current version: `0.6.4` (desktop); `0.6.3` (Android and macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
 
+## 2026-10-29 — Notification timing and verified Windows delay fix
+
+The owner reported roughly 5–10 seconds between seeing a Codex async question
+and receiving its phone notification, and requested stage timing before tuning.
+The diagnostic implementation adds bounded scalar timing records on desktop,
+relay and Android, plus `scripts/analyze-notification-timing.js` and collection
+instructions in `docs/REMOTE_SETUP.md`. It leaves all notification timers,
+protocol payloads, approval behavior and database schemas unchanged. Logging is
+fail-open and excludes question content, credentials and device identities.
+
+Final desktop tests passed (252 pass, one existing skip); the three timing
+tests include multiline Wrangler capture parsing. Relay typecheck and
+20 tests passed. Android debug Kotlin compilation and unit tests passed. The
+Windows directory build and 0.6.4 package verification passed. Android release
+assembly and lint passed; the diagnostic APK in ignored
+`dist/companion-timing/Vibe-Halo-Mobile-0.6.3-timing.apk` preserves the existing
+release certificate and package/version identity for data-preserving replacement.
+Relay production-config dry-run passed. After replacing the USB cable, the
+owner's Xiaomi 15 connected and the signed APK installed successfully with
+`adb install -r`, preserving pairing. The diagnostic relay was deployed as
+`3004b322-c017-4492-8159-686b7d00794f` (prior version
+`bec0dd7c-6823-43ea-a0d7-83ef3db5a121`), retaining production bindings, variables,
+secrets and notification timers. No new stable tag or updater release was made.
+
+Four real async questions were captured. The second exposed 15,547 ms between
+desktop event-ready and publish-start. `IslandController.refresh` synchronously
+rebuilds the tray, whose integration status refresh expires after 30 seconds;
+Windows executable detection then spawned `where.exe` repeatedly on Electron's
+main thread. A separate same-machine discovery benchmark took 17,686 ms.
+Windows now directly enumerates current-directory/PATH entries and PATHEXT,
+with a one-second shared directory listing cache, preserving application-path
+fallbacks. The same discovery benchmark took 129 ms. Tests cover quoted and
+case-insensitive PATH/PATHEXT, absent files, directories and invalid names.
+POSIX discovery is unchanged.
+
+After switching to `dist/timing-optimized/win-unpacked/Vibe Halo.exe`, samples
+3/4 took 265/391 ms from source JSONL time to local socket submission. Their
+relay event-stored-to-push-due intervals were 1,896/1,732 ms; FCM request durations
+were 84/93 ms; Android receipt-to-result durations were 61/64 ms. The owner
+confirmed sample 4 was noticeably faster. The relay's 1.5–2 second LAN-ack
+grace remains unchanged. Raw captures and the report are in ignored `.smoke/`.
+The optimized desktop remains running for testing; the installed stable desktop
+and its next normal startup are still 0.6.4 without this fix until a new release.
+
+Source JSONL time is not Codex UI render time, FCM acceptance is not device
+receipt, and Android notify-return time is not banner/watch appearance.
+Cross-host clocks differ (some Android times precede relay acceptance), so the
+figures above are strictly same-host intervals, not measured network latency.
+Wrangler WebSocket logs may only flush on socket closure; see setup notes.
+
 ## 2026-10-29 — 0.6.4 Windows desktop publication
 
 The owner authorized a new desktop release to test async Codex notifications on

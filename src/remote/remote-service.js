@@ -9,11 +9,13 @@ const { MediaStore } = require("./media-store");
 const { detail } = require("./event-projector");
 const { notificationPreview } = require("./notification-preview");
 const { LanService, createTlsIdentity } = require("./lan-service");
+const { notificationTiming } = require("../notification-timing");
+const { performance } = require("node:perf_hooks");
 const { validate, safeTree } = require("../../packages/protocol");
 
 class RemoteService extends EventEmitter {
-  constructor({ userData, safeStorage, approvals, decisions, allowLocal = false, lanOptions, processImage }) {
-    super(); this.approvals = approvals; this.decisions = decisions; this.allowLocal = allowLocal; this.lanOptions = lanOptions;
+  constructor({ userData, safeStorage, approvals, decisions, allowLocal = false, lanOptions, processImage, logger }) {
+    super(); this.logger = logger; this.approvals = approvals; this.decisions = decisions; this.allowLocal = allowLocal; this.lanOptions = lanOptions;
     this.credentials = new DeviceCredentialStore({ filePath: path.join(userData, "mobile-device.enc.json"), safeStorage });
     this.journal = new EventJournal({ filePath: path.join(userData, "mobile-events.enc.json"), safeStorage });
     this.media = new MediaStore({ filePath: path.join(userData, "mobile-media.enc"), safeStorage, processImage });
@@ -329,6 +331,7 @@ class RemoteService extends EventEmitter {
       if (this.reminderSources.size > 500) this.reminderSources.delete(this.reminderSources.keys().next().value);
     }
     if (this.journal.put(value) && ["completion", "plan"].includes(kind)) this.media.capture(`event:${eventId}`, content, input.cwd);
+    notificationTiming(this.logger, "desktop_event_ready", eventId, 1, { sourceAtMs: input.createdAt, detectedAtMs: input.detectedAtMs });
     this.queuePublish(); return eventId;
   }
   resolveReminder(requestKey, reason = "answered") {
@@ -379,11 +382,14 @@ class RemoteService extends EventEmitter {
     for (const value of this.journal.list()) for (const binding of this.state.bindings.filter(value => value.state === "active" && value.scopes.includes("events.read"))) {
       const key = `${binding.bindingId}:${value.summary.eventId}`, revision = `${binding.revision}:${value.summary.eventRevision}`;
       if ((!force || value.summary.state !== "pending") && this.sentRevisions.get(key) === revision) continue;
+      const timingStart = performance.now();
+      notificationTiming(this.logger, "desktop_publish_start", value.summary.eventId, value.summary.eventRevision);
       const preview = await this.encryptNotification(value, binding);
       if (!this.send({ type: "event.upsert", summary: value.summary,
         recipients: [{ mobileId: binding.mobile.deviceId, envelope: await this.encryptEvent(value, binding) }],
         notificationPreviews: preview ? [{ mobileId: binding.mobile.deviceId, envelope: preview }] : [],
       })) return;
+      notificationTiming(this.logger, "desktop_socket_queued", value.summary.eventId, value.summary.eventRevision, { elapsedMs: performance.now() - timingStart });
       this.sentRevisions.set(key, revision);
       if (this.sentRevisions.size > 3200) this.sentRevisions.delete(this.sentRevisions.keys().next().value);
     }

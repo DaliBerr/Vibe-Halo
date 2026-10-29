@@ -37,7 +37,9 @@ object CompanionNotifications {
         ))
     }
     @Synchronized
-    fun show(context: Context, data: Map<String, String>, preview: NotificationPreview? = null): String {
+    fun show(context: Context, data: Map<String, String>, preview: NotificationPreview? = null, transport: String = "unknown"): String {
+        val timingStart = android.os.SystemClock.elapsedRealtime()
+        NotificationTiming.record("android_show_start", data, transport)
         if (data.keys.any { it !in setOf("protocolVersion", "pcId", "pcSessionEpoch", "eventId", "eventRevision", "kind", "agentId", "expiresAt") } || data["protocolVersion"] != "1") return "invalid"
         val pcId = data["pcId"] ?: return "invalid"; val eventId = data["eventId"] ?: return "invalid"
         val revision = data["eventRevision"]?.toLongOrNull()?.takeIf { it > 0 } ?: return "invalid"
@@ -74,6 +76,7 @@ object CompanionNotifications {
         val notification = builder.build()
         // No decision action, inline reply, full-screen intent, or custom watch UI.
         context.getSystemService(NotificationManager::class.java).notify(key, 0, notification)
+        NotificationTiming.record("android_notify_returned", data, transport, timingStart)
         remember(context, key, revision, true)
         return "notification_posted"
     }
@@ -105,10 +108,14 @@ object CompanionNotifications {
 }
 class CompanionMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
+        val timingStart = android.os.SystemClock.elapsedRealtime()
+        NotificationTiming.record("android_fcm_received", message.data, "fcm")
         runCatching {
             val preview = NotificationPreview.decrypt(this, message.data)
-            CompanionNotifications.show(this, message.data - "preview", preview)
-        }
+            NotificationTiming.record("android_decrypted", message.data, "fcm", timingStart)
+            val result = CompanionNotifications.show(this, message.data - "preview", preview, "fcm")
+            NotificationTiming.record("android_result_$result", message.data, "fcm", timingStart)
+        }.onFailure { NotificationTiming.record("android_processing_failed", message.data, "fcm", timingStart) }
     }
     @Suppress("OVERRIDE_DEPRECATION")
     override fun onNewToken(token: String) {

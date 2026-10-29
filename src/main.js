@@ -684,7 +684,7 @@ function startApplication() {
     platformAdapter.configureReady(app);
     logger = createLogger(path.join(app.getPath("userData"), "logs"));
     settings = new SettingsStore(path.join(app.getPath("userData"), "settings.json"));
-    remote = new RemoteService({ userData: app.getPath("userData"), safeStorage, approvals, decisions,
+    remote = new RemoteService({ userData: app.getPath("userData"), safeStorage, approvals, decisions, logger,
       allowLocal: !app.isPackaged && process.env.VIBE_HALO_TEST === "1" });
     await remote.initialize({ autoConnect: process.env.VIBE_HALO_TEST !== "1" });
     remoteWindow = new RemoteSettingsWindow({ BrowserWindow, ipcMain, remote });
