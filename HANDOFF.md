@@ -1,8 +1,21 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-29 (0.6.4 Windows desktop published)
-Current version: `0.6.4` (desktop); `0.6.3` (Android and macOS/Linux preview)
+Updated: 2026-10-29 (0.6.5 Windows release prepared)
+Current version: `0.6.5` (desktop); `0.6.3` (Android and macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-10-29 — 0.6.5 Windows release
+
+The owner authorized publishing the verified notification delay fix as a stable
+release. Version 0.6.5 includes implementation `52c0d4f` and version/documentation
+updates only. The stable `v0.6.5` workflow must complete its dependency install,
+desktop tests, update-enabled packaging, metadata generation and silent
+install/uninstall checks before publication is considered successful.
+The implementation's local desktop suite passed (252 pass, one existing skip),
+and all six protocol tests passed on the release version. The four real phone
+samples and owner acceptance are documented below. Existing Android 0.6.3
+remains compatible; no APK release or re-pairing is required for this fix.
+No macOS/Linux preview tag is part of this Windows release.
 
 ## 2026-10-29 — Notification timing and verified Windows delay fix
 

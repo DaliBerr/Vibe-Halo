@@ -6,7 +6,7 @@
 
 A desktop Dynamic Island for AI coding clients: handle supported approvals and questions, and see when a task needs attention or finishes. An optional Android companion brings paired notifications, approvals and history to your phone.
 
-![Version](https://img.shields.io/badge/version-0.6.4-6d7cff)
+![Version](https://img.shields.io/badge/version-0.6.5-6d7cff)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
 ![Vibe Halo displaying an approval request](docs/assets/vibe-halo-demo.gif)
@@ -26,7 +26,8 @@ Windows packages may show an unknown-publisher warning. Preview desktop packages
 
 - One desktop approval queue, with native-client fallback when no valid decision is made.
 - Structured answers where the client exposes an exact answer protocol; Codex questions remain reminders to answer in Codex.
-- Codex mid-turn async questions also reach the paired phone, even with desktop input reminders disabled. Unanswered async reminders survive turn completion and unrelated prompts, until answered, dismissed or timed out (up to 30 minutes). Requires desktop 0.6.4; Android 0.6.3 and the existing relay remain compatible.
+- Codex mid-turn async questions also reach the paired phone, even with desktop input reminders disabled. Unanswered async reminders survive turn completion and unrelated prompts, until answered, dismissed or timed out (up to 30 minutes). Requires desktop 0.6.4 or later; Android 0.6.3 and the existing relay remain compatible.
+- Windows 0.6.5 removes repeated external executable lookups during tray refresh, preventing client discovery from blocking phone notification delivery. Stage timing diagnostics help distinguish desktop processing, relay waiting and phone handling.
 - Completion notifications and optional tray-opened recent-event history.
 - Paired Android notifications, explicitly authorized remote control, readable history cards and editable device names.
 - Phone/watch notifications show the client and a short task preview; updated phones deduplicate LAN/cloud delivery, and Codex follow-up suggestions no longer trigger completion alerts.
