@@ -1,8 +1,25 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-29 (Codex async input reminders; source change after 0.6.3)
-Current version: `0.6.3`
+Updated: 2026-10-29 (0.6.4 Windows desktop release preparation)
+Current version: `0.6.4` (desktop); `0.6.3` (Android and macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-10-29 — 0.6.4 Windows desktop release preparation
+
+The owner authorized a new desktop release to test async Codex notifications on
+the phone. Version 0.6.4 contains the verified async reminder implementation
+below and version/documentation updates only. Publish Windows stable through
+the existing GitHub update channel; Android remains 0.6.3, with no APK rebuild,
+relay deployment or re-pairing. macOS/Linux preview links remain at 0.6.3.
+
+Local release checks passed: `npm ci`; desktop tests (248 passed, one existing
+Windows skip); all six protocol tests; normal package verification; stable
+update-enabled package verification; NSIS installer generation plus regenerated
+blockmap, `latest.yml` and SHA-256 checksums. Both directory builds use the
+unchanged locked dependencies. Public artifact verification will be recorded
+after publication. Physical phone/watch background delivery remains owner
+acceptance after updating the desktop. Do not replace the owner's installed
+desktop as part of publication; the owner will exercise its update flow.
 
 ## 2026-10-29 — Codex async questions and phone notifications
 
