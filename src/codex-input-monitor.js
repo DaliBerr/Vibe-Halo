@@ -42,22 +42,22 @@ function normalizeCollaborationMode(value) {
   return mode === "default" || mode === "plan" ? mode : "unknown";
 }
 
-function normalizeQuestions(argumentsValue) {
+function normalizeQuestions(argumentsValue, asynchronous = false) {
   const data = parseArguments(argumentsValue);
   if (!Array.isArray(data.questions)) return [];
-  return data.questions.slice(0, 3).map((question, index) => {
+  return data.questions.slice(0, asynchronous ? 10 : 3).map((question, index) => {
     const value = question && typeof question === "object" ? question : {};
     const options = Array.isArray(value.options)
-      ? value.options.slice(0, 4).map(option => ({
-        label: safeText(option?.label, 120),
+      ? value.options.slice(0, asynchronous ? 20 : 4).map(option => ({
+        label: safeText(asynchronous ? option : option?.label, 120),
         description: safeText(option?.description, 300),
       })).filter(option => option.label)
       : [];
     return {
       header: safeText(value.header, 80),
-      id: safeText(value.id, 120) || `question_${index + 1}`,
-      question: safeText(value.question, 600),
-      questionKey: safeText(value.question, 600) ? "" : "fallback.codexWaitingInput",
+      id: (!asynchronous && safeText(value.id, 120)) || `question_${index + 1}`,
+      question: safeText(asynchronous ? value.title : value.question, 600),
+      questionKey: safeText(asynchronous ? value.title : value.question, 600) ? "" : "fallback.codexWaitingInput",
       options,
     };
   });
@@ -117,6 +117,7 @@ class CodexInputMonitor {
     this.recoveryMaxAgeMs = options.recoveryMaxAgeMs || CODEX_INPUT_RECOVERY_MAX_AGE_MS;
     this.now = options.now || Date.now;
     this.onRequested = options.onRequested || (() => true);
+    this.onRemoteRequested = options.onRemoteRequested || (() => false);
     this.onResolved = options.onResolved || (() => {});
     this.logger = options.logger || { info() {}, warn() {}, error() {} };
     this.files = new Map();
@@ -189,6 +190,12 @@ class CodexInputMonitor {
 
   replayPending() {
     this._announcePending();
+  }
+
+  pendingAsyncRequestKeys(sessionId) {
+    return new Set([...this.pending.values()]
+      .filter(item => item.asynchronous && item.sessionId === sessionId)
+      .map(item => item.requestKey));
   }
 
   _startWatcher() {
@@ -301,18 +308,27 @@ class CodexInputMonitor {
     }
     if (record?.type !== "response_item" || !record.payload || typeof record.payload !== "object") return;
     const payload = record.payload;
+    if (payload.type === "message" && payload.role === "user") {
+      this._consumeAsyncReply(payload, filePath, now);
+      return;
+    }
     const callId = safeText(payload.call_id, 240);
     if (!callId) return;
     const requestKey = requestKeyFor(filePath, callId);
 
-    if (payload.type === "function_call" && payload.name === "request_user_input") {
+    if (payload.type === "function_call" && ["request_user_input", "request_user_input_async"].includes(payload.name)) {
       const createdAt = Number.isFinite(Date.parse(record.timestamp)) ? Date.parse(record.timestamp) : now;
       if (createdAt < now - this.recoveryMaxAgeMs || this.pending.has(requestKey)) return;
-      const questions = normalizeQuestions(payload.arguments);
+      const asynchronous = payload.name === "request_user_input_async";
+      const argumentsData = parseArguments(payload.arguments);
+      const questions = normalizeQuestions(argumentsData, asynchronous);
+      if (asynchronous && (!questions.length || questions.some(question => !question.question))) return;
       const content = formatQuestions(questions);
       this.pending.set(requestKey, {
         requestKey,
         callId,
+        asynchronous,
+        answers: {},
         filePath,
         sessionId: tracked.sessionId,
         cwd: tracked.cwd,
@@ -322,8 +338,11 @@ class CodexInputMonitor {
         contentKey: content ? "" : "fallback.returnToCodex",
         questions,
         questionCount: questions.length,
+        // Truncated forms must not be marked answered after only the visible subset.
+        expectedQuestionCount: asynchronous ? argumentsData.questions.length : questions.length,
         collaborationMode: tracked.collaborationMode,
         createdAt,
+        expiresAt: createdAt + this.recoveryMaxAgeMs,
         notified: false,
       });
       return;
@@ -332,18 +351,56 @@ class CodexInputMonitor {
     if (payload.type === "function_call_output") {
       const pending = this.pending.get(requestKey);
       if (!pending) return;
-      this.pending.delete(requestKey);
-      if (pending.notified) {
-        this.lastEventAt = new Date(now).toISOString();
-        const answers = normalizeOutputAnswers(payload.output);
-        this.onResolved({ ...pending, answers, answerAvailable: Object.keys(answers).length > 0 });
-        this.logger.info("Codex input request resolved", { sessionId: pending.sessionId });
+      if (pending.asynchronous) {
+        // The immediate acknowledgement is not the user's answer.
+        if (parseArguments(payload.output).accepted === false) this._resolve(pending, now, {}, "cancelled");
+        return;
       }
+      this._resolve(pending, now, normalizeOutputAnswers(payload.output));
+    }
+  }
+
+  _consumeAsyncReply(payload, filePath, now) {
+    if (!Array.isArray(payload.content)) return;
+    for (const part of payload.content.slice(0, 20)) {
+      if (part?.type !== "input_text" || typeof part.text !== "string" || part.text.length > 256 * 1024) continue;
+      const match = part.text.trim().match(/^<send_user_message_question_reply>\s*([\s\S]*?)\s*<\/send_user_message_question_reply>$/);
+      if (!match) continue;
+      let replies;
+      try { replies = JSON.parse(match[1]); } catch { continue; }
+      if (!Array.isArray(replies)) continue;
+      for (const reply of replies.slice(0, 100)) {
+        let identity;
+        if (typeof reply?.questionItemId !== "string" || reply.questionItemId.length > 1000) continue;
+        try { identity = JSON.parse(reply.questionItemId); } catch { continue; }
+        if (!Array.isArray(identity) || identity.length !== 3 || identity[0] !== "request_user_input_async"
+          || typeof identity[1] !== "string" || !identity[1] || identity[1].length > 240 || !Number.isInteger(identity[2])) continue;
+        const pending = this.pending.get(requestKeyFor(filePath, identity[1]));
+        if (!pending?.asynchronous || identity[2] < 0 || identity[2] >= pending.questions.length) continue;
+        const answer = safeText(reply.answer, 2000);
+        if (!answer) continue;
+        pending.answers[`question_${identity[2] + 1}`] = answer;
+        if (Object.keys(pending.answers).length === pending.expectedQuestionCount) this._resolve(pending, now, pending.answers);
+      }
+    }
+  }
+
+  _resolve(pending, now, answers = {}, reason = "answered") {
+    this.pending.delete(pending.requestKey);
+    // A disabled desktop reminder can still have been delivered to the phone.
+    if (pending.notified || pending.remoteNotified) {
+      this.lastEventAt = new Date(now).toISOString();
+      this.onResolved({ ...pending, answers, reason, answerAvailable: Object.keys(answers).length > 0 });
+      this.logger.info("Codex input request resolved", { sessionId: pending.sessionId });
     }
   }
 
   _announcePending() {
     for (const pending of this.pending.values()) {
+      if (!pending.remoteNotified) {
+        try { pending.remoteNotified = !!this.onRemoteRequested({ ...pending }); }
+        catch (error) { this.logger.warn("Codex remote input reminder handler failed", { message: error.message }); }
+      }
       if (pending.notified) continue;
       let accepted = false;
       try { accepted = this.onRequested({ ...pending, notified: undefined }) !== false; }
@@ -360,10 +417,9 @@ class CodexInputMonitor {
   }
 
   _expire(now) {
-    for (const [requestKey, pending] of this.pending) {
+    for (const pending of this.pending.values()) {
       if (pending.createdAt >= now - this.recoveryMaxAgeMs) continue;
-      this.pending.delete(requestKey);
-      if (pending.notified) this.onResolved(pending);
+      this._resolve(pending, now, {}, "expired");
     }
   }
 }

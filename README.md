@@ -26,6 +26,7 @@ Windows packages may show an unknown-publisher warning. Preview desktop packages
 
 - One desktop approval queue, with native-client fallback when no valid decision is made.
 - Structured answers where the client exposes an exact answer protocol; Codex questions remain reminders to answer in Codex.
+- Codex mid-turn async questions also reach the paired phone, even with desktop input reminders disabled. Unanswered async reminders survive turn completion and unrelated prompts, until answered, dismissed or timed out (up to 30 minutes). Available in source after 0.6.3; requires an updated desktop, with no Android or relay change.
 - Completion notifications and optional tray-opened recent-event history.
 - Paired Android notifications, explicitly authorized remote control, readable history cards and editable device names.
 - Phone/watch notifications show the client and a short task preview; updated phones deduplicate LAN/cloud delivery, and Codex follow-up suggestions no longer trigger completion alerts.

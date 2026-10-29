@@ -312,8 +312,11 @@ class RemoteService extends EventEmitter {
     const sourceKey = input.requestKey;
     if (sourceKey && this.reminderSources.has(sourceKey)) return this.reminderSources.get(sourceKey).eventId;
     const createdAt = Date.now(), eventId = `evt_${randomUUID()}`;
+    const inputExpiry = input.asynchronous === true && Number.isFinite(input.expiresAt)
+      ? Math.max(createdAt, Math.min(input.expiresAt, createdAt + require("../constants").CODEX_INPUT_RECOVERY_MAX_AGE_MS))
+      : createdAt + 120000;
     const summary = { protocolVersion: 1, eventId, pcId: this.pcId, pcSessionEpoch: this.approvals.pcSessionEpoch, streamSeq: 1, eventRevision: 1,
-      kind, agentId: input.agentId || "codex", createdAt: new Date(createdAt).toISOString(), expiresAt: new Date(createdAt + (kind === "input" ? 120000 : 3600000)).toISOString(),
+      kind, agentId: input.agentId || "codex", createdAt: new Date(createdAt).toISOString(), expiresAt: new Date(kind === "input" ? inputExpiry : createdAt + 3600000).toISOString(),
       state: kind === "input" ? "pending" : "resolved", actionable: false, pendingCount: this.approvals.size,
       summaryKey: kind === "input" ? "remote.inputRequested" : kind === "plan" ? "remote.planReady" : "remote.completed" };
     const { sanitizeValue, truncateUtf8 } = require("../history-store");
@@ -328,16 +331,16 @@ class RemoteService extends EventEmitter {
     if (this.journal.put(value) && ["completion", "plan"].includes(kind)) this.media.capture(`event:${eventId}`, content, input.cwd);
     this.queuePublish(); return eventId;
   }
-  resolveReminder(requestKey) {
+  resolveReminder(requestKey, reason = "answered") {
     const source = this.reminderSources.get(requestKey); if (!source) return;
     this.reminderSources.delete(requestKey);
     const previous = this.journal.events.get(source.eventId);
     if (!previous || previous.summary.state !== "pending") return;
-    const value = structuredClone(previous); value.summary.state = "resolved"; value.summary.actionable = false; value.summary.eventRevision += 1;
+    const value = structuredClone(previous); value.summary.state = reason === "expired" ? "expired" : "resolved"; value.summary.actionable = false; value.summary.eventRevision += 1;
     this.journal.put(value); this.queuePublish();
   }
-  resolveSessionReminders(agentId, sessionId) {
-    for (const [key, value] of this.reminderSources) if (value.agentId === agentId && value.sessionId === sessionId) this.resolveReminder(key);
+  resolveSessionReminders(agentId, sessionId, preserveKeys = new Set()) {
+    for (const [key, value] of this.reminderSources) if (value.agentId === agentId && value.sessionId === sessionId && !preserveKeys.has(key)) this.resolveReminder(key);
   }
   queuePublish() {
     clearTimeout(this.publishTimer); this.publishTimer = setTimeout(() => { this.serial = this.serial.then(() => this.publishAll()).catch(() => {}); }, 40); this.publishTimer.unref(); this.lan?.notify();

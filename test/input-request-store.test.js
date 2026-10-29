@@ -67,6 +67,26 @@ test("session lifecycle only clears matching reminders", () => {
   assert.equal(store.snapshot().current.sessionId, "s2");
 });
 
+test("session cleanup preserves exact async reminders without preserving unrelated FIFO entries", () => {
+  const { store, timers } = fixture();
+  store.enqueue({ requestKey: "async", sessionId: "s1" });
+  store.enqueue({ requestKey: "sync", sessionId: "s1" });
+  store.enqueue({ requestKey: "other-agent", sessionId: "s1", agentId: "claude" });
+  store.enqueue({ requestKey: "other-session", sessionId: "s2" });
+  store.clearSession("s1", "session-stopped", "codex", new Set(["async"]));
+  assert.equal(store.size, 3);
+  assert.equal(store.current.requestKey, "async");
+  assert.equal(timers[0].cleared, false);
+  assert.equal(timers[1].cleared, true);
+  store.clearSession("s1", "new-prompt", "codex", new Set(["async"]));
+  assert.equal(store.size, 3);
+  const finalized = [];
+  store.on("finalized", event => finalized.push(event));
+  store.resolve("async", { answerAvailable: false }, "expired");
+  assert.equal(finalized[0].reason, "expired");
+  assert.equal(store.current.requestKey, "other-agent");
+});
+
 test("keeps bounded structured questions for the native-like reminder layout", () => {
   const { store } = fixture();
   store.enqueue({

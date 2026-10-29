@@ -1,8 +1,55 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-22 (0.6.3 desktop and Android published)
+Updated: 2026-10-29 (Codex async input reminders; source change after 0.6.3)
 Current version: `0.6.3`
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-10-29 — Codex async questions and phone notifications
+
+The owner requested phone notifications for Codex mid-turn questions. The
+read-only session monitor now recognizes `request_user_input_async`, its `title`
+and string-option schema, and the immediate `accepted: true` acknowledgement.
+The acknowledgement does not resolve a question. Exact user-role
+`send_user_message_question_reply` records resolve questions by file, call ID
+and question index; multi-question requests wait for every answer. Parsing,
+question/option display and answer lengths are bounded. Truncated forms cannot
+be marked answered from only the displayed subset. Malformed replies, unrelated
+messages and other sessions cannot resolve the pending request.
+
+Async reminders survive Stop and unrelated UserPromptSubmit hooks. The monitor
+is scanned before lifecycle cleanup so replies already written to disk are
+handled first. Sync reminders retain their existing cleanup rules. Desktop and
+phone delivery are tracked independently: desktop reminders may be disabled,
+and phone dismissal does not cause re-delivery on the next scan. Phone input
+events use the existing encrypted notification/detail protocol with no answer
+authority. Async events use the remaining recovery window (at most 30 minutes)
+instead of the ordinary two-minute mobile input expiry. Timeout is recorded as
+expired, not answered.
+
+Verification:
+
+- Desktop tests: 248 passed, one existing Windows platform skip. New coverage
+  includes ack-before-answer, partial/multi-question replies, wrong identities,
+  incomplete JSONL, recovery without flashing answered history, bounded forms,
+  expiry, independent local/phone delivery and preserved FIFO entries.
+- Protocol tests: all six passed. The remote integration test decrypts the
+  actual notification preview and event detail, exercises cloud event.upsert
+  publication and revision deduplication, and verifies resolution while desktop
+  reminders are disabled. It uses synthetic identities and an in-memory socket.
+- Read-only replay of nine real local async requests from October 22, 25 and 26
+  detected all nine and matched all nine replies; no phone notifications were
+  sent and no conversation text was saved to the repository.
+- Windows directory packaging and packaged-resource verification passed at
+  `dist/codex-async-input/win-unpacked`. All four changed production modules
+  match the ASAR contents; the packaged monitor passes a synthetic mobile-only
+  request/ack/reply smoke check.
+
+No Android update, relay deployment, protocol migration or re-pairing is needed.
+Hook commands/trust are unchanged. This is a source change only: no version
+bump, tag, public release or installed-desktop replacement. Real phone/watch
+background push, notification removal and installed-client acceptance remain
+pending after updating the desktop; encrypted payload tests and historical
+replay do not substitute for physical-device delivery.
 
 ## 2026-10-22 — 0.6.3 desktop and Android publication
 

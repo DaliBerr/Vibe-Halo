@@ -637,10 +637,17 @@ function startApplication() {
     const sessionId = typeof data.sessionId === "string" ? data.sessionId
       : (typeof data.session_id === "string" ? data.session_id : `${agentId}:unknown`);
     rememberAgentOrigin({ ...data, agentId, sessionId });
+    // Async Codex questions can remain unanswered across prompts and turn completion.
+    // Read replies before taking the preservation snapshot (the hook may win the poll).
+    const preserveInputKeys = new Set();
+    if (agentId === "codex" && ["UserPromptSubmit", "Stop"].includes(data.event) && inputMonitor) {
+      inputMonitor.scanNow(true);
+      for (const key of inputMonitor.pendingAsyncRequestKeys(sessionId)) preserveInputKeys.add(key);
+    }
     if (data.event === "UserPromptSubmit") {
-      remote?.resolveSessionReminders(agentId, sessionId);
+      remote?.resolveSessionReminders(agentId, sessionId, preserveInputKeys);
       completions.clear("new-prompt", sessionId, agentId);
-      inputRequests.clearSession(sessionId, "new-prompt", agentId);
+      inputRequests.clearSession(sessionId, "new-prompt", agentId, preserveInputKeys);
       return;
     }
     if (data.event === "PermissionRequest" && descriptor.capabilities.passiveApproval) {
@@ -660,9 +667,9 @@ function startApplication() {
     if (data.event !== "Stop") return;
     const remoteCompletion = completionFromStop(data, descriptor, sessionId);
     if (!remoteCompletion) return;
-    remote?.resolveSessionReminders(agentId, sessionId);
+    remote?.resolveSessionReminders(agentId, sessionId, preserveInputKeys);
     remote?.recordReminder(remoteCompletion, remoteCompletion.completionKind === "plan" ? "plan" : "completion");
-    inputRequests.clearSession(sessionId, "session-stopped", agentId);
+    inputRequests.clearSession(sessionId, "session-stopped", agentId, preserveInputKeys);
     if (approvals.size > 0 || inputRequests.size > 0) return;
     completions.show(remoteCompletion);
   }
@@ -748,8 +755,8 @@ function startApplication() {
 
     inputMonitor = new CodexInputMonitor({
       logger,
+      onRemoteRequested: request => remote?.recordReminder({ ...request, agentId: "codex" }, "input"),
       onRequested: request => {
-        remote?.recordReminder({ ...request, agentId: "codex" }, "input");
         if (!settings.get("inputReminderEnabled")) return false;
         const origin = sessionOrigins.get("codex", request.sessionId);
         return !!inputRequests.enqueue({
@@ -762,8 +769,8 @@ function startApplication() {
         }).entry;
       },
       onResolved: request => {
-        remote?.resolveReminder(request.requestKey);
-        return inputRequests.resolve(request.requestKey, { answers: request.answers, answerAvailable: request.answerAvailable });
+        remote?.resolveReminder(request.requestKey, request.reason);
+        return inputRequests.resolve(request.requestKey, { answers: request.answers, answerAvailable: request.answerAvailable }, request.reason);
       },
     });
     inputMonitor.start();

@@ -82,6 +82,98 @@ test("a Codex chat title reaches the mobile record and encrypted notification pr
   }
 });
 
+test("async Codex questions reach encrypted mobile notifications and survive turn cleanup with desktop reminders off", async t => {
+  const { remote, directory } = await fixture(t);
+  remote.queuePublish = () => {}; // Publish explicitly so the test controls revision ordering.
+  const { CodexInputMonitor } = require("../src/codex-input-monitor");
+  const { validate } = require("../packages/protocol");
+  const sessionsDir = path.join(directory, "sessions"); fs.mkdirSync(sessionsDir);
+  const file = path.join(sessionsDir, "rollout-async.jsonl");
+  const record = payload => JSON.stringify({ type: "response_item", timestamp: new Date().toISOString(), payload }) + "\n";
+  const sessionId = "codex:async-mobile";
+  const monitor = new CodexInputMonitor({ sessionsDir,
+    onRemoteRequested: request => remote.recordReminder({ ...request, agentId: "codex" }),
+    onRequested: () => false,
+    onResolved: request => remote.resolveReminder(request.requestKey, request.reason),
+  });
+  t.after(() => monitor.stop());
+  fs.writeFileSync(file, JSON.stringify({ type: "session_meta", payload: { id: "async-mobile" } }) + "\n"
+    + record({ type: "function_call", name: "request_user_input_async", call_id: "async-mobile-call",
+      arguments: JSON.stringify({ questions: [{ title: "报告需要哪种格式？", options: ["PDF", "Word"] }] }) })
+    + record({ type: "function_call_output", call_id: "async-mobile-call", output: '{"accepted":true}' }));
+  monitor.scanNow(true); monitor.scanNow();
+  assert.equal(remote.journal.events.size, 1);
+  const value = remote.journal.list()[0], eventId = value.summary.eventId;
+  assert.equal(validate("eventDetail", value).ok, true);
+  assert.equal(value.summary.kind, "input");
+  assert.equal(value.summary.state, "pending");
+  assert.equal(value.remoteActionable, false);
+  assert.equal(value.summary.actionable, false);
+  assert.match(value.toolInputText, /报告需要哪种格式？/);
+  assert.match(value.toolInputText, /PDF/);
+  assert.ok(Date.parse(value.summary.expiresAt) - Date.now() > 25 * 60000);
+  assert.equal(Object.hasOwn(value, "asynchronous"), false);
+  const mobile = await remote.crypto.generateIdentity("mobile");
+  const binding = { bindingId: crypto.randomUUID(), revision: 1, mobile: await remote.crypto.publicDevice(mobile), scopes: ["events.read"] };
+  const encrypted = await remote.encryptNotification(value, binding);
+  const decoded = await remote.crypto.open(encrypted, mobile.encryptionKey, remote.state.identity.signKey, "notification-preview");
+  assert.equal(decoded.kind, "input");
+  assert.equal(decoded.preview.agent, "Codex");
+  assert.match(decoded.preview.text, /报告需要哪种格式？/);
+  assert.equal(encrypted.includes("报告"), false);
+  binding.state = "active";
+  remote.state.bindings.push(binding);
+  const sent = [];
+  remote.socket = { readyState: 1, terminate() {}, send(_message, callback) { callback?.(); } };
+  remote.send = message => { sent.push(message); return true; };
+  await remote.publishAll();
+  await remote.publishAll();
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].type, "event.upsert");
+  assert.equal(sent[0].summary.kind, "input");
+  assert.equal(sent[0].notificationPreviews[0].mobileId, mobile.deviceId);
+  const ordinary = remote.recordReminder({ agentId: "codex", sessionId, requestKey: "ordinary", content: "old reminder" });
+  const other = remote.recordReminder({ agentId: "codex", sessionId: "codex:other", requestKey: "other", content: "other chat" });
+  remote.resolveSessionReminders("codex", sessionId, monitor.pendingAsyncRequestKeys(sessionId));
+  assert.equal(remote.journal.events.get(eventId).summary.state, "pending");
+  assert.equal(remote.journal.events.get(ordinary).summary.state, "resolved");
+  assert.equal(remote.journal.events.get(other).summary.state, "pending");
+  const reply = [{ questionItemId: JSON.stringify(["request_user_input_async", "async-mobile-call", 0]), answer: "PDF" }];
+  fs.appendFileSync(file, record({ type: "message", role: "user", content: [{ type: "input_text",
+    text: `<send_user_message_question_reply>\n${JSON.stringify(reply)}\n</send_user_message_question_reply>` }] }));
+  monitor.scanNow(); monitor.scanNow();
+  const resolved = remote.journal.events.get(eventId);
+  assert.equal(resolved.summary.state, "resolved");
+  assert.equal(resolved.summary.eventRevision, 2);
+  await remote.publishAll();
+  const updates = sent.filter(message => message.summary.eventId === eventId);
+  assert.equal(updates.length, 2);
+  assert.equal(updates[1].summary.state, "resolved");
+  const page = await remote.eventsFor(binding);
+  const mobileEvent = page.events.find(item => item.summary.eventId === eventId);
+  const detail = await remote.crypto.open(mobileEvent.envelope, mobile.encryptionKey, remote.state.identity.signKey);
+  assert.equal(detail.detail.summary.state, "resolved");
+  assert.equal(detail.detail.remoteActionable, false);
+  // A phone-side dismissal removes its source mapping; polling must not recreate it.
+  fs.appendFileSync(file, record({ type: "function_call", name: "request_user_input_async", call_id: "dismissed-call",
+    arguments: JSON.stringify({ questions: [{ title: "Another question?" }] }) }));
+  monitor.scanNow();
+  const dismissedKey = [...monitor.pendingAsyncRequestKeys(sessionId)][0];
+  remote.resolveReminder(dismissedKey);
+  const countAfterDismiss = remote.journal.events.size;
+  monitor.scanNow(); monitor.replayPending();
+  assert.equal(remote.journal.events.size, countAfterDismiss);
+});
+
+test("async mobile reminder expiry is bounded and reports expiry without an answer", async t => {
+  const { remote } = await fixture(t);
+  const id = remote.recordReminder({ requestKey: "async-expiry", asynchronous: true, expiresAt: Date.now() + 86400000, content: "Question" });
+  assert.ok(Date.parse(remote.journal.events.get(id).summary.expiresAt) <= Date.now() + 30 * 60000);
+  remote.resolveReminder("async-expiry", "expired");
+  assert.equal(remote.journal.events.get(id).summary.state, "expired");
+  assert.equal(remote.journal.events.get(id).summary.eventRevision, 2);
+});
+
 test("image queries bind snapshots to the record, PC epoch, current local grants and encrypted response", async t => {
   const { remote, directory, approvals } = await fixture(t), c = remote.crypto, mobile = await c.generateIdentity("mobile");
   const binding = { bindingId: crypto.randomUUID(), revision: 1, state: "active", mobile, scopes: ["events.read"] };

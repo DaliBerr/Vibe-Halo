@@ -121,9 +121,9 @@ class InputRequestStore extends EventEmitter {
     return { entry: item, duplicate: false };
   }
 
-  resolve(requestKey, result = {}) {
+  resolve(requestKey, result = {}, reason = "answered") {
     const item = this.byRequestKey.get(requestKey);
-    return item ? this.removeById(item.id, "answered", result) : false;
+    return item ? this.removeById(item.id, reason, result) : false;
   }
 
   dismiss(id) {
@@ -175,11 +175,11 @@ class InputRequestStore extends EventEmitter {
     return true;
   }
 
-  clearSession(sessionId, reason = "session-cleared", agentId = null) {
+  clearSession(sessionId, reason = "session-cleared", agentId = null, preserveKeys = new Set()) {
     const normalized = clean(sessionId, 240);
     if (!normalized) return false;
     const normalizedAgent = clean(agentId, 80);
-    const removed = this.queue.filter(item => item.sessionId === normalized && (!normalizedAgent || item.agentId === normalizedAgent));
+    const removed = this.queue.filter(item => item.sessionId === normalized && (!normalizedAgent || item.agentId === normalizedAgent) && !preserveKeys.has(item.requestKey));
     if (removed.length === 0) return false;
     for (const item of removed) {
       this.byRequestKey.delete(item.requestKey);
@@ -188,7 +188,7 @@ class InputRequestStore extends EventEmitter {
         entry: finalizedItem(item), reason, answers: {}, answerAvailable: false, finalizedAt: this.now(),
       });
     }
-    this.queue = this.queue.filter(item => item.sessionId !== normalized || (normalizedAgent && item.agentId !== normalizedAgent));
+    this.queue = this.queue.filter(item => !removed.includes(item));
     this.emit("changed", this.snapshot(), reason);
     return true;
   }
