@@ -1,25 +1,37 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-29 (0.6.4 Windows desktop release preparation)
+Updated: 2026-10-29 (0.6.4 Windows desktop published)
 Current version: `0.6.4` (desktop); `0.6.3` (Android and macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
 
-## 2026-10-29 — 0.6.4 Windows desktop release preparation
+## 2026-10-29 — 0.6.4 Windows desktop publication
 
 The owner authorized a new desktop release to test async Codex notifications on
 the phone. Version 0.6.4 contains the verified async reminder implementation
-below and version/documentation updates only. Publish Windows stable through
-the existing GitHub update channel; Android remains 0.6.3, with no APK rebuild,
+below and version/documentation updates only. Published `v0.6.4` at commit
+`cca1ff6` through the existing Windows stable update channel. Android remains 0.6.3, with no APK rebuild,
 relay deployment or re-pairing. macOS/Linux preview links remain at 0.6.3.
 
 Local release checks passed: `npm ci`; desktop tests (248 passed, one existing
 Windows skip); all six protocol tests; normal package verification; stable
 update-enabled package verification; NSIS installer generation plus regenerated
 blockmap, `latest.yml` and SHA-256 checksums. Both directory builds use the
-unchanged locked dependencies. Public artifact verification will be recorded
-after publication. Physical phone/watch background delivery remains owner
-acceptance after updating the desktop. Do not replace the owner's installed
-desktop as part of publication; the owner will exercise its update flow.
+unchanged locked dependencies. Stable workflow `40932094994` passed, including
+update configuration checks and silent install/uninstall verification. The
+underlying feature's cross-platform run `40931155996` and mobile/relay run
+`40931156021` also passed. Redundant same-commit feature checks and the release
+commit's duplicate main preview run were cancelled; no preview tag was created.
+
+Downloaded and verified all six public stable assets against GitHub SHA-256
+digests, all three SHA256SUMS entries, and the installer's SHA-512/size against
+`latest.yml`. GitHub Latest resolves to `v0.6.4`, non-draft and non-prerelease.
+Published LICENSE and NOTICE text match the tagged source (normalizing the
+Windows checkout's LICENSE line endings). Bilingual release notes link Android
+0.6.3 and explain that only Windows desktop needs updating.
+
+The owner's installed desktop was left unchanged so the owner can exercise its
+update flow. Physical phone/watch background delivery remains owner acceptance
+after updating the desktop.
 
 ## 2026-10-29 — Codex async questions and phone notifications
 
