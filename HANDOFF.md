@@ -1,6 +1,6 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-01 (Android 0.6.6 in-app updater replacement preparation)
+Updated: 2026-11-01 (Android 0.6.6 in-app updater replacement published)
 Current version: `0.6.6` (Windows and Android); `0.6.3` (macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
 
@@ -40,8 +40,22 @@ loaded repository and invalidates that synthetic fixture's startup assumption.
 The final APK signature matches the existing public APK and its Firebase release
 configuration, package, version and ZIP alignment checks passed. APK SHA-256:
 `7d58343ad07fcff242a5d24f6ec46d7193287dbbd7899603b430aad2ad94b792`.
-Replacement publication and public download verification are pending. Existing
-0.6.6 users must install this replacement APK once to obtain the update entry.
+Published the replacement APK, `android-update.json` and updated checksums on the
+existing `v0.6.6` release from Android source
+`eba4f6e601d0f9e49dfd67356dc92fa43f2af47e`. Main mobile/relay CI `41294478005`
+passed both jobs. Downloaded the public replacement and metadata again: their
+GitHub digests, all five checksum entries, source/build/package fields, APK size
+and original v2/v3 signing certificate agree. The signed release also upgraded
+the emulator from versionCode 6 to 7 and launched successfully. All existing
+Windows/license asset IDs and digests match the pre-replacement release; the
+desktop tag still points to `f8edab1`. No Windows rebuild, tag movement, relay
+deployment or physical-phone installation was performed.
+
+Existing 0.6.6 users must install this replacement APK once to obtain the update
+entry. Future checks/downloads happen in Devices → App updates. OEM-specific
+source permission and real-phone network/installation remain owner acceptance
+checks. The original 0.6.6 publication entry below records the superseded
+versionCode 6 APK and its original checksum.
 
 ## 2026-11-01 — 0.6.6 Windows and Android publication
 
