@@ -115,6 +115,9 @@ class CompanionMessagingService : FirebaseMessagingService() {
             NotificationTiming.record("android_decrypted", message.data, "fcm", timingStart)
             val result = CompanionNotifications.show(this, message.data - "preview", preview, "fcm")
             NotificationTiming.record("android_result_$result", message.data, "fcm", timingStart)
+            if (result in setOf("notification_posted", "suppressed_by_user")) {
+                NotificationSync.enqueue(this, message.data, message.priority == RemoteMessage.PRIORITY_HIGH)
+            }
         }.onFailure { NotificationTiming.record("android_processing_failed", message.data, "fcm", timingStart) }
     }
     @Suppress("OVERRIDE_DEPRECATION")

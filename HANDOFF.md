@@ -1,8 +1,55 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-10-29 (0.6.5 Windows desktop published)
+Updated: 2026-11-01 (Android notification-triggered message cache; unreleased)
 Current version: `0.6.5` (desktop); `0.6.3` (Android and macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-01 — Android notification-triggered background message cache
+
+The owner reported delayed phone message synchronization and requested syncing
+the newest message when its notification arrives. Inspection confirmed that
+`CompanionMessagingService` only decrypted/displayed a short preview, while full
+event refresh ran only with the Activity started. `onStop` closed live sockets;
+there was no notification-triggered detail fetch. Full encrypted event details
+were already available from the existing relay events endpoint.
+
+FCM handling now displays the notification first, then queues a unique one-time
+WorkManager job for that PC/epoch/event/revision. Android 12+ uses expedited work
+for high-priority FCM with ordinary-work fallback; older versions use ordinary
+work. Jobs require connectivity and retry at most three times after the initial
+attempt. They fetch only the corresponding event, paging if necessary, and verify
+the existing binding, signature, recipient, summary, epoch and revision before
+persisting full details in the encrypted cache. Work input contains only bounded
+routing metadata; no body, preview, credential or remote-supplied URL is stored.
+
+The worker shares the application's repository/mutex with the UI, preventing a
+separate stale cache from overwriting newer events or revoked grants. Background
+load preserves an already running foreground lifecycle. The job skips clock,
+history and image queries, profile/push-token maintenance, discovery, socket
+subscriptions and decision submission.
+Background-cached events have no actionable clock; opening the app still refreshes
+current status/authority. Existing notification deduplication remains in place.
+Content-free `android_sync_queued/start/synced/retry/ignored` timing stages allow
+follow-up measurement. The desktop, relay and protocol payloads are unchanged.
+
+Verification: desktop tests passed (252 pass, one existing Windows skip), all six
+protocol tests passed, and all 10 Android JVM tests passed. Debug APK, test APK and
+minified unsigned release APK assembly plus debug/release lint passed (zero
+errors; existing code/dependency notices remain). Android emulator tests passed:
+four new cases cover the actual FCM callback -> WorkManager -> authenticated
+paginated fetch -> verified encrypted cache -> fresh repository reload without
+opening an Activity, newer terminal revisions and duplicate delivery, bad
+signatures/wrong epochs/network errors/revocation, and foreground lifecycle/unknown
+PC handling. The six existing notification safety tests also passed. The relay in
+these tests is synthetic and loopback-only; no real pairing or user message data
+is used.
+
+No version bump, public APK release, relay deployment, desktop replacement or
+phone installation is included. An updated Android APK is required to enable this
+behavior on the owner's phone, with no re-pairing or desktop/relay update needed.
+Real FCM receipt, expedited scheduling under Doze/HyperOS and phone/watch delivery
+remain physical-device acceptance checks; emulator callback tests do not measure
+those delivery delays.
 
 ## 2026-10-29 — 0.6.5 Windows release
 

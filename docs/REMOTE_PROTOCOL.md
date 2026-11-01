@@ -241,6 +241,17 @@ for a network request, following Firebase's [data message](https://firebase.goog
 and [priority guidance](https://firebase.google.com/docs/cloud-messaging/android-message-priority).
 Late reminders cannot restore old authority when opened.
 
+After notification handling, a bounded one-time WorkManager job reads the pushed
+event through the authenticated cloud events endpoint. Push metadata is only a
+routing hint: the local active `events.read` binding determines the relay origin,
+and the full encrypted event must pass the normal signature, recipient, binding,
+summary, epoch and revision checks before caching. Only metadata enters the work
+database. The job shares the application repository/mutex, fetches no clock or
+history and opens no socket, and cannot submit decisions. Background-cached events
+have no actionable clock; foreground refresh still verifies current authority.
+No push payload or relay API changes are required. High-priority work is expedited
+on Android 12+ with ordinary-work fallback; retries are bounded to four attempts.
+
 Push tokens are encrypted in D1 with independent AES-256-GCM and device-ID AAD.
 Token rotation/preferences/revocations retry on foreground sync; token rotation
 also schedules bounded network-constrained WorkManager maintenance (five attempts,

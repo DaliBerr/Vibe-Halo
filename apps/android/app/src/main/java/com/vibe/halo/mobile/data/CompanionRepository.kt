@@ -58,7 +58,7 @@ class CompanionRepository(private val context: Context) {
     private var pairingOffer: JSONObject? = null
     private var confirmedGrant: JSONObject? = null
     private var loaded = false
-    @Volatile private var foreground = true
+    @Volatile private var foreground = false
     private val cloud = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS).callTimeout(12, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build()
     val discovery = LanDiscovery(context)
     private class Account(val origin: String, val store: SecureStore, val crypto: DeviceCrypto) {
@@ -70,8 +70,8 @@ class CompanionRepository(private val context: Context) {
         val store = SecureStore(context, origin); Account(origin, store, DeviceCrypto(context, store))
     }
     suspend fun load(startDiscovery: Boolean = true) = operation {
-        foreground = startDiscovery
         if (loaded) { if (startDiscovery) discovery.start(); return@operation }
+        foreground = startDiscovery
         mutable.value = mutable.value.copy(loadError = false, computers = emptyList(), events = emptyList())
         val saved = registry.read()
         for (raw in saved.optJSONArray("origins")?.values().orEmpty()) {
@@ -198,7 +198,50 @@ class CompanionRepository(private val context: Context) {
         }
         prune(); persistEvents()
     }
-    private fun consume(account: Account, computer: Computer, event: JSONObject) {
+    /** Fetch only the pushed event, without profile/token maintenance, clocks,
+     * history queries, discovery, socket subscriptions or decision submission. */
+    suspend fun syncNotification(target: NotificationSyncTarget): NotificationSyncResult = withContext(Dispatchers.IO) {
+        val coroutine = kotlinx.coroutines.currentCoroutineContext()
+        mutex.withLock {
+            val computers = mutable.value.computers.filter { it.pcId == target.pcId && it.state == "active" && it.permits("events.read") }
+            if (computers.isEmpty()) return@withLock NotificationSyncResult.IGNORED
+            var retry = false
+            for (computer in computers) {
+                val account = account(computer.origin)
+                try {
+                    val cached = mutable.value.events.find { it.computerKey == computer.key && it.summary.getString("eventId") == target.eventId }
+                    if (cached != null && matchesNotification(cached.summary, target)) {
+                        prune(); persistEvents()
+                        return@withLock NotificationSyncResult.SYNCED
+                    }
+                    var offset: Int? = 0
+                    while (offset != null) {
+                        coroutine.ensureActive()
+                        val response = request(account, "/v1/pcs/${computer.pcId}/events?offset=$offset")
+                        val events = response.getJSONArray("events"); require(events.length() <= 50)
+                        for (raw in events.values()) {
+                            val event = raw as JSONObject
+                            if (!matchesNotification(event.getJSONObject("summary"), target)) continue
+                            consume(account, computer, event, if (foreground) SystemClock.elapsedRealtime() else 0)
+                            prune(); persistEvents()
+                            return@withLock NotificationSyncResult.SYNCED
+                        }
+                        val next = if (response.isNull("nextOffset")) null else response.getInt("nextOffset")
+                        require(next == null || next > offset && next <= 500) { "invalid_cursor" }; offset = next
+                    }
+                    retry = true
+                } catch (error: Exception) {
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    if (error is ApiError && error.status == 403) revokeLocally(computer) else retry = true
+                }
+            }
+            if (retry) NotificationSyncResult.RETRY else NotificationSyncResult.IGNORED
+        }
+    }
+    private fun matchesNotification(summary: JSONObject, target: NotificationSyncTarget): Boolean =
+        summary.getString("pcId") == target.pcId && summary.getString("pcSessionEpoch") == target.epoch &&
+            summary.getString("eventId") == target.eventId && summary.getLong("eventRevision") >= target.revision && summary.getString("kind") == target.kind
+    private fun consume(account: Account, computer: Computer, event: JSONObject, received: Long = SystemClock.elapsedRealtime()) {
         val message = account.crypto.open(event.getString("envelope"), computer.grant.getJSONObject("pc").getJSONObject("signKey"))
         bound(message, computer, account, "event.detail")
         val detail = message.getJSONObject("detail"); wire.validate("event-detail", detail)
@@ -212,7 +255,6 @@ class CompanionRepository(private val context: Context) {
             if (previous.summary.getLong("eventRevision") > summary.getLong("eventRevision")) return
             if (previous.summary.getString("state") != "pending" && summary.getString("state") == "pending") return
         }
-        val received = SystemClock.elapsedRealtime()
         val value = RemoteEvent(key, computer.key, detail, received)
         mutable.value = mutable.value.copy(events = mutable.value.events.filterNot { it.key == key } + value)
     }

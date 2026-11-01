@@ -277,6 +277,21 @@ foreground app falls back to the configured cloud relay. Do not open router port
 or expose the local Hook listener. Android background notifications use FCM even
 on the same Wi-Fi; there is no permanent background socket/approval poller.
 
+After displaying an app-managed FCM notification, Android schedules a one-time
+WorkManager fetch for that event's full encrypted detail. It uses the existing
+paired relay and verifies the binding, signature, PC epoch and event revision
+before saving the message in the encrypted local cache. Opening the notification
+can show cached text while foreground refresh checks the current status. This
+does not prefetch images or original computer history, and never grants cached
+approvals permission to execute. On Android 12+, high-priority FCM schedules
+expedited work with an ordinary-work fallback; older Android uses ordinary work.
+Offline requests wait for connectivity and retry at most three times after the
+initial attempt. Duplicate in-flight deliveries share one job per event revision.
+The foreground and worker share a repository to avoid stale cache overwrites.
+An updated Android build is required; the existing desktop and relay need no
+protocol changes or re-pairing. FCM arrival and OS background scheduling can still
+be delayed by connectivity, quotas or device power settings.
+
 The Pending page aggregates bound PCs while keeping their queues separate. History
 separates recent synced events (24 hours) from original computer history (up to
 30 days/200 records per PC). Opening History loads authorized online PCs; Refresh
