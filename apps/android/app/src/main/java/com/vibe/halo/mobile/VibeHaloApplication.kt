@@ -8,6 +8,7 @@ import com.vibe.halo.mobile.notifications.CompanionNotifications
 
 class VibeHaloApplication : Application() {
     val repository by lazy { CompanionRepository(this) }
+    val appUpdates by lazy { com.vibe.halo.mobile.updates.AppUpdateManager(this) }
     override fun onCreate() {
         super.onCreate()
         UiLanguage.mode = getSharedPreferences("ui-preferences", MODE_PRIVATE).getString("language", "system") ?: "system"

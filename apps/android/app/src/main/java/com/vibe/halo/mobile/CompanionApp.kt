@@ -82,6 +82,7 @@ import kotlinx.coroutines.launch
                         scope.launch { repo.loadHistoryDetail(item.computerKey, id) }
                     })
                     else -> {
+                        AppUpdateCard()
                         DeviceNameCard(state, repo)
                         Row { for ((label, mode) in listOf("跟随系统" to "system", "中文" to "zh-CN", "English" to "en-US")) TextButton(onClick = {
                             UiLanguage.mode = mode; context.getSharedPreferences("ui-preferences", Context.MODE_PRIVATE).edit().putString("language", mode).apply()

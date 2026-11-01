@@ -72,3 +72,30 @@ public download. Attach the locally verified, original-key-signed
 an Android preview. Publish its SHA-256 checksum alongside the existing desktop
 checksums without changing `latest.yml` or the installer blockmap. Keep remaining
 physical-device checks explicit in the release notes.
+
+### Android in-app update metadata
+
+After signing and verifying the APK, generate `android-update.json` with
+`scripts/generate-android-update-metadata.js`. Pass `--apk`, `--version-name`,
+`--version-code`, and the full committed Android source SHA via `--source-commit`.
+The script binds the expected public filename, package ID, build code, byte size,
+SHA-256 and source commit. It writes beside the APK, or under `--out-dir`.
+Upload the APK and this manifest to the same stable release, then update
+`SHA256SUMS.txt` to include both. Preserve existing Windows checksums and update
+metadata. The application scans up to 20 stable releases and skips releases that
+have no Android manifest; GitHub's asset digests, the manifest and the APK must
+agree before an update can be offered and installed.
+
+The Devices page offers explicit check, download and install actions. APKs are
+bounded to 64 MiB and checked again against their metadata, installed package,
+newer versionCode and current signing certificates before a read-only FileProvider
+URI is passed to Android's installer. The initial source permission and each
+installation require Android confirmation. Updates never use companion traffic,
+pairing credentials, approvals, or remote control.
+
+Published tags remain immutable. If the owner explicitly requests replacing an
+Android asset under an existing visible version, increment Android versionCode,
+retain versionName and the signing key, and record the new source commit in the
+manifest and release notes. Replace only the Android assets and their checksum
+entries; verify that the existing Windows assets remain byte-identical. The
+0.6.6 replacement uses versionCode 7; its original desktop tag remains unchanged.

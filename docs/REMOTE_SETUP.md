@@ -367,6 +367,20 @@ shape, not the deployed Worker or physical-phone network behavior.
 
 ## Real-device acceptance
 
+### Android in-app updates
+
+The 0.6.6 replacement APK (versionCode 7) adds **Devices → App updates**. Install
+that original-key APK once; subsequent signed releases can be checked and
+downloaded inside the application. Android still asks for source permission on
+first use and confirms each installation. Pairing and message caches survive a
+normal in-place upgrade. Check/download failures can be retried without visiting
+GitHub; downloads use the public GitHub release service and still need network
+access to it. The updater is separate from companion authentication and sends no
+pairing credentials or task content. APKs must match release digests and the
+currently installed application and signing identity before installation.
+
+### Device notification acceptance
+
 Test a synthetic request before any real command. Record phone model/Android/GMS,
 watch model/system and companion-app notification settings. Check same Wi-Fi
 foreground, Wi-Fi background/lock, cellular, denied notification permission,

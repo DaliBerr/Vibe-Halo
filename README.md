@@ -32,6 +32,7 @@ Windows packages may show an unknown-publisher warning. Preview desktop packages
 - Desktop 0.6.6 gives the island a wider shadow; clicks in its shadow and transparent rounded corners reach the window behind it.
 - Paired Android notifications, explicitly authorized remote control, readable history cards and editable device names.
 - Android 0.6.6 fetches and encrypts the full message in the background after a notification arrives, showing cached content on opening while refreshing its current status. Upgrade the APK to enable this behavior; existing pairing is preserved.
+- The Android 0.6.6 replacement build adds **Devices → App updates**: check for a release, download its verified APK in the app, then confirm installation with Android. Install this replacement APK once to enable future in-app updates; its visible version remains 0.6.6.
 - Phone/watch notifications show the client and a short task preview; updated phones deduplicate LAN/cloud delivery, and Codex follow-up suggestions no longer trigger completion alerts.
 - Markdown and Codex cards in phone records; encrypted project-image snapshots from new completion/plan records, with tap-to-zoom viewing.
 - Codex completion/plan titles use the local chat-name index when available. Phone record details show a compact colored status badge below the title; list cards show a matching status dot and short label.

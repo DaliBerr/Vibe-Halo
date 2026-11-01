@@ -1,8 +1,47 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-01 (0.6.6 Windows and Android publication verified)
+Updated: 2026-11-01 (Android 0.6.6 in-app updater replacement preparation)
 Current version: `0.6.6` (Windows and Android); `0.6.3` (macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-01 — Android 0.6.6 in-app updater replacement
+
+The owner explicitly requested in-app Android updates and replacement of the
+existing 0.6.6 download without changing its visible version. Android versionName
+stays 0.6.6 and versionCode advances from 6 to 7. The original signing identity
+and application ID are retained. The existing `v0.6.6` tag and Windows release
+assets must remain unchanged; the Android manifest and release notes identify
+the newer Android source commit independently.
+
+Devices now contains an App updates card with explicit check, download, cancel
+and install actions. It scans up to 20 stable GitHub releases, skips desktop-only
+and prerelease entries, and downloads only from bounded HTTPS GitHub endpoints.
+GitHub asset digests, a new `android-update.json`, streamed SHA-256/size checks,
+native APK package/version/min-SDK and current signing certificates must agree.
+Packages are checked again before installation. Only a read-only URI under a
+dedicated APK cache is granted to Android's installer. Initial source permission
+and installation confirmation remain Android-controlled. Verified downloads
+restore after process recreation, including source-permission changes that can
+restart the app. Pairing credentials, companion traffic and decisions are not
+used by the updater. `scripts/generate-android-update-metadata.js` and the release
+guide cover future signed APK publication.
+
+Local verification passed: desktop tests (258 pass, one existing Windows skip),
+all 13 Android JVM tests, Firebase-configured debug/test and minified release
+builds, both lint variants with zero errors, all six new updater instrumentation
+tests and all 10 notification/background-cache regressions. The updater tests
+exercise the final original-key signed APK, corrupt packages, wrong signers,
+redirect boundaries, interrupted downloads and retry, cache restoration,
+FileProvider scope, large text and actual system-installer confirmation.
+Run the no-Activity notification suite in a fresh instrumentation process:
+combining it after a MainActivity UI test retains the application's already
+loaded repository and invalidates that synthetic fixture's startup assumption.
+
+The final APK signature matches the existing public APK and its Firebase release
+configuration, package, version and ZIP alignment checks passed. APK SHA-256:
+`7d58343ad07fcff242a5d24f6ec46d7193287dbbd7899603b430aad2ad94b792`.
+Replacement publication and public download verification are pending. Existing
+0.6.6 users must install this replacement APK once to obtain the update entry.
 
 ## 2026-11-01 — 0.6.6 Windows and Android publication
 

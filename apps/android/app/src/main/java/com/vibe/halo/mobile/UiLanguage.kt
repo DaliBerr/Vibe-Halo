@@ -8,6 +8,19 @@ import java.util.Locale
 object UiLanguage {
     var mode by mutableStateOf("system")
     private val english = mapOf(
+        "应用更新" to "App updates", "当前版本" to "Current version", "可用版本" to "Available version",
+        "检查更新" to "Check for updates", "下载更新" to "Download update", "安装更新" to "Install update", "允许安装更新" to "Allow update installation",
+        "正在检查更新…" to "Checking for updates…", "已是最新版本" to "You're up to date", "正在下载更新…" to "Downloading update…",
+        "正在校验安装包…" to "Verifying update…", "下载完成，可以安装更新。" to "Download complete. Ready to install.",
+        "首次安装更新需要允许 Vibe Halo 安装应用，随后由系统确认安装。" to "Allow Vibe Halo to install updates first. Android will then ask you to confirm installation.",
+        "更新服务暂时受限，请稍后重试。" to "The update service is rate limited. Please try again later.",
+        "更新信息校验失败，请稍后重新检查。" to "Update information could not be verified. Check again later.",
+        "安装包校验失败，请重新下载。" to "The update package could not be verified. Download it again.",
+        "无法打开系统安装程序，请检查安装权限后重试。" to "Could not open the system installer. Check installation permission and try again.",
+        "更新未完成，请检查网络和存储空间后重试。" to "Update incomplete. Check your connection and free space, then try again.",
+        "在应用内下载更新，安装前由系统确认。" to "Download updates here and confirm installation with Android.",
+        "开发版本请使用开发包更新。" to "Use a development package to update this development build.",
+        "此版本有新的更新包。" to "A newer build of this version is available.",
         "图片" to "Image", "查看图片" to "View image", "点击查看大图" to "View full image", "图片大图" to "Full image",
         "图片暂不可用，请确认电脑在线且图片已同步。" to "Image unavailable. Check that the computer is online and the image has synced.",
         "正在加载图片…" to "Loading image…", "图片加载失败" to "Image could not be loaded", "重置" to "Reset",
