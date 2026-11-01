@@ -1,16 +1,16 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-01 (0.6.6 Windows and Android release preparation)
+Updated: 2026-11-01 (0.6.6 Windows and Android publication verified)
 Current version: `0.6.6` (Windows and Android); `0.6.3` (macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
 
-## 2026-11-01 — 0.6.6 Windows and Android release preparation
+## 2026-11-01 — 0.6.6 Windows and Android publication
 
 The owner authorized packaging and publishing both endpoints for combined
 feature testing. Version 0.6.6 includes desktop implementation `8b13f45` and
 Android implementation `c0f52cd`: a wider, click-through island shadow and
 notification-triggered encrypted full-message caching. Android versionCode is 6;
-the release must retain its existing package ID, Firebase configuration and
+the release retains its existing package ID, Firebase configuration and
 original signing identity for an in-place upgrade preserving pairing.
 The existing relay remains compatible and needs no redeployment. macOS/Linux
 preview downloads stay at 0.6.3.
@@ -27,9 +27,24 @@ The signing certificate matches the downloaded public 0.6.3 APK. The signed
 0.6.6 APK also installed over the emulator's 0.6.0 release with `adb install -r`.
 APK SHA-256: `9b404beb4be9f85fbb5b6d7807fa3064300f1ffb3d917b6ef00a923529e766d1`.
 
-Public release publication and downloaded-asset verification are pending.
+Published `v0.6.6` at `f8edab1`. Windows stable workflow `41291224365` passed
+update-enabled packaging, final-byte metadata, silent install/uninstall and
+publication. Main mobile/relay workflow `41291215375` passed both jobs. Redundant
+same-commit branch checks were cancelled in favor of main checks.
+
+Downloaded all seven public assets and verified their GitHub SHA-256 digests,
+all four `SHA256SUMS.txt` entries, and the installer's SHA-512, size, version and
+filename against `latest.yml`. The public APK equals the locally signed bytes;
+its downloaded signature verifies with the original certificate. LICENSE and
+NOTICE match the repository. GitHub Latest resolves to non-draft, non-prerelease
+`v0.6.6`. Bilingual release notes and the labeled Android preview APK are attached
+to the same release; desktop update metadata and blockmap were preserved when
+adding Android's checksum. Installer SHA-256:
+`36484057e7f72b98a333235be390773b77d8e4b722915b2779a4a39fc28a0595`.
+
 Physical phone/watch FCM timing and OEM/Doze background scheduling still need
-owner acceptance. The owner's desktop and physical phone have not been replaced.
+owner acceptance. No relay deployment or macOS/Linux preview publication was
+performed. The owner's desktop and physical phone have not been replaced.
 
 ## 2026-11-01 — Wider island shadow and transparent-area mouse passthrough
 
