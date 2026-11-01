@@ -249,18 +249,21 @@ function measureLineWidth(text, element) {
 }
 
 function desiredDimensions() {
+  const padding = getComputedStyle(document.body);
+  const gutterWidth = parseFloat(padding.paddingLeft) + parseFloat(padding.paddingRight);
+  const gutterHeight = parseFloat(padding.paddingTop) + parseFloat(padding.paddingBottom);
   const item = state?.current;
   const isApproval = item?.type === "approval";
   const widthSource = isApproval ? item.presentation?.primary : "";
   const lineWidth = measureLineWidth(widthSource, primaryCode);
-  const width = Math.max(668, Math.min(808, Math.ceil(lineWidth + 182)));
+  const width = Math.max(620, Math.min(760, Math.ceil(lineWidth + 134))) + gutterWidth;
   const visibleRows = [expanded.querySelector("header"), description.hidden ? null : description, contentPanel, expanded.querySelector("footer")].filter(Boolean);
   const fixedHeight = visibleRows
     .filter(element => element !== contentPanel)
     .reduce((total, element) => total + element.offsetHeight, 0);
   const gaps = Math.max(0, visibleRows.length - 1) * 18;
   const naturalPanelHeight = Math.max(180, Math.min(360, contentPanel.scrollHeight));
-  const height = Math.max(516, Math.min(636, Math.ceil(36 + 48 + fixedHeight + gaps + naturalPanelHeight)));
+  const height = Math.max(480, Math.min(600, Math.ceil(48 + fixedHeight + gaps + naturalPanelHeight))) + gutterHeight;
   return { width, height };
 }
 

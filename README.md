@@ -29,6 +29,7 @@ Windows packages may show an unknown-publisher warning. Preview desktop packages
 - Codex mid-turn async questions also reach the paired phone, even with desktop input reminders disabled. Unanswered async reminders survive turn completion and unrelated prompts, until answered, dismissed or timed out (up to 30 minutes). Requires desktop 0.6.4 or later; Android 0.6.3 and the existing relay remain compatible.
 - Windows 0.6.5 removes repeated external executable lookups during tray refresh, preventing client discovery from blocking phone notification delivery. Stage timing diagnostics help distinguish desktop processing, relay waiting and phone handling.
 - Completion notifications and optional tray-opened recent-event history.
+- The island has a wider shadow; clicks in its shadow and transparent rounded corners reach the window behind it. This desktop improvement is unreleased.
 - Paired Android notifications, explicitly authorized remote control, readable history cards and editable device names.
 - Android fetches and encrypts the full message in the background after a notification arrives, showing cached content on opening while refreshing its current status. This improvement is unreleased and requires a new Android build.
 - Phone/watch notifications show the client and a short task preview; updated phones deduplicate LAN/cloud delivery, and Codex follow-up suggestions no longer trigger completion alerts.

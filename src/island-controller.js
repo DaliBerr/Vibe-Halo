@@ -6,8 +6,8 @@ const { DecisionService, validateDecision } = require("./decision-service");
 const { formatApprovalInput } = require("./approval-presenter");
 const { createLocalizer } = require("./i18n");
 const { locateDisplay } = require("./window-locator");
+const { SHADOW_GUTTER, IslandMousePassthrough } = require("./island-mouse-passthrough");
 
-const SHADOW_GUTTER = Object.freeze({ top: 8, right: 24, bottom: 28, left: 24 });
 const BOUNDS_ANIMATION_MS = 220;
 const BOUNDS_FRAME_MS = 16;
 const COMPACT_CONTENT = Object.freeze({ width: 300, height: 52 });
@@ -16,12 +16,12 @@ const COMPACT = Object.freeze({
   height: COMPACT_CONTENT.height + SHADOW_GUTTER.top + SHADOW_GUTTER.bottom,
 });
 const EXPANDED = Object.freeze({
-  width: 668,
-  height: 516,
-  minWidth: 608,
-  maxWidth: 808,
-  minHeight: 356,
-  maxHeight: 636,
+  width: 620 + SHADOW_GUTTER.left + SHADOW_GUTTER.right,
+  height: 480 + SHADOW_GUTTER.top + SHADOW_GUTTER.bottom,
+  minWidth: 560 + SHADOW_GUTTER.left + SHADOW_GUTTER.right,
+  maxWidth: 760 + SHADOW_GUTTER.left + SHADOW_GUTTER.right,
+  minHeight: 320 + SHADOW_GUTTER.top + SHADOW_GUTTER.bottom,
+  maxHeight: 600 + SHADOW_GUTTER.top + SHADOW_GUTTER.bottom,
 });
 
 function validAnswersPayload(value) {
@@ -138,6 +138,7 @@ class IslandController {
     this.preloadPath = options.preloadPath || path.join(__dirname, "preload.js");
     this.htmlPath = options.htmlPath || path.join(__dirname, "renderer", "index.html");
     this.window = null;
+    this.mousePassthrough = null;
     this.expandedApprovalId = null;
     this.lastApprovalId = null;
     this.currentDisplay = null;
@@ -176,6 +177,7 @@ class IslandController {
       },
     });
     this.window = win;
+    this.mousePassthrough = new IslandMousePassthrough(win, this.screen);
     this.platformAdapter?.configureWindow?.(win);
     try { win.setAlwaysOnTop(true, "pop-up-menu"); } catch {}
     win.setMenuBarVisibility(false);
@@ -365,6 +367,7 @@ class IslandController {
       win.hide();
       return;
     }
+    this.mousePassthrough?.setExpanded(state.mode.endsWith("expanded"));
     win.webContents.send("island:state", state);
     this.refreshPosition(this.activeEntry());
     this.applyBounds();
@@ -506,6 +509,8 @@ class IslandController {
 
   destroy() {
     this.cancelBoundsAnimation();
+    this.mousePassthrough?.destroy();
+    this.mousePassthrough = null;
     for (const dispose of this.disposers.splice(0)) {
       try { dispose(); } catch {}
     }

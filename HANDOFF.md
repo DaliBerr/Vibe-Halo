@@ -1,8 +1,42 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-01 (Android notification-triggered message cache; unreleased)
+Updated: 2026-11-01 (wider island shadow and mouse passthrough; unreleased)
 Current version: `0.6.5` (desktop); `0.6.3` (Android and macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-01 — Wider island shadow and transparent-area mouse passthrough
+
+The owner reported that the island's transparent margin blocked clicks on the
+window underneath, then requested a wider shadow with click-through behavior.
+The shadow now uses a 40 px outer blur (previously 28 px), with 16/40/48/40 px
+top/right/bottom/left gutters. Compact content remains 300 x 52 DIP; expanded
+content limits are preserved by adding the new gutters to the outer window and
+including the renderer's computed padding in its measurements.
+
+`src/island-mouse-passthrough.js` performs main-process hit testing against the
+visible rounded island in DIP and switches `setIgnoreMouseEvents` only when the
+hit state changes. Mouse movement is forwarded on Windows/macOS; a visible-only
+50 ms cursor poll also recovers without forwarding (including Linux and an
+elevated Windows foreground app). Resize/move events keep the hit region aligned
+during bounds animation and display changes. Dragging retains mouse capture until
+release; blur/hide clear capture, and hide/destroy stop polling. No renderer IPC
+or approval/companion/protocol behavior was added or changed.
+
+Verification: all desktop tests passed (257 pass, one existing Windows skip).
+Five new regression tests cover rounded geometry, CSS/content-size agreement,
+forwarded movement, cursor fallback/resize/display/hide/disposal, and drag capture.
+Windows native-input checks on this machine passed with actual clicks on a
+synthetic background window through eight compact/expanded shadow/corner points;
+native expand, copy, collapse, drag-release, hidden-to-visible recovery and
+non-focus-stealing initial display also passed. The local ignored harness and
+dark/light captures are under `.smoke/island-click-through*`.
+The Windows directory build and 0.6.5 package verification passed; the same
+native-input checks also passed against its packaged `app.asar` resources.
+macOS/Linux, additional DPI/multi-monitor configurations and elevated Windows
+foreground apps remain physical-platform acceptance checks.
+
+No version bump, public release or replacement of the owner's running desktop
+is included. Use the new local build or a future desktop release for this change.
 
 ## 2026-11-01 — Android notification-triggered background message cache
 

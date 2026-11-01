@@ -66,7 +66,7 @@ test("a new input reminder drops stale display state and rises without focus", a
   controller.measuredCurrentId = "old-item";
 
   controller.refresh("queued");
-  assert.deepEqual(bounds[0], { x: 326, y: 10, width: 348, height: 88 });
+  assert.deepEqual(bounds[0], { x: 310, y: 10, width: 380, height: 116 });
   assert.equal(showInactiveCount, 1);
   assert.equal(moveTopCount, 1);
   assert.equal(alwaysOnTopCount, 1);
@@ -74,7 +74,7 @@ test("a new input reminder drops stale display state and rises without focus", a
   assert.equal(sent.at(-1)[1].mode, "input-request-compact");
 
   await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(bounds.at(-1), { x: 1426, y: 20, width: 348, height: 88 });
+  assert.deepEqual(bounds.at(-1), { x: 1410, y: 20, width: 380, height: 116 });
 
   controller.refresh("theme");
   assert.equal(moveTopCount, 1);

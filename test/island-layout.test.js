@@ -18,7 +18,7 @@ const display = {
 };
 
 test("centers the larger compact island with its transparent gutter at work-area top", () => {
-  assert.deepEqual(SHADOW_GUTTER, { top: 8, right: 24, bottom: 28, left: 24 });
+  assert.deepEqual(SHADOW_GUTTER, { top: 16, right: 40, bottom: 48, left: 40 });
   assert.equal(COMPACT.width - SHADOW_GUTTER.left - SHADOW_GUTTER.right, COMPACT_CONTENT.width);
   assert.equal(COMPACT.height - SHADOW_GUTTER.top - SHADOW_GUTTER.bottom, COMPACT_CONTENT.height);
   const bounds = calculateBounds("approval-compact", null, display);
