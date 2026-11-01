@@ -1,8 +1,35 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-01 (wider island shadow and mouse passthrough; unreleased)
-Current version: `0.6.5` (desktop); `0.6.3` (Android and macOS/Linux preview)
+Updated: 2026-11-01 (0.6.6 Windows and Android release preparation)
+Current version: `0.6.6` (Windows and Android); `0.6.3` (macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-01 — 0.6.6 Windows and Android release preparation
+
+The owner authorized packaging and publishing both endpoints for combined
+feature testing. Version 0.6.6 includes desktop implementation `8b13f45` and
+Android implementation `c0f52cd`: a wider, click-through island shadow and
+notification-triggered encrypted full-message caching. Android versionCode is 6;
+the release must retain its existing package ID, Firebase configuration and
+original signing identity for an in-place upgrade preserving pairing.
+The existing relay remains compatible and needs no redeployment. macOS/Linux
+preview downloads stay at 0.6.3.
+
+Local release checks passed: clean dependency installation; desktop tests
+(257 pass, one existing Windows skip); all six protocol tests; normal and
+update-enabled Windows package verification; NSIS installer and regenerated
+final-byte update metadata; native-input island checks against the 0.6.6 packaged
+resources; all 10 Android JVM tests; debug/test and minified release assembly;
+debug/release lint with zero errors; and all 10 notification/background-cache
+instrumentation tests on the API 34 emulator. APK signing, 16 KiB ZIP alignment,
+package/version checks and intended release Firebase configuration passed.
+The signing certificate matches the downloaded public 0.6.3 APK. The signed
+0.6.6 APK also installed over the emulator's 0.6.0 release with `adb install -r`.
+APK SHA-256: `9b404beb4be9f85fbb5b6d7807fa3064300f1ffb3d917b6ef00a923529e766d1`.
+
+Public release publication and downloaded-asset verification are pending.
+Physical phone/watch FCM timing and OEM/Doze background scheduling still need
+owner acceptance. The owner's desktop and physical phone have not been replaced.
 
 ## 2026-11-01 — Wider island shadow and transparent-area mouse passthrough
 

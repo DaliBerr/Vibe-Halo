@@ -6,7 +6,7 @@
 
 为 AI 编程客户端提供桌面灵动岛：处理支持的审批和问答，接收待处理提醒与任务完成通知。可选 Android 伴侣支持配对通知、审批和历史记录。
 
-![Version](https://img.shields.io/badge/version-0.6.5-6d7cff)
+![Version](https://img.shields.io/badge/version-0.6.6-6d7cff)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
 ![Vibe Halo 审批界面](docs/assets/vibe-halo-demo.gif)
@@ -18,7 +18,7 @@
 | Windows x64 | [NSIS 安装程序](https://github.com/DaliBerr/Vibe-Halo/releases/latest) | 稳定版；确认重启后安装更新 |
 | macOS 12+ | [Apple Silicon / Intel DMG、ZIP](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | 预览版；仅临时签名，未经公证 |
 | Linux x64 | [AppImage、deb](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | 预览版 |
-| Android 8+ | [原签名伴侣 APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.3/Vibe-Halo-Mobile-0.6.3.apk) | 预览版；小米后台设置仍需真机验证 |
+| Android 8+ | [原签名伴侣 APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.6/Vibe-Halo-Mobile-0.6.6.apk) | 预览版；小米后台设置仍需真机验证 |
 
 Windows 可能提示未知发布者。桌面预览版不启用自动更新。Codex、ZCode 已在 Windows 上完成真实客户端验证；macOS/Linux 目前有 CI 打包和启动检查，其他集成仍可能存在客户端兼容问题。
 
@@ -29,9 +29,9 @@ Windows 可能提示未知发布者。桌面预览版不启用自动更新。Cod
 - Codex 中途异步提问也会同步到已配对的手机，关闭桌面问题提醒不影响手机通知。未回答的异步提醒跨回合结束和无关的新消息保留，直至回答、忽略或超时（最长 30 分钟）。需桌面版 0.6.4 或更新版本，现有 Android 0.6.3 和中继继续兼容。
 - Windows 0.6.5 修复托盘刷新时反复启动外部查询命令的问题，避免客户端扫描卡住手机通知发送；新增分阶段时间记录，方便区分电脑处理、云端等待和手机处理耗时。
 - 任务完成通知，以及从托盘打开的可选历史窗口。
-- 灵动岛阴影范围扩大，阴影和圆角外的透明区域可点击穿透到后面的窗口；此桌面改进尚未发版。
+- 桌面版 0.6.6 扩大灵动岛阴影范围，阴影和圆角外的透明区域可点击穿透到后面的窗口。
 - Android 配对通知、明确授权后的远程控制、易读历史卡片和设备改名。
-- Android 收到通知后会后台拉取对应的完整消息并加密保存，打开时先显示缓存，再刷新最新状态；此改进尚未发版，需使用新的安卓构建。
+- Android 0.6.6 收到通知后会后台拉取对应的完整消息并加密保存，打开时先显示缓存，再刷新最新状态；更新 APK 即可启用，现有配对保留。
 - 手机／手表通知显示客户端名称和简短任务摘要；新版手机对局域网与云推送统一去重，Codex 自动建议不再触发完成提醒。
 - 手机记录正文支持 Markdown 和 Codex 信息卡片；新完成／计划记录的项目内图片可加密同步、点击放大查看。
 - Codex 完成／计划记录优先读取本地聊天名称；手机详情页标题下方用简短的彩色圆角标签显示状态，列表卡片也有对应的状态小点与短文字。

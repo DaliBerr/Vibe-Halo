@@ -6,7 +6,7 @@
 
 A desktop Dynamic Island for AI coding clients: handle supported approvals and questions, and see when a task needs attention or finishes. An optional Android companion brings paired notifications, approvals and history to your phone.
 
-![Version](https://img.shields.io/badge/version-0.6.5-6d7cff)
+![Version](https://img.shields.io/badge/version-0.6.6-6d7cff)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
 ![Vibe Halo displaying an approval request](docs/assets/vibe-halo-demo.gif)
@@ -18,7 +18,7 @@ A desktop Dynamic Island for AI coding clients: handle supported approvals and q
 | Windows x64 | [NSIS installer](https://github.com/DaliBerr/Vibe-Halo/releases/latest) | Stable; explicit-restart updates |
 | macOS 12+ | [Apple Silicon / Intel DMG and ZIP](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | Preview; ad-hoc signed, not notarized |
 | Linux x64 | [AppImage / deb](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | Preview |
-| Android 8+ | [Signed companion APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.3/Vibe-Halo-Mobile-0.6.3.apk) | Preview; Xiaomi background settings need device verification |
+| Android 8+ | [Signed companion APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.6/Vibe-Halo-Mobile-0.6.6.apk) | Preview; Xiaomi background settings need device verification |
 
 Windows packages may show an unknown-publisher warning. Preview desktop packages have automatic updates disabled. Codex and ZCode have real-client coverage on Windows; macOS/Linux have CI packaging and smoke coverage. Other integrations remain subject to client compatibility.
 
@@ -29,9 +29,9 @@ Windows packages may show an unknown-publisher warning. Preview desktop packages
 - Codex mid-turn async questions also reach the paired phone, even with desktop input reminders disabled. Unanswered async reminders survive turn completion and unrelated prompts, until answered, dismissed or timed out (up to 30 minutes). Requires desktop 0.6.4 or later; Android 0.6.3 and the existing relay remain compatible.
 - Windows 0.6.5 removes repeated external executable lookups during tray refresh, preventing client discovery from blocking phone notification delivery. Stage timing diagnostics help distinguish desktop processing, relay waiting and phone handling.
 - Completion notifications and optional tray-opened recent-event history.
-- The island has a wider shadow; clicks in its shadow and transparent rounded corners reach the window behind it. This desktop improvement is unreleased.
+- Desktop 0.6.6 gives the island a wider shadow; clicks in its shadow and transparent rounded corners reach the window behind it.
 - Paired Android notifications, explicitly authorized remote control, readable history cards and editable device names.
-- Android fetches and encrypts the full message in the background after a notification arrives, showing cached content on opening while refreshing its current status. This improvement is unreleased and requires a new Android build.
+- Android 0.6.6 fetches and encrypts the full message in the background after a notification arrives, showing cached content on opening while refreshing its current status. Upgrade the APK to enable this behavior; existing pairing is preserved.
 - Phone/watch notifications show the client and a short task preview; updated phones deduplicate LAN/cloud delivery, and Codex follow-up suggestions no longer trigger completion alerts.
 - Markdown and Codex cards in phone records; encrypted project-image snapshots from new completion/plan records, with tap-to-zoom viewing.
 - Codex completion/plan titles use the local chat-name index when available. Phone record details show a compact colored status badge below the title; list cards show a matching status dot and short label.
