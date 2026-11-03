@@ -1,8 +1,46 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-03 (DSH integration and local acceptance; not a release)
+Updated: 2026-11-03 (DSH parallel native/island answers; not a release)
 Current version: `0.6.6` (Windows and Android); `0.6.3` (macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-03 — DSH native and island questions in parallel
+
+Fixed an integration regression: the question waterfall previously waited for
+the island before calling the native answerer, hiding the native question while
+the island was open. Both answerers now start immediately. The first structured
+answer wins, and a separate UI AbortSignal withdraws the other side without
+aborting the owning Turn. Native cancellation and the native timed deadline
+remain authoritative. Closing, expiring or unloading the island leaves the
+already-open native question usable. Unsupported forms still stay native.
+The separate tool-approval waterfall is unchanged.
+
+Verification for this correction:
+
+- Desktop suite: **279 tests, 278 pass, one existing POSIX-only skip, zero
+  failures**; protocol suite **6 pass**. Eight new regressions cover native-first,
+  island-first, simultaneous answers, close, expiry, immediate answers, missing
+  providers, Turn cancellation, native timeout, immutable events and unload.
+- The installed DSH **0.2.1-rc.5** runtime/service smoke tests still pass,
+  including timed pending projection, late-reply steering and the `never` gate.
+- A dedicated live-model DSH Web session used the actual native DSH renderer and
+  actual island renderer. Native answering after island expiry succeeded; with
+  both UIs available, native-first returned the selected original label and
+  removed the island request. Island-first returned its selected original label
+  and removed the native question's option and submit buttons (renderer DOM and
+  screenshots checked). All three model turns completed.
+  Evidence: `.smoke/dsh-parallel-live/`; no real user session was answered.
+- Windows local package built and verified at
+  `.smoke/dsh-parallel-package/win-unpacked/`; its unpacked plugin exactly matches
+  source. The default output directory was busy with the owner's running app,
+  so the build used this separate output directory. Version remains 0.6.6;
+  there is no public release or installed stable-app replacement.
+- The shared local DSH plugin asset was updated without rewriting either
+  profile's settings. An already-running DSH must reload/restart to import it.
+  The same owned unpacked plugin asset was updated in the running local build;
+  reading it through the app's ASAR path confirms the fixed source, so restarting
+  that build will not reinstall the previous plugin.
+  macOS/Linux and physical-phone round trips were not repeated for this fix.
 
 ## 2026-11-03 — DeepSeek Harness integration
 

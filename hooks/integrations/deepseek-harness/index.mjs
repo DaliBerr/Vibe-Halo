@@ -13,6 +13,62 @@ const record = value => value !== null && typeof value === 'object' && !Array.is
 const fits = (s, max, required = false) => typeof s === 'string' && s.length <= max && (!required || s.trim().length > 0);
 const short = (s, max = 2000) => typeof s === 'string' ? s.slice(0, max) : '';
 
+// UserQuestionService dispatches a mutable event copy. Its public signal belongs
+// to the answer UI, while the service retains the original Turn/timed signal.
+// Give next() a separate lifetime so an island answer can withdraw the native
+// card through the normal Gateway cancellation frame without aborting the Turn.
+export function parallelQuestion(request, next, answerInIsland) {
+  const parent = request.signal;
+  if (parent?.aborted) return next();
+  const native = new AbortController();
+  const island = new AbortController();
+  const hadSignal = Object.hasOwn(request, 'signal');
+  try { request.signal = native.signal; }
+  catch { return next(); } // An immutable future event remains fully native.
+  let settled = false;
+  let nativeDone = false, islandDone = false, nativeValue, nativeError;
+  let abort;
+  const result = new Promise((resolve, reject) => {
+    const finish = (value, error, winner) => {
+      if (settled) return;
+      settled = true;
+      if (error !== undefined) reject(error); else resolve(value);
+      if (winner !== 'native') native.abort();
+      if (winner !== 'island') island.abort();
+    };
+    const exhausted = () => {
+      if (nativeDone && islandDone) finish(nativeValue, nativeError, 'native');
+    };
+    abort = () => finish(undefined, parent?.reason || Object.assign(new Error('question cancelled'), { code: 'ASK_ABORTED' }), 'abort');
+    parent?.addEventListener('abort', abort, { once: true });
+    if (parent?.aborted) { abort(); return; }
+    // Start native UI immediately, never after the island's timeout/close.
+    void Promise.resolve().then(next).then(value => {
+      nativeDone = true; nativeValue = value;
+      if (record(value) && Array.isArray(value.answers)) finish(value, undefined, 'native');
+      else exhausted();
+    }, error => {
+      nativeDone = true; nativeError = error;
+      // Native user cancellation and the native timed-question deadline are
+      // authoritative; unavailable/disconnected answerers leave the island live.
+      if (['ASK_ABORTED', 'ASK_TIMED_OUT'].includes(error?.code)) finish(undefined, error, 'native');
+      else exhausted();
+    }).finally(() => {
+      // Keep the child signal until next() finishes: a queued Gateway frame may
+      // not have read it yet. Never replace the caller's original signal.
+      if (request.signal === native.signal) {
+        if (hadSignal) request.signal = parent; else delete request.signal;
+      }
+    }).catch(() => {});
+    void Promise.resolve().then(() => answerInIsland(island.signal)).then(value => {
+      islandDone = true;
+      if (record(value) && Array.isArray(value.answers)) finish(value, undefined, 'island');
+      else exhausted();
+    }, () => { islandDone = true; exhausted(); });
+  });
+  return result.finally(() => parent?.removeEventListener('abort', abort));
+}
+
 export function questionForm(questions) {
   if (!Array.isArray(questions) || !questions.length || questions.length > 10) return null;
   if (new Set(questions.map(q => q?.id)).size !== questions.length) return null;
@@ -193,9 +249,9 @@ export function apply(ctx, config = {}) {
       const call = calls.get(request.wait.callId) || {};
       calls.set(request.wait.callId, { ...call, request });
     }
-    // Do not claim attachWait: the Host's original timed deadline remains authoritative.
-    // Its abort signal withdraws the live island; a continued call gets a separate late-reply route below.
-    return ask(request, next);
+    // The native Client owns its normal attachWait/countdown. Both UIs receive
+    // the request now; the first actual answer wins and withdraws the other UI.
+    return parallelQuestion(request, next, signal => ask({ ...request, signal }, () => undefined));
   }, { prepend: true });
   ctx.on('session/event', (session, e) => {
     if (!session || session.header?.origin === 'subagent' || disposed) return;

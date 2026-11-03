@@ -27,7 +27,10 @@ async function fixture(t) {
   const ctx = new EventEmitter();
   const agent = { id: "session", session: { id: "session", header: { cwd: dir } }, ctx: { workingDirectory: { cwd: dir } } };
   (await plugin).apply(ctx, { runtimePath });
-  const call = (name, req, next = () => "native") => ctx.listeners(name)[0]({ agent, ...req }, next);
+  const call = (name, req, next = () => "native") => {
+    const event = { agent, ...req };
+    return ctx.listeners(name)[0](event, () => next(event));
+  };
   t.after(async () => { ctx.emit("dispose"); await server.stop(); fs.rmSync(dir, { recursive: true, force: true }); });
   return { ctx, call, agent, approvals, events, dir, server, runtimePath };
 }
@@ -198,7 +201,7 @@ test("DSH continued timed answers use the owning late-reply method and native an
   const firstReady = once(f.approvals, "changed");
   const first = f.call("user-questions/request", { questions: q, signal: controller.signal, wait: { callId: "timed", timed: true } });
   await firstReady; const gone = once(f.approvals, "changed"); controller.abort();
-  assert.equal(await first, "native"); await gone;
+  await assert.rejects(first, { name: "AbortError" }); await gone;
   let reply;
   f.ctx.userQuestions = { answer: (agent, callId, answer) => { reply = { agent, callId, answer }; return true; } };
   const lateReady = once(f.approvals, "changed");

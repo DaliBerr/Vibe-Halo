@@ -73,7 +73,9 @@ Initialized profiles under `$DSH_HOME` (default `~/.dsh`) receive an independent
 
 The island displays **DSH** and supports allow-once/reject, batches, single/multiple selections, custom text, explicit skips, plan review and supporting details. Persistent grants appear only when the caller actually offers them; mobile persistent actions still require PC-local opt-in. Timed requests keep their Host deadline, withdraw stale buttons, and use the official late-answer method after continuation. Reopening the owning session or reloading the plugin restores continued questions from the public DSH projection.
 
-Close, disconnect, expiry, invalid responses and unload delegate without granting. Unsupported oversized forms remain native. Only successful committed turns produce completion notifications. New Android question fields require an updated companion; physical-phone and macOS/Linux DSH round trips remain acceptance work.
+Questions appear in both the native DSH window and the island immediately. Either can answer; the first submitted answer wins and withdraws the other UI. Closing the island or unloading its plugin leaves the already-open native question usable. Timed questions retain the native deadline and cancellation behavior.
+
+Close, disconnect, expiry, invalid responses and unload never grant approval. Unsupported oversized forms remain native. Only successful committed turns produce completion notifications. New Android question fields require an updated companion; physical-phone and macOS/Linux DSH round trips remain acceptance work.
 
 ## How it works
 
