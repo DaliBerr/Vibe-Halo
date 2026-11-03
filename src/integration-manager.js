@@ -7,6 +7,7 @@ const path = require("path");
 const { agent, listAgents } = require("./agent-registry");
 const { HookManager } = require("./hook-manager");
 const { createPlatformAdapter } = require("./platform-adapter");
+const { DshIntegration } = require("./dsh-integration");
 
 const MARKER = "vibe-halo-hook.js";
 const GROUP_ID = "vibe-halo";
@@ -331,6 +332,8 @@ class IntegrationManager {
     this.settings = options.settings;
     this.logger = options.logger || { info() {}, warn() {}, error() {} };
     this.detectionCache = new Map();
+    this.dsh = new DshIntegration({ homeDir: this.homeDir, root: options.dshHome || process.env.DSH_HOME,
+      assetRoot: this.assetRoot, backup: file => backupOnce("deepseek-harness", file, this.backupRoot), write: atomicWrite });
     this.codexManager = options.codexManager || new HookManager({
       executablePath: this.executablePath,
       hookScriptPath: this.hookScriptPath,
@@ -350,6 +353,7 @@ class IntegrationManager {
   }
 
   paths(agentId) {
+    if (agentId === "deepseek-harness") return this.dsh.profiles().map(dir => path.join(dir, "cordis.patch.yml"));
     const home = this.homeDir;
     const map = {
       zcode: [path.join(home, ".zcode", "cli", "config.json")],
@@ -377,6 +381,7 @@ class IntegrationManager {
   }
 
   configHomePath(descriptorValue) {
+    if (descriptorValue?.id === "deepseek-harness") return this.dsh.root;
     if (!descriptorValue?.configHome) return null;
     if (descriptorValue.id === "reasonix") return this.platform === "win32"
       ? path.join(this.appData, "reasonix")
@@ -498,6 +503,7 @@ class IntegrationManager {
   }
 
   install(agentId) {
+    if (agentId === "deepseek-harness") return this.dsh.install();
     const descriptorValue = agent(agentId);
     if (!descriptorValue) return { ok: false, reason: "unknown-agent" };
     if (descriptorValue.platforms?.[this.platform] !== true) return { ok: false, reason: "not-available-on-platform" };
@@ -521,6 +527,7 @@ class IntegrationManager {
   }
 
   status(agentId) {
+    if (agentId === "deepseek-harness") return this.dsh.status();
     if (agentId === "codex") {
       const value = this.codexManager.status();
       return { detected: value.codexHomeExists, installed: Object.values(value.events).every(Boolean), healthy: value.healthy, disabled: value.feature === "false", reason: value.feature === "false" ? "hooks-explicitly-disabled" : (value.healthy ? "healthy" : "trust-or-hook-pending") };
@@ -608,6 +615,7 @@ class IntegrationManager {
   }
 
   uninstall(agentId) {
+    if (agentId === "deepseek-harness") return this.dsh.uninstall();
     if (agentId === "codex") return this.codexManager.uninstall();
     if (["opencode", "openclaw"].includes(agentId)) {
       const configPath = this.paths(agentId).find(pathExists);

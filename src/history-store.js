@@ -100,6 +100,7 @@ function cleanQuestions(value, state) {
     questionKey: cleanKey(question?.questionKey),
     multiSelect: question?.multiSelect === true,
     allowText: question?.allowText !== false,
+    ...(question?.answerFormat === "dsh" ? { answerFormat: "dsh", detail: cleanText(question.detail, 16000) } : {}),
     options: Array.isArray(question?.options) ? question.options.slice(0, 20).map(option => ({
       id: cleanText(option?.id, 240),
       label: cleanText(option?.label, 1000),

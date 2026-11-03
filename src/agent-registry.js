@@ -103,6 +103,14 @@ const AGENTS = Object.freeze([
     transport: "reverse-bridge", configKind: "plugin", configHome: ".config/opencode",
     executableNames: ["opencode.exe", "opencode"], configPaths: [".config/opencode/opencode.json", ".config/opencode/opencode.jsonc"],
   }),
+  descriptor("deepseek-harness", "DeepSeek Harness", "approval", {
+    appearance: appearance("DS", "#4D6BFE", "#354DC7", "#A9B8FF"),
+    transport: "cordis-plugin", configKind: "plugin", configHome: ".dsh",
+    executableNames: ["dsh.cmd", "dsh", "DeepSeek Harness.exe"],
+    applicationPaths: { win32: ["%LOCALAPPDATA%/Programs/DeepSeek Harness/DeepSeek Harness.exe"], darwin: ["/Applications/DeepSeek Harness.app"] },
+    configPaths: [".dsh/profiles"], capabilities: { elicitation: true },
+    events: ["PermissionRequest", "Elicitation", "Stop", "UserPromptSubmit"],
+  }),
   descriptor("kimi-code", "Kimi Code", "passive", {
     appearance: appearance("K", "#00A86B", "#047857", "#6EE7B7"),
     configKind: "toml", configHome: ".kimi-code", executableNames: ["kimi.exe", "kimi"],
@@ -198,7 +206,7 @@ function boundedValue(value, depth = 0) {
   return output;
 }
 
-function normalizeQuestions(value) {
+function normalizeQuestions(value, allowDshFormat = false) {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 10).map((question, index) => {
     const options = Array.isArray(question?.options) ? question.options.slice(0, 20).map((option, optionIndex) => ({
@@ -215,6 +223,10 @@ function normalizeQuestions(value) {
         : "fallback.agentWaitingInput",
       multiSelect: question?.multiSelect === true || question?.multi_select === true,
       allowText: question?.allowText !== false && question?.allow_text !== false,
+      ...(allowDshFormat && question?.answerFormat === "dsh" ? {
+        answerFormat: "dsh",
+        detail: typeof question.detail === "string" ? question.detail.slice(0, 16000) : "",
+      } : {}),
       options,
     };
   });
@@ -250,6 +262,15 @@ function normalizePermissionSuggestions(value) {
 }
 
 function permissionOptions(agentId, data = {}, permissionSuggestions = []) {
+  if (agentId === "deepseek-harness" && data.dsh_actions && typeof data.dsh_actions === "object") {
+    return [
+      { id: "allow", label: cleanText(data.dsh_actions.allow, 160), tone: "primary" },
+      { id: "deny", label: cleanText(data.dsh_actions.deny, 160), tone: "danger" },
+      ...(typeof data.dsh_actions.always === "string" && data.dsh_actions.always.length <= 160
+        ? [{ id: "always", label: cleanText(data.dsh_actions.always, 160), tone: "secondary", overflow: true }] : []),
+      { id: "native", labelKey: "action.handleInClient", tone: "secondary", overflow: true },
+    ];
+  }
   if (agentId === "opencode") {
     const options = [
       { id: "once", labelKey: "action.allowOnce", tone: "primary" },
@@ -286,7 +307,8 @@ function questionsFit(questions) {
   if (!Array.isArray(questions) || questions.length > 10) return false;
   return questions.every(question => {
     if (!question || !textFits(question.id, 120) || !textFits(question.header, 120)
-      || !textFits(question.question ?? question.prompt ?? question.text, 1000)) return false;
+      || !textFits(question.question ?? question.prompt ?? question.text, 1000)
+      || !textFits(question.detail, 16000)) return false;
     if (question.options === undefined) return true;
     if (!Array.isArray(question.options) || question.options.length > 20) return false;
     return question.options.every(option => textFits(option?.id ?? option?.value, 120)
@@ -300,9 +322,10 @@ function normalizeRequest(agentId, data) {
   const event = normalizeEventName(data.event || data.hook_event_name || data.hookEventName || data.type);
   const rawInput = data.tool_input ?? data.toolInput ?? data.input ?? data.arguments;
   const toolInput = boundedValue(rawInput) || {};
+  if (agentId === "deepseek-harness" && typeof rawInput?.detail === "string" && rawInput.detail.length <= 16000) toolInput.detail = rawInput.detail;
   const requestId = cleanText(data.request_id || data.requestId || data.tool_use_id || data.toolUseId, 240);
   const rawQuestions = data.questions || toolInput.questions;
-  const questions = normalizeQuestions(rawQuestions);
+  const questions = normalizeQuestions(rawQuestions, descriptorValue.id === "deepseek-harness");
   const permissionSuggestions = normalizePermissionSuggestions(data.permission_suggestions || data.permissionSuggestions);
   const toolName = cleanText(data.tool_name || data.toolName, 160) || (event === "Elicitation" ? "Elicitation" : "Unknown");
   const zcodeQuestion = descriptorValue.id === "zcode"
@@ -313,6 +336,10 @@ function normalizeRequest(agentId, data) {
   const approval = event === "PermissionRequest" && descriptorValue.capabilities.approval && !zcodeQuestion;
   const passive = event === "PermissionRequest" && descriptorValue.capabilities.passiveApproval;
   const persistentPreviews = {};
+  if (descriptorValue.id === "deepseek-harness" && data.dsh_actions?.always) {
+    const preview = JSON.stringify({ action: data.dsh_actions.always, scope: rawInput }, null, 2);
+    if (preview.length <= 16000) persistentPreviews.always = preview;
+  }
   if (["claude-code", "codebuddy"].includes(descriptorValue.id)
     && sameJson(data.permission_suggestions || data.permissionSuggestions || [], permissionSuggestions)) {
     permissionSuggestions.slice(0, 9).forEach((suggestion, index) => {
@@ -340,7 +367,8 @@ function normalizeRequest(agentId, data) {
     // Conservative remote review gate: normalization must not hide context.
     // Persistent permission previews are a separate gate in DecisionService.
     remoteContextComplete: sameJson(rawInput ?? {}, toolInput)
-      && sameJson(data.questions ?? [], boundedValue(data.questions ?? []))
+      && (descriptorValue.id !== "deepseek-harness" || data.dsh_context_complete !== false)
+      && (descriptorValue.id === "deepseek-harness" || sameJson(data.questions ?? [], boundedValue(data.questions ?? [])))
       && questionsFit(rawQuestions)
       && textFits(data.tool_name || data.toolName, 160)
       && textFits(data.tool_input_description || data.description || toolInput.description, 1000),
@@ -374,6 +402,20 @@ function validateAnswers(questions, answers) {
   for (const [key, raw] of Object.entries(answers)) {
     const question = allowed.get(key);
     if (!question || forbidden.has(key) || !key || key.length > 120) return null;
+    if (question.answerFormat === "dsh") {
+      if (raw === "skip:" && question.allowText !== false) { output[key] = raw; continue; }
+      const values = Array.isArray(raw) ? raw : [raw];
+      if (!values.length || values.length > 21 || (!question.multiSelect && values.length !== 1)
+        || new Set(values).size !== values.length) return null;
+      let custom = 0;
+      for (const value of values) {
+        if (typeof value !== "string" || !value || value.length > 2000) return null;
+        if (question.options?.some(option => option.id === value)) continue;
+        if (question.allowText === false || !value.startsWith("text:") || !value.slice(5).trim() || ++custom > 1) return null;
+      }
+      output[key] = question.multiSelect ? [...values] : values[0];
+      continue;
+    }
     const values = Array.isArray(raw) ? raw : [raw];
     if (!values.length || values.length > 20 || (!question.multiSelect && values.length !== 1)
       || values.some(value => typeof value !== "string" || !value.length || value.length > 2000)) return null;
@@ -389,6 +431,14 @@ function encodeDecision(agentId, decision, request = {}) {
   const id = cleanText(decision?.optionId, 80);
   const denyMessage = cleanText(decision?.message, 500) || "Denied in Vibe Halo";
   if (!id || id === "native") return noDecisionOutput(agentId);
+  if (agentId === "deepseek-harness") {
+    if (id === "submit") {
+      const answers = validateAnswers(request.questions, decision.answers);
+      return answers ? JSON.stringify({ decision: "answer", answers }) : noDecisionOutput(agentId);
+    }
+    if (!["allow", "deny", "always"].includes(id) || !request.options?.some(option => option.id === id)) return noDecisionOutput(agentId);
+    return JSON.stringify({ decision: id });
+  }
   const suggestionMatch = /^(?:suggestion:)(\d+)$/.exec(id);
   if (suggestionMatch && ["claude-code", "codebuddy"].includes(agentId)) {
     const suggestion = request.nativeMeta?.permissionSuggestions?.[Number(suggestionMatch[1])];

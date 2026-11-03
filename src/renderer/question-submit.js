@@ -19,5 +19,14 @@
     };
   }
 
-  return { zcodeSingleChoiceDecision };
+  function formAnswer(question, selected, text) {
+    if (question.answerFormat === "dsh") {
+      if (text) return question.multiSelect ? [...selected, `text:${text}`] : `text:${text}`;
+      if (!selected.length) return question.allowText ? "skip:" : null;
+      return question.multiSelect ? selected : selected[0];
+    }
+    const values = text ? [...selected, text] : selected;
+    return values.length ? (question.multiSelect ? values.slice(0, 20) : values[0]) : null;
+  }
+  return { zcodeSingleChoiceDecision, formAnswer };
 });

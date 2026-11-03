@@ -10,6 +10,10 @@ function displayAnswers(questions, answers) {
   for (const [questionId, answer] of Object.entries(answers)) {
     const question = Array.isArray(questions) ? questions.find(item => item?.id === questionId) : null;
     const label = value => {
+      if (question?.answerFormat === "dsh" && typeof value === "string") {
+        if (value.startsWith("text:")) return value.slice(5);
+        if (value === "skip:") return "";
+      }
       const option = Array.isArray(question?.options) ? question.options.find(item => item?.id === value) : null;
       return option?.label || value;
     };

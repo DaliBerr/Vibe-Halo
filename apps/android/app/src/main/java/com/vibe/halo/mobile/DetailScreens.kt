@@ -58,7 +58,7 @@ import org.json.JSONObject
         val payload = if (id == "submit") JSONObject().apply {
             for (question in event.detail.getJSONArray("questions").values().map { it as JSONObject }) {
                 val values = answers[question.getString("id")].orEmpty()
-                put(question.getString("id"), if (question.getBoolean("multiSelect")) JSONArray(values) else values.firstOrNull().orEmpty())
+                put(question.getString("id"), if (question.optString("answerFormat") == "dsh" && values.isEmpty() && question.getBoolean("allowText")) "skip:" else if (question.getBoolean("multiSelect")) JSONArray(values) else values.firstOrNull().orEmpty())
             }
         } else null
         scope.launch { repo.decide(event.key, id, payload, persistent); repo.checkReceipts(); repo.refresh() }
@@ -84,17 +84,23 @@ import org.json.JSONObject
             if (event.summary.optString("state") == "pending" && (event.detail.optBoolean("truncated") || event.detail.optBoolean("redacted"))) Text(tr("详情有省略或脱敏，当前不能从这里授权。"), fontSize = 12.sp)
             for (question in event.detail.getJSONArray("questions").values().map { it as JSONObject }) {
                 val id = question.getString("id"); val selected = answers[id].orEmpty(); val multi = question.getBoolean("multiSelect")
+                val dsh = question.optString("answerFormat") == "dsh"
+                var text by remember(event.key, id) { mutableStateOf("") }
                 Text(question.getString("question"), Modifier.padding(top = 22.dp, bottom = 10.dp), fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                if (question.optString("detail").isNotBlank()) SelectionContainer { Text(question.getString("detail"), Modifier.padding(bottom = 10.dp), fontSize = 13.sp) }
                 for (option in question.getJSONArray("options").values().map { it as JSONObject }) {
                     val value = option.getString("id")
-                    Row(Modifier.fillMaxWidth().clickable(enabled = active) { answers[id] = if (!multi) listOf(value) else if (value in selected) selected - value else selected + value }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().clickable(enabled = active) { if (dsh && !multi) text = ""; answers[id] = if (!multi) listOf(value) else if (value in selected) selected - value else selected + value }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (multi) Checkbox(value in selected, onCheckedChange = null) else RadioButton(value in selected, onClick = null)
                         Column(Modifier.padding(start = 12.dp)) { Text(option.getString("label"), fontSize = 14.sp); if (option.getString("description").isNotBlank()) Text(option.getString("description"), fontSize = 12.sp) }
                     }
                 }
                 if (question.getBoolean("allowText")) {
-                    var text by remember(event.key, id) { mutableStateOf("") }
-                    OutlinedTextField(text, { text = it.take(2000); answers[id] = if (text.isBlank()) emptyList() else listOf(text) }, enabled = active, label = { Text(tr("补充回答")) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                    OutlinedTextField(text, {
+                        text = it.take(if (dsh) 1995 else 2000)
+                        val custom = if (text.isBlank()) emptyList() else listOf(if (dsh) "text:$text" else text)
+                        answers[id] = if (dsh && multi) selected.filterNot { it.startsWith("text:") } + custom else custom
+                    }, enabled = active, label = { Text(tr("补充回答")) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
                 }
             }
             if (event.summary.optString("kind") == "input") {
@@ -107,7 +113,7 @@ import org.json.JSONObject
         Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.background) { Column(Modifier.fillMaxWidth().heightIn(max = 230.dp).verticalScroll(rememberScrollState()).padding(16.dp)) {
             for (option in event.detail.getJSONArray("options").values().map { it as JSONObject }) {
                 val id = option.getString("id")
-                val ready = id != "submit" || event.detail.getJSONArray("questions").values().all { answers[(it as JSONObject).getString("id")]?.isNotEmpty() == true }
+                val ready = id != "submit" || event.detail.getJSONArray("questions").values().all { val q = it as JSONObject; (q.optString("answerFormat") == "dsh" && q.getBoolean("allowText")) || answers[q.getString("id")]?.isNotEmpty() == true }
                 val label = option.optString("label").ifBlank { when { id in listOf("allow", "once") -> "允许这一次"; id in listOf("deny", "reject") -> "拒绝"; id == "submit" -> "提交回答"; id == "always" || id.startsWith("suggestion:") -> "查看长期授权范围…"; else -> "回到客户端处理" } }
                 Button(enabled = active && ready, onClick = {
                     if (id == "always" || id.startsWith("suggestion:")) { scopeChecked = false; persistentOption = id } else execute(id, false)

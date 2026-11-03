@@ -267,6 +267,13 @@ function questionsSection(detail) {
     options.className = "question-options";
     options.textContent = (question.options || []).map(option => option.label).filter(Boolean).join(" · ");
     block.appendChild(name);
+    if (question.detail) {
+      const detail = document.createElement("div");
+      detail.className = "question-options";
+      detail.style.whiteSpace = "pre-wrap";
+      detail.textContent = question.detail;
+      block.appendChild(detail);
+    }
     if (options.textContent) block.appendChild(options);
     article.appendChild(block);
   }

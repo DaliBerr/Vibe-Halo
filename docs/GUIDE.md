@@ -52,20 +52,28 @@
 
 ## Client support
 
-Vibe Halo currently registers 19 clients. “Supported” means that the repository contains an adapter and automated contract coverage; it does **not** mean that every client has passed a real runtime acceptance test.
+Vibe Halo currently registers 20 clients. “Supported” means that the repository contains an adapter and automated contract coverage; it does **not** mean that every client has passed a real runtime acceptance test.
 
 > [!WARNING]
-> Only **Codex** and **ZCode** have completed real client triggering, dynamic-island interaction, and response round-trip verification in the maintainer's environment. The other 17 integrations are based primarily on public protocols, the previous repository implementation, and automated contract tests. They may contain bugs caused by client-version differences, configuration changes, or subtle response-protocol mismatches. Keep the client's native approval UI available and inspect the tray diagnostics when evaluating these integrations.
+> **Codex** and **ZCode** retain their earlier live acceptance records. **DeepSeek Harness (DSH)** has Windows 0.2.1-rc.5 live-model multi-question, island submission and approval-response coverage; see `HANDOFF.md` for exact evidence and remaining limits. The other 17 integrations remain primarily contract-tested. Keep native approval UI available and inspect tray diagnostics.
 
 | Capability tier | Clients | Vibe Halo behavior |
 | --- | --- | --- |
-| Dynamic-island approval | Codex, ZCode, Qwen Code, Copilot CLI, Claude Code, CodeBuddy, Hermes, OpenCode | Shows only options declared by the client adapter and encodes the selected result into the native protocol |
-| Exact in-island answers | ZCode `AskUserQuestion`, Claude/CodeBuddy Elicitation, Hermes clarify | Renders a structured form and maps validated answers back to the original protocol |
+| Dynamic-island approval | Codex, ZCode, Qwen Code, Copilot CLI, Claude Code, CodeBuddy, Hermes, OpenCode, DSH | Shows only options declared by the client adapter and encodes the selected result into the native protocol |
+| Exact in-island answers | ZCode `AskUserQuestion`, Claude/CodeBuddy Elicitation, Hermes clarify, DSH `ask_user_question` | Renders a structured form and maps validated answers back to the original protocol |
 | Native approval reminder | Kimi Code, Qoder, QoderWork | Tells you to approve in the client and does not answer on the client's behalf |
 | Completion/status notification | Gemini CLI, Antigravity, Cursor Agent, Kiro, CodeWhale, Pi, OpenClaw, Reasonix, plus the clients above | Shows completion after `Stop` or an equivalent event; a new prompt clears the old notification for that session |
 
 > [!NOTE]
 > Codex `request_user_input` is detected in ordinary/default, Plan, and unknown modes and remains reminder-only. Vibe Halo uses short-lived in-memory Hook origin data to place and raise the reminder on the relevant display when available, then reads Codex session JSONL to detect resolution. It never writes answers to the session file or bypasses the native Codex answer UI.
+
+### DeepSeek Harness (DSH)
+
+Initialized profiles under `$DSH_HOME` (default `~/.dsh`) receive an independently managed plugin row and a first-edit backup. Dependencies, model settings and third-party rows are preserved. Restart the affected DSH process after installing, repairing or removing the integration. The dependency-free plugin is copied to `~/.vibe-halo/integrations/deepseek-harness/`; explicit disables and separately owned overrides are never overwritten.
+
+The island displays **DSH** and supports allow-once/reject, batches, single/multiple selections, custom text, explicit skips, plan review and supporting details. Persistent grants appear only when the caller actually offers them; mobile persistent actions still require PC-local opt-in. Timed requests keep their Host deadline, withdraw stale buttons, and use the official late-answer method after continuation. Reopening the owning session or reloading the plugin restores continued questions from the public DSH projection.
+
+Close, disconnect, expiry, invalid responses and unload delegate without granting. Unsupported oversized forms remain native. Only successful committed turns produce completion notifications. New Android question fields require an updated companion; physical-phone and macOS/Linux DSH round trips remain acceptance work.
 
 ## How it works
 
@@ -251,7 +259,7 @@ The desktop core uses Electron and local files without a frontend framework. The
 ├── src/
 │   ├── main.js                  # Electron lifecycle, tray, and service wiring
 │   ├── platform-adapter.js      # OS paths, stable hooks, login items, notifications, window backend
-│   ├── agent-registry.js        # 19 adapters, normalization, options, response codecs
+│   ├── agent-registry.js        # 20 adapters, normalization, options, response codecs
 │   ├── integration-manager.js   # Detection, backup, install, health, repair, removal
 │   ├── server.js                # Token-authenticated 127.0.0.1 HTTP gateway
 │   ├── approval-store.js        # Global approval FIFO, deduplication, connection lifecycle
@@ -370,7 +378,7 @@ npm test
 
 The automated suite covers:
 
-- Registration, capability declarations, event normalization, and bounded output for all 19 adapters.
+- Registration, capability declarations, event normalization, and bounded output for all 20 adapters.
 - Allow, deny, no-decision, and structured-answer snapshots for each approval protocol.
 - Cross-client FIFO, deduplication isolation, repeated connections, timeouts, disconnects, and shutdown fallback.
 - Loopback authentication, request-size bounds, invalid option IDs, bridge tokens, and replay protection.

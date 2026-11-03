@@ -24,6 +24,7 @@ data class NotificationPreview(val agent: String, val context: String = "", val 
         fun agentName(id: String): String = when (id) {
             "codex" -> "Codex"; "claude-code" -> "Claude Code"; "zcode" -> "ZCode"
             "opencode" -> "OpenCode"; "gemini-cli" -> "Gemini CLI"; "copilot-cli" -> "Copilot CLI"
+            "deepseek-harness" -> "DeepSeek Harness"
             else -> snippet(id, 40)
         }
         fun fromDetail(detail: JSONObject): NotificationPreview {

@@ -45,7 +45,7 @@ export interface EventDetail {
   toolInputText: string;
   description: string;
   options: { id: string; label: string; labelKey: string; tone: "primary" | "danger" | "secondary" }[];
-  questions: { id: string; header: string; question: string; questionKey: string; multiSelect: boolean; allowText: boolean;
+  questions: { id: string; header: string; question: string; questionKey: string; multiSelect: boolean; allowText: boolean; answerFormat?: "dsh"; detail?: string;
     options: { id: string; label: string; description: string }[] }[];
   truncated: boolean;
   redacted: boolean;

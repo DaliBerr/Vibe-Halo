@@ -124,7 +124,7 @@
           },
           {
             "type": "array",
-            "maxItems": 20,
+            "maxItems": 21,
             "items": {
               "type": "string",
               "minLength": 1,

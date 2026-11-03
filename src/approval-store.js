@@ -157,6 +157,7 @@ class ApprovalStore extends EventEmitter {
         questionKey: safeMessageKey(question?.questionKey),
         multiSelect: question?.multiSelect === true,
         allowText: question?.allowText !== false,
+        ...(question?.answerFormat === "dsh" ? { answerFormat: "dsh", detail: typeof question.detail === "string" ? question.detail.slice(0, 16000) : "" } : {}),
         options: Array.isArray(question?.options) ? question.options.slice(0, 20).map(option => ({
           id: safeText(option?.id, 120),
           label: safeText(option?.label, 240),

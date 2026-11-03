@@ -133,6 +133,13 @@ function renderQuestions(questions, interactive = false, item = null) {
     text.className = "question-text";
     text.textContent = question.question || formatUi("waitingInput", { agentName: item?.agentName || "Codex" });
     card.appendChild(text);
+    if (question.detail) {
+      const detail = document.createElement("div");
+      detail.className = "question-detail";
+      detail.style.whiteSpace = "pre-wrap";
+      detail.textContent = question.detail;
+      card.appendChild(detail);
+    }
     if (Array.isArray(question.options) && question.options.length) {
       const options = document.createElement("div");
       options.className = "option-list";
@@ -172,7 +179,7 @@ function renderQuestions(questions, interactive = false, item = null) {
       const textarea = document.createElement("textarea");
       textarea.className = "answer-text";
       textarea.dataset.questionId = question.id;
-      textarea.maxLength = 2000;
+      textarea.maxLength = question.answerFormat === "dsh" ? 1995 : 2000;
       textarea.placeholder = question.options?.length ? ui("otherAnswerOptional") : ui("enterAnswer");
       card.appendChild(textarea);
     }
@@ -187,9 +194,9 @@ function collectAnswers(questions) {
       .map(input => input.value).filter(Boolean);
     const textarea = questionList.querySelector(`textarea[data-question-id="${CSS.escape(question.id)}"]`);
     const text = textarea?.value.trim().slice(0, 2000) || "";
-    if (text) selected.push(text);
-    if (!selected.length) return null;
-    result[question.id] = question.multiSelect ? selected.slice(0, 20) : selected[0];
+    const answer = window.vibeQuestionSubmit.formAnswer(question, selected, text);
+    if (answer === null) return null;
+    result[question.id] = answer;
   }
   return result;
 }

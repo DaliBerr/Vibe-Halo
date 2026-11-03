@@ -1,8 +1,74 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-01 (Android 0.6.6 in-app updater replacement published)
+Updated: 2026-11-03 (DSH integration and local acceptance; not a release)
 Current version: `0.6.6` (Windows and Android); `0.6.3` (macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-03 — DeepSeek Harness integration
+
+Added the twentieth adapter, DeepSeek Harness, and its independently implemented
+Cordis plugin. The live island uses the owner's requested **DSH** abbreviation;
+the integration list keeps the full client name. Public approval/question
+waterfalls were checked against official source `8bd0733` and the existing
+`dsh-windows-notification` / `dsh-notify-zeta` implementations. No third-party
+plugin code or runtime dependencies were incorporated.
+
+Supported paths include allow-once/reject; multi-question batches, single and
+multiple selections, custom text and explicit skips; plan-review details; caller-
+offered persistent grants; timed cancellation, official late-reply steering and
+continued-question restoration from the public projection. Question/option IDs
+are mapped locally back to exact original IDs/labels. Custom text is tagged to
+avoid collisions with option IDs. The existing global FIFO, current-ID checks,
+PC-local persistent-action policy, loopback authentication and native fallback
+remain authoritative. Only successful committed turns generate completion
+notifications; cancellations and failures are not advertised as successes.
+
+Initialized DSH profiles under `DSH_HOME` / `~/.dsh` receive a managed YAML row
+and a first-edit backup. Stable plugin assets live under
+`~/.vibe-halo/integrations/deepseek-harness/`. Existing dependencies, model
+configuration and third-party rows are preserved; separately owned overrides and
+explicit disables block automatic installation. Removal only removes owned rows.
+Restart DSH after installation/repair/removal. Both local desktop and web profiles
+were installed and their original files backed up. The installed Vibe Halo
+application was not replaced; the local build contains the new adapter.
+
+Verification:
+
+- Final desktop suite: **271 tests, 270 pass, one existing POSIX-only skip,
+  zero failures**; protocol suite **6 pass**. Twelve DSH tests cover HTTP/FIFO,
+  answer codecs, long plans, continued-question restoration, native fallback,
+  expiry/unload, policy options, completion classification and profile ownership.
+- Installed DSH **0.2.1-rc.5** libraries were loaded directly from the real
+  installation. Real Cordis/Session/Approval/UserQuestion services passed allow,
+  deny, batched/multiple/custom answers, timed expiry, durable pending projection,
+  late-reply steering and the native `never` policy gate. These are composed
+  runtime tests with synthetic requests, not model or OS sandbox acceptance.
+- Live DSH Web used the installed runtime and a dedicated test session. The real
+  model called `ask_user_question` with three questions; the actual island
+  renderer submitted the second single choice, both multiple choices and Chinese
+  custom text. The tool result preserved all three answers and the turn completed.
+  Evidence: `.smoke/dsh-question-accepted/`.
+- A second live-model session called `todo_write`. A test-only pre-tool listener
+  required approval for that isolated session; the real island renderer allowed
+  once, DSH audited `allowed-once`, the tool successfully created one completed
+  todo, and the turn completed. The captured island header reads `DSH`.
+  Evidence: `.smoke/dsh-live/approval-status.json` and `approval.png`.
+- An earlier harmless `pwsh` echo test also received `allowed-once`, but DSH's
+  own Windows sandbox then failed with `SetNamedSecurityInfoW` / Win32 5 while
+  granting workspace access. No Windows ACL or DSH security setting was changed.
+  This establishes approval delivery, not successful sandboxed shell execution.
+- Windows `build:dir` and package-content verification passed with version 0.6.6
+  and local auto-updates disabled. No version bump, tag, public release, relay
+  deployment or installed-desktop replacement was performed.
+- Android now preserves the DSH answer encoding, plan details and persistent-
+  action gate. Debug assembly and all **13 JVM tests** passed. Android lint passed
+  with zero errors and 30 warnings (`.smoke/dsh-final-android.log`); physical phone DSH round trips and
+  macOS/Linux live tests remain unperformed. Existing installed companions need
+  an updated APK for the new optional question fields; no APK was published.
+
+Local logs, captures and synthetic acceptance helpers remain untracked in
+`.smoke/`. DSH account credentials and real conversation contents were not copied
+into the repository or test artifacts.
 
 ## 2026-11-01 — Android 0.6.6 in-app updater replacement
 

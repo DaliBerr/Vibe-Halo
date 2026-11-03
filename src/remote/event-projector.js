@@ -51,6 +51,7 @@ function detail(entry, context) {
     questions: entry.questions.map(question => ({
       id: question.id, header: question.header, question: question.question, questionKey: question.questionKey,
       multiSelect: question.multiSelect, allowText: question.allowText,
+      ...(question.answerFormat === "dsh" ? { answerFormat: "dsh", detail: question.detail || "" } : {}),
       options: question.options.map(option => ({ id: option.id, label: option.label, description: option.description })),
     })),
     truncated: entry.remoteContextComplete !== true, redacted,

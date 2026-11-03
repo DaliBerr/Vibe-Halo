@@ -10,12 +10,12 @@ const {
   validateAnswers,
 } = require("../src/agent-registry");
 
-test("registers all 19 bounded client adapters", () => {
+test("registers all 20 bounded client adapters", () => {
   const adapters = listAgents();
-  assert.equal(adapters.length, 19);
-  assert.equal(new Set(adapters.map(value => value.id)).size, 19);
-  assert.equal(new Set(adapters.map(value => value.appearance.glyph)).size, 19);
-  assert.equal(new Set(adapters.map(value => value.appearance.accent)).size, 19);
+  assert.equal(adapters.length, 20);
+  assert.equal(new Set(adapters.map(value => value.id)).size, 20);
+  assert.equal(new Set(adapters.map(value => value.appearance.glyph)).size, 20);
+  assert.equal(new Set(adapters.map(value => value.appearance.accent)).size, 20);
   for (const value of adapters) {
     assert.equal(typeof value.name, "string");
     assert.equal(typeof value.capabilities.completion, "boolean");

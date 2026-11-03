@@ -49,10 +49,14 @@ test("dates and scalar limits are strict; no type coercion or answer truncation"
   for (const patch of [
     { issuedAt: "2026-02-30T09:00:35.000Z" },
     { expiresAt: fixture.issuedAt }, { issuedAt: "2026-09-16T09:00:35Z" },
-    { answers: { q1: "a".repeat(2001) } }, { answers: { q1: Array(21).fill("a") } },
+    { answers: { q1: "a".repeat(2001) } }, { answers: { q1: Array(22).fill("a") } },
     { answers: { q1: [] } }, { answers: { q1: true } },
     { expectedRevision: Number.MAX_SAFE_INTEGER + 1 },
   ]) assert.equal(validate("decisionIntent", { ...fixture, ...patch }).ok, false);
+  // A DSH multi-select can carry all 20 option IDs plus one tagged custom answer.
+  assert.equal(validate("decisionIntent", { ...fixture, answers: {
+    q1: [...Array.from({ length: 20 }, (_, i) => `option_${i + 1}`), "text:custom"],
+  } }).ok, true);
 });
 
 test("shipped validators have no Electron, Node, dynamic eval or Ajv dependency", () => {

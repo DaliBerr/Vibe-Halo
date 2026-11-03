@@ -38,7 +38,7 @@ Windows packages may show an unknown-publisher warning. Preview desktop packages
 - Codex completion/plan titles use the local chat-name index when available. Phone record details show a compact colored status badge below the title; list cards show a matching status dot and short label.
 - English/Chinese UI with system light/dark appearance.
 
-The registry includes 19 integrations with different capabilities. See the [client support table](docs/GUIDE.md#client-support).
+The registry includes 20 integrations with different capabilities. See the [client support table](docs/GUIDE.md#client-support).
 
 ## Get started
 

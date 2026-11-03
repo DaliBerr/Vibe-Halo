@@ -32,7 +32,7 @@ function validAnswersPayload(value) {
   return entries.every(([key, answer]) => {
     if (typeof key !== "string" || !key || key.length > 120) return false;
     const values = Array.isArray(answer) ? answer : [answer];
-    return values.length > 0 && values.length <= 20
+    return values.length > 0 && values.length <= 21
       && values.every(item => typeof item === "string" && item.length > 0 && item.length <= 2000);
   });
 }
@@ -318,13 +318,15 @@ class IslandController {
 
   localizeEntry(entry) {
     if (!entry) return entry;
-    const localize = (value, key, params) => value || (key ? this.localization.t(key, params) : "");
+    const localize = (value, key, params) => value || (key ? this.localization.t(key,
+      entry.agentId === "deepseek-harness" && params?.agentName ? { ...params, agentName: "DSH" } : params) : "");
     const {
       titleKey, titleParams, contentKey, contentParams, outputKey, outputParams,
       agentAppearance: ignoredAppearance,
       ...safe
     } = entry;
     const descriptor = agent(entry.agentId);
+    if (entry.agentId === "deepseek-harness") safe.agentName = "DSH";
     safe.agentAppearance = descriptor?.appearance || {
       glyph: "A", accent: "#64748B", inkLight: "#334155", inkDark: "#CBD5E1",
     };

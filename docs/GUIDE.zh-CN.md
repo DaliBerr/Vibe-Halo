@@ -52,20 +52,29 @@
 
 ## 客户端支持
 
-Vibe Halo 当前注册 19 个客户端。这里的“支持”表示仓库包含对应适配器和契约测试，不代表所有客户端都已经通过真实运行验收。
+Vibe Halo 当前注册 20 个客户端。这里的“支持”表示仓库包含对应适配器和契约测试，不代表所有客户端都已经通过真实运行验收。
 
 > [!WARNING]
-> 当前只有 **Codex** 与 **ZCode** 在维护者环境完成了真实客户端触发、灵动岛交互和结果回传验证。其余 17 个客户端主要依据公开协议、旧仓库实现和自动契约测试完成适配，尚未进行完整实机验证，可能存在客户端版本差异、配置格式变化或响应协议 Bug。使用这些集成前请保留客户端原生审批入口，并通过托盘诊断确认状态。
+> **Codex** 与 **ZCode** 保留既有实机验收记录。**DeepSeek Harness（DSH）** 在 Windows 0.2.1-rc.5 上完成了真实模型多题问答、灵动岛提交与审批回传联调；具体结果和边界见 `HANDOFF.md`。其余 17 个客户端主要依据公开协议和自动契约测试完成适配。保留客户端原生审批入口，并通过托盘诊断确认状态。
 
 | 能力层级 | 客户端 | Vibe Halo 行为 |
 | --- | --- | --- |
-| 灵动岛审批 | Codex、ZCode、Qwen Code、Copilot CLI、Claude Code、CodeBuddy、Hermes、OpenCode | 显示客户端明确提供的审批选项，并编码为原生协议响应 |
-| 岛内精确回答 | ZCode `AskUserQuestion`、Claude/CodeBuddy Elicitation、Hermes clarify | 显示结构化表单，并把答案映射回客户端原协议 |
+| 灵动岛审批 | Codex、ZCode、Qwen Code、Copilot CLI、Claude Code、CodeBuddy、Hermes、OpenCode、DSH | 显示客户端明确提供的审批选项，并编码为原生协议响应 |
+| 岛内精确回答 | ZCode `AskUserQuestion`、Claude/CodeBuddy Elicitation、Hermes clarify、DSH `ask_user_question` | 显示结构化表单，并把答案映射回客户端原协议 |
 | 原生审批提醒 | Kimi Code、Qoder、QoderWork | 提醒你回到客户端完成审批，不代替客户端作答 |
 | 完成/状态通知 | Gemini CLI、Antigravity、Cursor Agent、Kiro、CodeWhale、Pi、OpenClaw、Reasonix，以及上述客户端 | 在 `Stop` 或等价事件后显示完成通知；新提示清除同会话旧通知 |
 
 > [!NOTE]
 > Codex `request_user_input` 在普通/default、计划和未知模式下都会被识别，但仍然只有只读提醒。Vibe Halo 会使用短期内存中的 Hook 来源信息，尽量把提醒放到对应显示器并重新置顶，再监控 Codex session JSONL 判断请求是否结束；它不会向 session 文件写入答案，也不会绕过 Codex 原生回答界面。
+
+### DeepSeek Harness（DSH）
+
+- 自动发现 `$DSH_HOME`（默认 `~/.dsh`）内已初始化的 profile，为桌面版、Web 及自定义 profile 添加独立的 Vibe Halo 插件行；不修改现有依赖、模型设置或其他插件。首次改动有备份。
+- **安装、修复或停用后重启相应 DSH 进程**。插件代码保存在 `~/.vibe-halo/integrations/deepseek-harness/`，运行时只使用 Node 内置模块。显式禁用或用户自建的同名覆盖不会被改写。
+- 支持一次性允许/拒绝、单题和多题、单选和多选、自由文字、明确跳过、计划审阅及完整详情。只有原请求明确提供长期授权时才显示该选项；手机长期授权仍受电脑本地开关约束。
+- 限时问题遵守 DSH 自己的期限；超时撤掉原按钮，继续后的答案通过 DSH 正式补答接口提交。重新打开会话或重载插件时从 DSH 投影恢复仍可补答的问题。
+- 关闭灵动岛、连接失败、超时、非法答案或插件卸载均不产生同意，交给 DSH 后续原生回答流程。过大的表单保留在 DSH 中处理；不截短选项后猜测答案。普通完成提醒仅来自成功提交的 `turn/end`，取消和失败不会被显示为成功。
+- Android 伴侣使用新版问答字段；本次源码与本地 APK 已适配，旧版伴侣需要更新后才能处理 DSH 问答详情。实体手机与 macOS/Linux 的 DSH 联调仍需验收。
 
 ## 工作方式
 
@@ -251,7 +260,7 @@ Windows NSIS 卸载程序也会调用相同清理流程。macOS 将应用拖入�
 ├── src/
 │   ├── main.js                  # Electron 生命周期、托盘与服务装配
 │   ├── platform-adapter.js      # 平台路径、稳定 Hook、开机启动、通知与窗口后端
-│   ├── agent-registry.js        # 19 个适配器、归一化、选项和决策编码
+│   ├── agent-registry.js        # 20 个适配器、归一化、选项和决策编码
 │   ├── integration-manager.js   # 检测、备份、安装、健康、修复与卸载
 │   ├── server.js                # 带令牌的 127.0.0.1 HTTP 网关
 │   ├── approval-store.js        # 全局审批 FIFO、去重与连接生命周期
@@ -362,7 +371,7 @@ npm test
 
 自动测试覆盖：
 
-- 19 个适配器的注册、能力、事件归一化和有界输出。
+- 20 个适配器的注册、能力、事件归一化和有界输出。
 - 各审批协议的允许、拒绝、无决定和结构化答案快照。
 - 跨客户端 FIFO、去重隔离、重复连接、超时、断线和 shutdown 回退。
 - loopback 认证、请求上限、非法 option ID、bridge token 和重放保护。
