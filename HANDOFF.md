@@ -54,6 +54,15 @@ the correct tool and stdin/stdout passed intact. Other Windows clients keep
 their existing cmd form; CodeBuddy may need the same change if it also uses
 Git Bash (unverified).
 
+Owner live check on 2026-11-05 (Windows, local 0.6.7 build with this fix,
+Claude Code in the Claude desktop app): the old cmd entries were repaired on
+startup, a Stop event showed the island completion notice, and an
+AskUserQuestion three-option question was delivered as a Claude Code
+PermissionRequest and appeared on the island (on the display of the source
+window). Still open: answering it from the island end to end, and whether the
+island entry is withdrawn when the question is answered natively first (it
+stayed pending in this check).
+
 Verification: `npm test` 293 tests (292 pass, the existing POSIX-only skip).
 Sandbox-mode Electron smoke screenshots (isolated USERPROFILE, APPDATA, user
 data and runtime directory) of General, Codex, Recent events list/detail and
