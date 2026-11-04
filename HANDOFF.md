@@ -1,6 +1,6 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-05 (0.7.0 Windows-only release prepared)
+Updated: 2026-11-05 (0.7.0 published, Windows only)
 Current version: `0.7.0` (Windows); Android companion `0.6.7`; macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
 
@@ -13,6 +13,16 @@ only on manual dispatch, and `release.yml` (tag `v*`) is the only automatic
 workflow. macOS/Linux platform code, local build scripts and builder targets are
 kept in the source but are no longer built, tested in CI or published. READMEs
 were rewritten as concise Windows-focused pages; the Android APK is unchanged.
+
+Published the immutable `v0.7.0` tag on `1f2af315d9555352839815c6838f8dd5c2cb0877`.
+Stable release workflow run `41937238102` passed (tests, update-enabled build,
+silent install/uninstall) and published a Latest, non-draft, non-prerelease
+release with the installer, blockmap, `latest.yml`, `SHA256SUMS.txt`, `LICENSE`
+and `NOTICE.md`; the public `latest/download/latest.yml` reports 0.7.0. Release
+notes were replaced with the Chinese 0.7.0 summary. A live 0.6.7 → 0.7.0
+in-app update on the owner's machine has not been observed yet (the owner is
+running a local 0.6.7 build, which has updates disabled; reinstall from the
+release to rejoin the update channel).
 
 ## 2026-11-04 — Unified settings window and default clients (unreleased)
 
