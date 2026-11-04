@@ -1,10 +1,10 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-04 (0.6.7 release preparation)
+Updated: 2026-11-04 (0.6.7 published and public downloads verified)
 Current version: `0.6.7` (Windows and Android); `0.6.3` (macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
 
-## 2026-11-04 — 0.6.7 release preparation
+## 2026-11-04 — 0.6.7 published
 
 The owner accepted the DSH tests and authorized publication. Windows 0.6.7
 includes the twentieth adapter, its managed plugin and parallel native/island
@@ -29,7 +29,26 @@ package verification and an NSIS build. The Firebase-configured Android release
 build and all 13 release JVM tests passed; release lint reported zero errors
 and 31 warnings. The signed APK preserves the public 0.6.6 certificate, passes
 v2/v3 verification and alignment, and reports package `com.vibe.halo.mobile`,
-versionName 0.6.7, versionCode 8. Publication evidence follows after completion.
+versionName 0.6.7, versionCode 8.
+
+Published the immutable `v0.6.7` tag on source commit
+`aec64f0ec509dcf1fa47a7174dba0d1dd1058340` as Latest, non-draft and
+non-prerelease. Cross-platform CI `41816667788`, mobile/relay CI `41816667827`
+and Windows stable-release CI `41817272621` all passed. The stable workflow
+verified the updater-enabled package and a silent install/uninstall before
+publishing. The original-key-signed Android APK and `android-update.json` were
+then attached without replacing the Windows installer, blockmap, update
+configuration or license assets.
+
+All eight public assets were downloaded and verified against GitHub SHA-256
+digests. All five checksum entries match; `latest.yml` SHA-512 and size match
+the public NSIS installer. Android metadata matches the public APK, build code,
+application ID and full tagged source commit. Public APK SHA-256:
+`d63c72c51e922565278baf90d142eb6c8cf75be3a6cc5c1680745c688992ea36`.
+Evidence remains untracked under `.smoke/published-067/` and
+`.smoke/release-067-*`. Physical-phone DSH acceptance and macOS/Linux live DSH
+acceptance remain unperformed; the existing public desktop previews stay at
+0.6.3. Restart DSH after its managed plugin update.
 
 ## 2026-11-03 — DSH native and island questions in parallel
 
