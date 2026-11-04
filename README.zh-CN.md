@@ -6,7 +6,7 @@
 
 为 AI 编程客户端提供桌面灵动岛：处理支持的审批和问答，接收待处理提醒与任务完成通知。可选 Android 伴侣支持配对通知、审批和历史记录。
 
-![Version](https://img.shields.io/badge/version-0.6.6-6d7cff)
+![Version](https://img.shields.io/badge/version-0.6.7-6d7cff)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
 ![Vibe Halo 审批界面](docs/assets/vibe-halo-demo.gif)
@@ -18,12 +18,13 @@
 | Windows x64 | [NSIS 安装程序](https://github.com/DaliBerr/Vibe-Halo/releases/latest) | 稳定版；确认重启后安装更新 |
 | macOS 12+ | [Apple Silicon / Intel DMG、ZIP](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | 预览版；仅临时签名，未经公证 |
 | Linux x64 | [AppImage、deb](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | 预览版 |
-| Android 8+ | [原签名伴侣 APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.6/Vibe-Halo-Mobile-0.6.6.apk) | 预览版；小米后台设置仍需真机验证 |
+| Android 8+ | [原签名伴侣 APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.7/Vibe-Halo-Mobile-0.6.7.apk) | 预览版；小米后台设置仍需真机验证 |
 
 Windows 可能提示未知发布者。桌面预览版不启用自动更新。Codex、ZCode 已在 Windows 上完成真实客户端验证；macOS/Linux 目前有 CI 打包和启动检查，其他集成仍可能存在客户端兼容问题。
 
 ## 主要功能
 
+- 0.6.7 新增 DeepSeek Harness（**DSH**）审批和结构化问答。DSH 原生窗口与灵动岛均可回答，先提交的答案生效，另一边自动收起；Android 同步支持对应的问答详情与答案格式。安装或更新集成后重启 DSH。
 - 所有桌面审批进入同一队列；没有有效决定时返回客户端原有流程。
 - 客户端支持精确答案协议时可在岛内回答；Codex 问题提醒回到 Codex 作答。
 - Codex 中途异步提问也会同步到已配对的手机，关闭桌面问题提醒不影响手机通知。未回答的异步提醒跨回合结束和无关的新消息保留，直至回答、忽略或超时（最长 30 分钟）。需桌面版 0.6.4 或更新版本，现有 Android 0.6.3 和中继继续兼容。

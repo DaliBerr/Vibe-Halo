@@ -6,7 +6,7 @@
 
 A desktop Dynamic Island for AI coding clients: handle supported approvals and questions, and see when a task needs attention or finishes. An optional Android companion brings paired notifications, approvals and history to your phone.
 
-![Version](https://img.shields.io/badge/version-0.6.6-6d7cff)
+![Version](https://img.shields.io/badge/version-0.6.7-6d7cff)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
 ![Vibe Halo displaying an approval request](docs/assets/vibe-halo-demo.gif)
@@ -18,12 +18,13 @@ A desktop Dynamic Island for AI coding clients: handle supported approvals and q
 | Windows x64 | [NSIS installer](https://github.com/DaliBerr/Vibe-Halo/releases/latest) | Stable; explicit-restart updates |
 | macOS 12+ | [Apple Silicon / Intel DMG and ZIP](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | Preview; ad-hoc signed, not notarized |
 | Linux x64 | [AppImage / deb](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | Preview |
-| Android 8+ | [Signed companion APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.6/Vibe-Halo-Mobile-0.6.6.apk) | Preview; Xiaomi background settings need device verification |
+| Android 8+ | [Signed companion APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.7/Vibe-Halo-Mobile-0.6.7.apk) | Preview; Xiaomi background settings need device verification |
 
 Windows packages may show an unknown-publisher warning. Preview desktop packages have automatic updates disabled. Codex and ZCode have real-client coverage on Windows; macOS/Linux have CI packaging and smoke coverage. Other integrations remain subject to client compatibility.
 
 ## What it does
 
+- Version 0.6.7 adds DeepSeek Harness (**DSH**) approvals and structured questions. Answer in either the native DSH window or the island; the first answer wins and withdraws the other UI. Android supports the corresponding question details and answer format. Restart DSH after installing or updating its integration.
 - One desktop approval queue, with native-client fallback when no valid decision is made.
 - Structured answers where the client exposes an exact answer protocol; Codex questions remain reminders to answer in Codex.
 - Codex mid-turn async questions also reach the paired phone, even with desktop input reminders disabled. Unanswered async reminders survive turn completion and unrelated prompts, until answered, dismissed or timed out (up to 30 minutes). Requires desktop 0.6.4 or later; Android 0.6.3 and the existing relay remain compatible.

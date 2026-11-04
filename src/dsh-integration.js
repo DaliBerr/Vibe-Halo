@@ -7,6 +7,7 @@ const { pathToFileURL } = require("node:url");
 const START = "# >>> Vibe Halo integration (deepseek-harness) >>>";
 const END = "# <<< Vibe Halo integration (deepseek-harness) <<<";
 const ID = "vibe-halo-dsh";
+const lf = text => text.replace(/\r\n/g, "\n");
 
 function withoutBlock(text) {
   const start = text.indexOf(START);
@@ -14,7 +15,22 @@ function withoutBlock(text) {
   if (start < 0 && end < 0) return text;
   if (start < 0 || end < start || text.indexOf(START, start + START.length) >= 0
     || text.indexOf(END, end + END.length) >= 0) throw new Error("invalid-dsh-managed-block");
-  return text.slice(0, start) + text.slice(end + END.length).replace(/^\r?\n/, "");
+  // DSH's YAML writer can wrap the file URL and append unrelated top-level
+  // patches before our trailing comment. The comments alone do not own those
+  // patches: remove only the exact plugin row we generated, preserving the rest.
+  const body = text.slice(start + START.length, end);
+  const row = /^\r?\n- insert:\r?\n    - id: vibe-halo-dsh\r?\n      name: ("(?:[^"\\]|\\(?:\r?\n[ \t]*|[^\r\n]))*")\r?\n/.exec(body);
+  if (!row) throw new Error("dsh-plugin-user-override");
+  let url;
+  try { url = new URL(JSON.parse(row[1].replace(/\\\r?\n[ \t]*/g, ""))); }
+  catch { throw new Error("dsh-plugin-user-override"); }
+  if (url.protocol !== "file:" || !url.pathname.endsWith("/deepseek-harness/index.mjs")) throw new Error("dsh-plugin-user-override");
+  const remaining = body.slice(row[0].length);
+  // An indented continuation could change the owned insert or plugin. Retain
+  // the whole file rather than guessing how to remove part of an unknown row.
+  const first = remaining.split(/\r?\n/).find(line => line.trim() && !/^\s*#/.test(line));
+  if (first && !/^- /.test(first)) throw new Error("dsh-plugin-user-override");
+  return text.slice(0, start) + remaining + text.slice(end + END.length).replace(/^\r?\n/, "");
 }
 
 class DshIntegration {
@@ -42,8 +58,6 @@ class DshIntegration {
     const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
     if (text.length > 1024 * 1024) throw new Error("dsh-patch-too-large");
     const base = withoutBlock(text);
-    const owned = text.slice(text.indexOf(START), text.indexOf(END));
-    if (/\b(?:disabled:\s*true|enabled:\s*false)\b/.test(owned)) throw new Error("dsh-plugin-user-override");
     // Any separately owned override of our ID is authoritative (including disable
     // patches). Do not guess YAML semantics or shadow an explicit user choice.
     if (base.includes(ID) || base.includes("deepseek-harness/index.mjs")) throw new Error("dsh-plugin-user-override");
@@ -57,8 +71,8 @@ class DshIntegration {
       const values = dirs.map(dir => this.inspect(dir));
       installed = values.some(v => v.text.includes(START));
       const assets = ["index.mjs", "package.json"].every(name => fs.existsSync(path.join(this.target, name))
-        && fs.readFileSync(path.join(this.target, name)).equals(fs.readFileSync(path.join(this.assetRoot, name))));
-      const healthy = assets && values.every(v => v.text.includes(this.block()));
+        && lf(fs.readFileSync(path.join(this.target, name), "utf8")) === lf(fs.readFileSync(path.join(this.assetRoot, name), "utf8")));
+      const healthy = assets && values.every(v => lf(v.text).includes(this.block()));
       return { detected: true, installed, healthy, disabled: false, reason: healthy ? "healthy" : "dsh-restart-or-repair-required" };
     } catch (error) {
       return { detected: true, installed, healthy: false, disabled: error.message === "dsh-plugin-user-override", reason: error.message };

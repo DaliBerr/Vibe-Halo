@@ -195,20 +195,23 @@ test("DSH expires and unloads requests without granting, and ignores invalid que
   assert.equal(f.approvals.size, 0);
 });
 
-test("DSH continued timed answers use the owning late-reply method and native answers withdraw the island", async t => {
+test("DSH continued timed answers use the owning late-reply method and native answers withdraw the island", { timeout: 5000 }, async t => {
   const f = await fixture(t), controller = new AbortController();
   const q = [{ id: "late-q", question: "稍后回答", options: [{ label: "甲" }] }];
   const firstReady = once(f.approvals, "changed");
   const first = f.call("user-questions/request", { questions: q, signal: controller.signal, wait: { callId: "timed", timed: true } });
   await firstReady; const gone = once(f.approvals, "changed"); controller.abort();
   await assert.rejects(first, { name: "AbortError" }); await gone;
-  let reply;
-  f.ctx.userQuestions = { answer: (agent, callId, answer) => { reply = { agent, callId, answer }; return true; } };
+  let reply, delivered;
+  const replied = new Promise(resolve => { delivered = resolve; });
+  f.ctx.userQuestions = { answer: (agent, callId, answer) => { reply = { agent, callId, answer }; delivered(); return true; } };
   const lateReady = once(f.approvals, "changed");
   f.ctx.emit("session/event", f.agent.session, { type: "tool/result", data: { message: { toolCallId: "timed", content: [{ type: "text", text: '{"pending":true,"callId":"timed"}' }] } } });
   await lateReady;
-  new DecisionService({ approvalStore: f.approvals }).decideLocal({ approvalId: f.approvals.current.id, optionId: "submit", answers: { q_1: "option_1" } });
-  await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  assert.equal(new DecisionService({ approvalStore: f.approvals }).decideLocal({ approvalId: f.approvals.current.id, optionId: "submit", answers: { q_1: "option_1" } }).accepted, true);
+  // Wait for the HTTP response to reach the owning DSH service, then let its
+  // completed late-answer entry clean up before dispatching another event.
+  await replied; await new Promise(r => setImmediate(r));
   assert.equal(reply.callId, "timed");
   assert.equal(reply.agent, f.agent);
   assert.deepEqual(reply.answer, { answers: [{ id: "late-q", selected: ["甲"] }] });

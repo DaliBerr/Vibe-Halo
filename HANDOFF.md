@@ -1,8 +1,35 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-03 (DSH parallel native/island answers; not a release)
-Current version: `0.6.6` (Windows and Android); `0.6.3` (macOS/Linux preview)
+Updated: 2026-11-04 (0.6.7 release preparation)
+Current version: `0.6.7` (Windows and Android); `0.6.3` (macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-04 — 0.6.7 release preparation
+
+The owner accepted the DSH tests and authorized publication. Windows 0.6.7
+includes the twentieth adapter, its managed plugin and parallel native/island
+question answers. Android 0.6.7 uses versionCode 8 for the new question details
+and exact answer encoding while retaining the existing application/signing
+identity. macOS/Linux public previews remain at 0.6.3.
+
+Pre-release audit found that the DSH late-reply test assumed an HTTP response
+would arrive within two `setImmediate` callbacks. That assumption failed on
+macOS arm64; the test now waits for delivery to the owning question service
+before checking its result. This changes test synchronization only.
+
+The profile installer now preserves unrelated top-level patches when DSH's
+native YAML writer places them before the trailing managed comment, including
+wrapped file URLs. Ambiguous edits to the owned row block repair/removal rather
+than guessing ownership. Health checks accept equivalent LF/CRLF text assets.
+Three regressions cover these configuration-protection cases.
+
+Local release preflight passed: 282 desktop tests (281 pass, one existing
+POSIX-only skip), all six protocol tests, normal and update-enabled Windows
+package verification and an NSIS build. The Firebase-configured Android release
+build and all 13 release JVM tests passed; release lint reported zero errors
+and 31 warnings. The signed APK preserves the public 0.6.6 certificate, passes
+v2/v3 verification and alignment, and reports package `com.vibe.halo.mobile`,
+versionName 0.6.7, versionCode 8. Publication evidence follows after completion.
 
 ## 2026-11-03 — DSH native and island questions in parallel
 
