@@ -2,16 +2,30 @@
 
 const { CLIENT_PREFERENCE_DEFAULTS } = require("./settings-store");
 const { LANGUAGE_PREFERENCES, translateReason } = require("./i18n");
+const { copyValue, historyDetail, historyListState, validId, COPY_SECTIONS } = require("./history-presenter");
+const { truncateUtf8 } = require("./history-store");
 
 const GENERAL_BOOLEAN_KEYS = Object.freeze(["approvalEnabled", "inputReminderEnabled", "historyEnabled", "openAtLogin"]);
 const CLIENT_PREFERENCE_KEYS = Object.freeze(Object.keys(CLIENT_PREFERENCE_DEFAULTS));
 const SIMPLE_ACTIONS = Object.freeze([
-  "rescan", "repair-all", "uninstall-all", "open-history", "open-mobile", "open-logs",
-  "copy-diagnostics", "check-updates", "install-update", "codex-enable-feature", "codex-copy-review",
+  "rescan", "repair-all", "uninstall-all", "open-logs", "copy-diagnostics", "check-updates", "install-update",
+  "codex-enable-feature", "codex-copy-review", "history-list", "history-clear",
 ]);
-const CLIENT_ACTIONS = Object.freeze(["client-enabled", "client-preference", "client-repair", "client-open-config"]);
-const MAX_CONFIG_PATHS = 6;
+const CLIENT_ACTIONS = Object.freeze(["client-enabled", "client-visible", "client-preference", "client-repair"]);
+const HISTORY_ID_ACTIONS = Object.freeze(["history-get", "history-delete", "history-copy"]);
 const AGENT_ID = /^[a-z0-9-]{1,80}$/;
+// Bundled brand icons (src/settings-renderer/icons, LobeHub Icons, MIT). Mono icons are tinted with the theme text color.
+const CLIENT_ICONS = Object.freeze({
+  codex: "color", zcode: "mono", "qwen-code": "color", "copilot-cli": "mono", "claude-code": "color",
+  codebuddy: "color", hermes: "mono", opencode: "mono", "deepseek-harness": "color", "kimi-code": "color",
+  qoder: "mono", qoderwork: "mono", "gemini-cli": "color", antigravity: "color", "cursor-agent": "mono",
+  kiro: "color", openclaw: "color",
+});
+
+function clientIcon(agentId) {
+  const mode = CLIENT_ICONS[agentId];
+  return mode ? { src: `icons/${agentId}.svg`, mono: mode === "mono" } : null;
+}
 
 function plainObject(value) {
   return !!value && typeof value === "object" && !Array.isArray(value)
@@ -26,6 +40,14 @@ function validateSettingsAction(input, knownAgent = () => true) {
   if (size > 1024) return null;
   const { type } = input;
   if (SIMPLE_ACTIONS.includes(type)) return { type };
+  if (HISTORY_ID_ACTIONS.includes(type)) {
+    if (!validId(input.id)) return null;
+    if (type === "history-copy") return COPY_SECTIONS.has(input.section) ? { type, id: input.id, section: input.section } : null;
+    return { type, id: input.id };
+  }
+  if (type === "mobile") {
+    return plainObject(input.request) && typeof input.request.action === "string" ? { type, request: input.request } : null;
+  }
   if (type === "general") {
     if (GENERAL_BOOLEAN_KEYS.includes(input.key) && typeof input.value === "boolean") return { type, key: input.key, value: input.value };
     if (input.key === "language" && LANGUAGE_PREFERENCES.includes(input.value)) return { type, key: input.key, value: input.value };
@@ -33,7 +55,7 @@ function validateSettingsAction(input, knownAgent = () => true) {
   }
   if (!CLIENT_ACTIONS.includes(type)) return null;
   if (typeof input.agentId !== "string" || !AGENT_ID.test(input.agentId) || !knownAgent(input.agentId)) return null;
-  if (type === "client-enabled") {
+  if (type === "client-enabled" || type === "client-visible") {
     return typeof input.value === "boolean" ? { type, agentId: input.agentId, value: input.value } : null;
   }
   if (type === "client-preference") {
@@ -62,12 +84,6 @@ function statusKey({ available, enabled, status }) {
   return "repair";
 }
 
-function verificationKey(state, descriptor) {
-  if (state.verification === "live" || descriptor.liveVerification === "local") return "live";
-  if (state.verification === "contract" || descriptor.liveVerification === "contract-only") return "contract";
-  return "none";
-}
-
 class SettingsService {
   constructor(options) {
     this.settings = options.settings;
@@ -80,6 +96,8 @@ class SettingsService {
     this.getUpdate = options.getUpdate || (() => ({ enabled: false, status: "disabled" }));
     this.getHistoryCount = options.getHistoryCount || (() => 0);
     this.getTheme = options.getTheme || (() => "light");
+    this.history = options.history || null;
+    this.companion = options.companion || null;
     this.effects = {
       setLogin: () => false,
       setLanguage: () => false,
@@ -87,9 +105,6 @@ class SettingsService {
       onClientChanged: () => {},
       confirm: async () => false,
       copyText: () => {},
-      showConfigPath: () => false,
-      openHistory: () => {},
-      openMobile: () => {},
       openLogs: () => {},
       diagnostics: () => "",
       checkUpdates: () => {},
@@ -119,33 +134,38 @@ class SettingsService {
     catch (error) { status = { detected: false, installed: false, healthy: false, disabled: false, reason: error.message }; }
     const available = descriptor.platforms?.[this.platform] === true;
     const enabled = state.enabled === true;
-    const features = supportedFeatures(descriptor);
     const preferences = this.settings.getClientPreferences(descriptor.id);
-    let configPaths = [];
-    try { configPaths = (this.integrationManager.paths(descriptor.id) || []).slice(0, MAX_CONFIG_PATHS).map(String); } catch {}
     const reason = enabled ? (state.reason || status.reason || "") : "";
+    const codex = descriptor.id === "codex" ? this.codexStatus() : null;
+    let clientStatus = statusKey({ available, enabled, status });
+    // Codex writes its hook first and then waits for the user's /hooks trust review.
+    if (codex && enabled && status.installed && codex.trustPending && !codex.featureDisabled) clientStatus = "review";
     return {
       id: descriptor.id,
       name: descriptor.name,
-      tier: descriptor.tier,
-      transport: descriptor.transport,
       appearance: descriptor.appearance || { glyph: "A", accent: "#64748B", inkLight: "#334155", inkDark: "#CBD5E1" },
+      icon: clientIcon(descriptor.id),
       available,
       enabled,
+      visible: this.settings.isClientVisible(descriptor.id),
       detected: status.detected === true,
-      executable: status.executable === true,
-      installed: status.installed === true,
       healthy: status.healthy === true,
-      clientDisabled: status.disabled === true,
-      status: statusKey({ available, enabled, status }),
+      status: clientStatus,
       canToggle: available && (enabled || status.detected === true),
-      verification: verificationKey(state, descriptor),
-      reason: reason && reason !== "healthy" && reason !== "disabled-by-user" ? translateReason(this.localization, reason) : "",
-      features,
+      reason: reason && clientStatus !== "review" && !["healthy", "disabled-by-user", "missing"].includes(reason) ? translateReason(this.localization, reason) : "",
+      features: supportedFeatures(descriptor),
       preferences: Object.fromEntries(CLIENT_PREFERENCE_KEYS.map(key => [key, preferences[key] === true])),
-      configPaths,
-      codex: descriptor.id === "codex" ? this.codexStatus() : null,
+      codex,
     };
+  }
+
+  historyState() {
+    if (!this.history) return null;
+    return historyListState(this.history, this.localization, { shouldUseDarkColors: this.getTheme() === "dark" });
+  }
+
+  companionSnapshot() {
+    try { return this.companion?.snapshot?.() || null; } catch { return null; }
   }
 
   state() {
@@ -163,7 +183,8 @@ class SettingsService {
         openAtLogin: this.settings.get("openAtLogin") === true,
         language: this.settings.get("language"),
         version: this.version,
-        historyCount: this.getHistoryCount(),
+        historyCount: this.history ? this.history.snapshot().count : this.getHistoryCount(),
+        historyMode: this.history ? this.history.snapshot().mode : "memory",
         update: {
           enabled: update.enabled === true,
           status: typeof update.status === "string" ? update.status : "disabled",
@@ -177,6 +198,8 @@ class SettingsService {
         detected: clients.filter(client => client.detected).length,
       },
       clients,
+      icons: Object.fromEntries(Object.keys(CLIENT_ICONS).map(id => [id, clientIcon(id)])),
+      companion: this.companionSnapshot(),
     };
   }
 
@@ -208,9 +231,44 @@ class SettingsService {
           ? this.result(this.t("settings.repaired", { agentName }), "success")
           : this.result(this.t("settings.enableFailed", { agentName, reason: translateReason(this.localization, repaired?.reason) }), "error");
       }
-      case "client-open-config": {
-        const shown = this.effects.showConfigPath(descriptor.id);
-        return this.result(shown ? "" : this.t("settings.configMissing"), shown ? "info" : "error");
+      case "client-visible":
+        this.settings.setClientVisible(descriptor.id, action.value);
+        return this.result("");
+      case "history-list":
+        return { ok: true, history: this.historyState() };
+      case "history-get": {
+        const detail = this.history ? historyDetail(this.history, this.localization, action.id) : null;
+        return detail ? { ok: true, detail } : { ok: false, error: "not-found" };
+      }
+      case "history-copy": {
+        const detail = this.history ? historyDetail(this.history, this.localization, action.id) : null;
+        const value = copyValue(detail, action.section);
+        if (!value) return { ok: false, error: "not-found" };
+        this.effects.copyText(truncateUtf8(value, 128 * 1024));
+        return { ok: true, message: { tone: "success", text: this.t("history.copied") } };
+      }
+      case "history-delete": {
+        if (!this.history?.get(action.id)) return { ok: false, error: "not-found" };
+        if (!await this.effects.confirm({
+          message: this.t("history.deleteConfirm"), detail: this.t("history.deleteDetail"),
+          confirm: this.t("history.delete"), type: "warning",
+        })) return { ok: false, error: "cancelled" };
+        this.history.remove(action.id);
+        return { ok: true, history: this.historyState() };
+      }
+      case "history-clear": {
+        if (!this.history?.snapshot().count) return { ok: false, error: "empty" };
+        if (!await this.effects.confirm({
+          message: this.t("history.clearConfirm"), detail: this.t("history.clearDetail"),
+          confirm: this.t("history.clear"), type: "warning",
+        })) return { ok: false, error: "cancelled" };
+        this.history.clear("user-cleared");
+        return { ok: true, history: this.historyState() };
+      }
+      case "mobile": {
+        if (!this.companion?.perform) return { ok: false, error: "unavailable" };
+        const companion = await this.companion.perform(action.request);
+        return companion?.error ? { ok: false, error: companion.error } : { ok: true, companion };
       }
       case "codex-enable-feature": {
         if (!await this.effects.confirm({
@@ -250,8 +308,6 @@ class SettingsService {
         }
         return this.result(this.t("settings.removedAll"), "success");
       }
-      case "open-history": this.effects.openHistory(); return this.result("");
-      case "open-mobile": this.effects.openMobile(); return this.result("");
       case "open-logs": this.effects.openLogs(); return this.result("");
       case "copy-diagnostics":
         this.effects.copyText(this.effects.diagnostics());
@@ -298,6 +354,7 @@ class SettingsService {
 }
 
 module.exports = {
+  CLIENT_ICONS,
   CLIENT_PREFERENCE_KEYS,
   GENERAL_BOOLEAN_KEYS,
   SettingsService,

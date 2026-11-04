@@ -28,18 +28,18 @@
 
 ### Recent events
 
-- Open **Recent events** from the tray to show a separate 460 × 720 right-side panel; drag either view's top header to reposition it. The live top-center island remains independent and stays above it.
+- Open **Recent events** from the tray (or the Settings sidebar) to show the history page of the settings window. The live top-center island remains independent and stays above it.
 - The list can be filtered by all events, approvals, questions, plans, or source client. Selecting an entry opens read-only details with separate copy controls for commands, parameters, answers, content, and working directories.
 - Approval outcomes—including allow, deny, return-to-client, timeout, disconnect, and close—are retained. Exact in-island answers and best-effort Codex `request_user_input` answers are retained; incompatible Codex output is marked as unavailable.
 - Codex and ZCode plan-ready output is retained. Ordinary task-completion notifications are deliberately excluded.
-- History keeps at most 200 events for 30 days and caps its file at 16 MiB. Moving the pointer away closes the panel after five seconds; it opens only from the tray or the Settings sidebar.
+- History keeps at most 200 events for 30 days and caps its file at 16 MiB.
 
 ### Integration management
 
-- Clients are off by default. At startup, Vibe Halo detects clients by executable or initialized configuration, but installs or repairs only the clients you enabled in **Settings**. Integrations that were already installed and active before this change stay enabled.
+- Only **Codex**, **Claude Code** and **DeepSeek Harness** are on by default; every other client stays off until you enable it in **Settings**. At startup, Vibe Halo detects clients by executable or initialized configuration and installs or repairs only enabled, detected clients. Integrations that were already installed before this change stay enabled.
 - Each client receives its own first-state backup before any edit. JSON, JSONC, TOML, and plugin installers preserve third-party content.
 - Explicit client disables—such as Codex `hooks=false`—are respected and are never silently reversed.
-- **Settings** lists every client in a sidebar grouped as enabled, detected, or not detected. Each client page turns the integration on or off and chooses what it may show: island approvals, island questions, waiting-for-input reminders, and completion notices (only the features its adapter supports).
+- The Settings sidebar shows only detected clients you chose to display (by default the three default clients). Choose them under **General → Clients in the sidebar**; clients not found on this computer are hidden. Hiding a client does not turn it off. Each client page turns the integration on or off and chooses what it may show: island approvals, island questions, waiting-for-input reminders, and completion notices (only the features its adapter supports).
 - Turning a client off removes only Vibe Halo's own entries. Events from a client that is off, or from a feature that is off, return the client's native no-decision fallback.
 - **General** in Settings also offers rescan, repair of enabled clients, and uninstall-all.
 
@@ -94,7 +94,7 @@ flowchart LR
     D --> B
     B --> A
     D --> J["Bounded local history"]
-    J --> K["Tray-opened right-side panel"]
+    J --> K["Settings window history page"]
     I["Integration Manager"] -. "backup, incremental install, health" .-> B
 ```
 
@@ -122,8 +122,8 @@ Other Linux distributions may work with the AppImage, but are not part of the fi
 After installation:
 
 1. Launch Vibe Halo. It stays in the system tray; the first launch opens **Settings**, and launching it again or clicking the tray icon brings Settings back.
-2. The app scans for installed or initialized supported clients. Every client is off until you enable it.
-3. In Settings, select your client in the sidebar, turn it on, and check its detection and health. The **Client integrations** section of **General** summarizes all clients.
+2. The app scans for installed or initialized supported clients. Codex, Claude Code and DeepSeek Harness are on by default; other clients stay off until you enable them.
+3. In Settings, select your client in the sidebar (or show it first under **General → Clients in the sidebar**), turn it on, and check its connection status.
 4. For Codex, enter `/hooks` in Codex and review the Vibe Halo `PermissionRequest`, `Stop`, and `UserPromptSubmit` entries under the user-level `~/.codex/hooks.json`.
 5. Trigger one approval or completion from the client and confirm that the island appears and that the result returns correctly.
 
@@ -180,12 +180,14 @@ Use `npm install` and commit the updated `package-lock.json` when intentionally 
 
 ### Settings window
 
-Open **Settings…** from the tray (or click the tray icon when nothing is pending). The sidebar has **General** at the top, a client search box, and every supported client grouped as enabled, detected, or not detected.
+Open **Settings…** from the tray (or click the tray icon when nothing is pending). The sidebar has **General**, **Recent events** and **Mobile companion** at the top, followed by the clients you chose to show, each with its own app icon.
 
 | Page | Controls |
 | --- | --- |
-| **General** | **Client integrations** summary with **Rescan** and **Repair enabled**; global **Approvals in the island**, **Waiting-for-input reminders**, and **Record recent events** switches; **Launch at login**; **Language** (Follow system, English, Simplified Chinese); version, updates, **Copy diagnostics**, **Open log folder**, and **Remove all…** |
-| A client | **Enable** switch; per-client island approvals, island questions, waiting-for-input reminders, and completion notices; detection, hook, verification, and configuration paths; **Repair** and **Show in folder**. Codex additionally shows hooks-feature and `/hooks` review guidance |
+| **General** | **Clients in the sidebar** (show or hide each detected client) with **Rescan** and **Repair enabled**; global **Approvals in the island**, **Waiting-for-input reminders**, and **Record recent events** switches; **Launch at login**; **Language** (Follow system, English, Simplified Chinese); version, updates, **Copy diagnostics**, **Open log folder**, and **Remove all…** |
+| **Recent events** | Filters by kind and client, read-only details with copy buttons, delete one, and clear all |
+| **Mobile companion** | Computer name, companion on/off, service and LAN state, remote-decision permission, test reminder, phone pairing with fingerprint confirmation, and connected phones |
+| A client | **Enable** switch; per-client island approvals, island questions, waiting-for-input reminders, and completion notices; a plain-language connection status with **Reconnect** or **Check again** when needed. Codex shows its `/hooks` review step with **Copy /hooks** |
 
 Global switches win over per-client switches: when **Approvals in the island** is off, every client handles approvals and questions natively.
 
@@ -194,8 +196,8 @@ Global switches win over per-client switches: when **Approvals in the island** i
 | Menu item | Purpose |
 | --- | --- |
 | **Settings…** | Opens the settings window |
-| **Recent events** | Opens the independent right-side history panel and shows the current retained count |
-| **Mobile companion…** | Opens phone pairing and remote settings |
+| **Recent events** | Opens the history page in the settings window and shows the current retained count |
+| **Mobile companion…** | Opens the phone-companion page in the settings window |
 | **Enable approvals** | Quick global island-approval switch |
 | **Input reminders** | Quick switch for read-only input reminders and native-approval reminders |
 | **Check for updates** | Appears only in official Windows stable builds |
@@ -249,7 +251,7 @@ Settings, logs, and integration backups live under Electron's `userData` directo
 | Layer | Technology |
 | --- | --- |
 | Desktop runtime | Electron 41, CommonJS, Node.js |
-| UI | Native HTML, CSS, and JavaScript in one live-island window plus one optional history window |
+| UI | Native HTML, CSS, and JavaScript in one live-island window plus one settings window |
 | Local transport | Node HTTP, loopback-only, per-process token |
 | Platform integration | `PlatformAdapter`, `koffi` on Windows, POSIX launchers, system tray |
 | Packaging | x64 NSIS; arm64/x64 DMG and ZIP; x64 AppImage and deb |
@@ -276,8 +278,9 @@ The desktop core uses Electron and local files without a frontend framework. The
 │   ├── island-controller.js     # Live island placement, priority, IPC, animation
 │   ├── history-store.js         # Bounded encrypted/plaintext recent-event persistence
 │   ├── history-events.js        # Approval, question, native-answer, and plan mapping
-│   ├── history-window-controller.js # Isolated right-side history window and IPC
-│   ├── history-preload.js       # Constrained history renderer bridge
+│   ├── history-presenter.js     # Localized history list/detail view models and copy regions
+│   ├── settings-service.js      # Settings state and validated actions (clients, history, companion)
+│   ├── settings-window-controller.js # Sandboxed settings window and IPC
 │   ├── update-manager.js        # Signed-build gate, checks, downloads, explicit install
 │   ├── shutdown-coordinator.js  # Ordered safe shutdown shared by quit and update
 │   ├── renderer/                # Native dynamic-island UI
@@ -371,7 +374,7 @@ npm start -- --smoke-test
 
 ### Development principles
 
-- Preserve CommonJS and the native renderers. Keep the window boundary to one live island, one tray-opened settings window, and one optional history window.
+- Preserve CommonJS and the native renderers. Keep the window boundary to one live island and one tray-opened settings window (which hosts history and the phone companion).
 - Protocol, queue, timeout, IPC, window-size, and integration-installer changes require regression tests.
 - Never commit `node_modules/`, `dist/`, `.smoke/`, logs, credentials, or local runtime data.
 - After changing hook command paths, run “Repair all” and review the changed commands again in Codex `/hooks`.

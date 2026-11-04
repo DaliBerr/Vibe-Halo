@@ -36,14 +36,13 @@ const { agent, listAgents } = require("./agent-registry");
 const { ApprovalStore } = require("./approval-store");
 const { DecisionService } = require("./decision-service");
 const { RemoteService } = require("./remote/remote-service");
-const { RemoteSettingsWindow } = require("./remote/settings-window");
+const { performCompanionAction } = require("./remote/companion-actions");
 const { CodexInputMonitor } = require("./codex-input-monitor");
 const { completionFromStop } = require("./completion-event");
 const { CompletionStore } = require("./completion-store");
 const { HookManager } = require("./hook-manager");
 const { approvalHistoryRecord, inputHistoryRecord, planHistoryRecord } = require("./history-events");
 const { HistoryStore } = require("./history-store");
-const { HistoryWindowController } = require("./history-window-controller");
 const { createLocalizer, translateReason } = require("./i18n");
 const { IntegrationManager } = require("./integration-manager");
 const { IslandController } = require("./island-controller");
@@ -124,7 +123,6 @@ function startApplication() {
   let tray = null;
   let island = null;
   let history = null;
-  let historyWindow = null;
   let server = null;
   let inputMonitor = null;
   let hookManager = null;
@@ -134,7 +132,6 @@ function startApplication() {
   let updateManager = null;
   let shutdownCoordinator = null;
   let remote = null;
-  let remoteWindow = null;
   let settingsWindow = null;
   let localization = createLocalizer({ preference: "system", systemLocale: "en-US" });
   const t = (key, params) => localization.t(key, params);
@@ -159,7 +156,7 @@ function startApplication() {
               else approvals.shutdown();
             },
           },
-          { name: "remote-companion", run: async () => { remoteWindow?.destroy(); await remote?.stop(); } },
+          { name: "remote-companion", run: async () => { await remote?.stop(); } },
           { name: "updater", run: () => updateManager?.stop() },
           {
             name: "input-monitor",
@@ -180,13 +177,6 @@ function startApplication() {
             run: () => {
               settingsWindow?.destroy();
               settingsWindow = null;
-            },
-          },
-          {
-            name: "history-window",
-            run: () => {
-              historyWindow?.destroy();
-              historyWindow = null;
             },
           },
           {
@@ -364,7 +354,6 @@ function startApplication() {
     localization.setPreference(preference);
     if (island) island.refresh("language");
     else rebuildTray();
-    historyWindow?.refresh();
     settingsWindow?.refresh();
     return true;
   }
@@ -401,29 +390,6 @@ function startApplication() {
     rebuildTray();
   }
 
-  function showConfigPath(agentId) {
-    let candidates = [];
-    try { candidates = integrationManager.paths(agentId) || []; } catch {}
-    for (const target of candidates) {
-      try {
-        if (!fs.existsSync(target)) continue;
-        if (fs.statSync(target).isDirectory()) shell.openPath(target);
-        else shell.showItemInFolder(target);
-        return true;
-      } catch {}
-    }
-    for (const target of candidates) {
-      const parent = path.dirname(target);
-      try {
-        if (fs.existsSync(parent)) {
-          shell.openPath(parent);
-          return true;
-        }
-      } catch {}
-    }
-    return false;
-  }
-
   async function confirmFromSettings({ message, detail, confirm, type }) {
     const options = {
       type: type || "question",
@@ -439,21 +405,8 @@ function startApplication() {
     return result.response === 1;
   }
 
-  async function openHistory() {
-    if (!history || !historyWindow) return false;
-    const status = history.snapshot();
-    if (status.mode === "plaintext" && !settings.get("historyPlaintextWarningSeen")) {
-      await dialog.showMessageBox({
-        type: "warning",
-        buttons: [t("renderer.close")],
-        defaultId: 0,
-        title: t("dialog.plaintextHistoryTitle"),
-        message: t("history.unencryptedWarning"),
-        detail: t("dialog.plaintextHistoryDetail"),
-      });
-      settings.set("historyPlaintextWarningSeen", true);
-    }
-    return historyWindow.open();
+  function openHistory() {
+    return openSettings("history");
   }
 
   function rebuildTray() {
@@ -500,7 +453,7 @@ function startApplication() {
       { type: "separator" },
       { label: t("tray.settings"), click: () => openSettings("general") },
       { label: t("tray.recentEvents", { count: history?.snapshot().count || 0 }), click: () => openHistory() },
-      { label: t("tray.mobileCompanion"), click: () => remoteWindow?.show() },
+      { label: t("tray.mobileCompanion"), click: () => openSettings("mobile") },
     ];
     if (codexEnabled && (hook.feature === "false" || hook.trust.pendingCount > 0)) {
       items.push({
@@ -609,7 +562,6 @@ function startApplication() {
     remote = new RemoteService({ userData: app.getPath("userData"), safeStorage, approvals, decisions, logger,
       allowLocal: !app.isPackaged && process.env.VIBE_HALO_TEST === "1" });
     await remote.initialize({ autoConnect: process.env.VIBE_HALO_TEST !== "1" });
-    remoteWindow = new RemoteSettingsWindow({ BrowserWindow, ipcMain, remote });
     localization = createLocalizer({ preference: settings.get("language"), systemLocale: app.getLocale() });
     remote.getLocale = () => localization.locale;
     integrationManager = createIntegrationManager(logger, settings);
@@ -646,19 +598,6 @@ function startApplication() {
     inputRequests.on("finalized", event => appendHistory(inputHistoryRecord(event)));
     completions.on("shown", item => appendHistory(planHistoryRecord(item)));
     history.on("changed", () => rebuildTray());
-    historyWindow = new HistoryWindowController({
-      BrowserWindow,
-      clipboard,
-      dialog,
-      historyStore: history,
-      ipcMain,
-      localization,
-      logger,
-      nativeTheme,
-      platformAdapter,
-      screen,
-    });
-
     island = new IslandController({
       BrowserWindow,
       clipboard,
@@ -748,6 +687,11 @@ function startApplication() {
       getUpdate: () => updateManager?.snapshot(),
       getHistoryCount: () => history?.snapshot().count || 0,
       getTheme: () => (nativeTheme.shouldUseDarkColors ? "dark" : "light"),
+      history,
+      companion: {
+        snapshot: () => remote.snapshot(),
+        perform: input => performCompanionAction(remote, input),
+      },
       effects: {
         setLogin,
         setLanguage,
@@ -755,9 +699,6 @@ function startApplication() {
         onClientChanged: onClientSettingChanged,
         confirm: confirmFromSettings,
         copyText: value => clipboard.writeText(String(value || "")),
-        showConfigPath,
-        openHistory: () => openHistory(),
-        openMobile: () => remoteWindow?.show(),
         openLogs: () => shell.openPath(path.dirname(logger.filePath)),
         diagnostics: () => diagnosticText(),
         checkUpdates: () => updateManager?.check({ manual: true }),
@@ -772,6 +713,7 @@ function startApplication() {
       platform: platformAdapter.platform,
       logger,
     });
+    remote.on("changed", () => settingsWindow?.refresh());
 
     tray = new Tray(trayImage());
     tray.on("click", () => {
@@ -944,15 +886,15 @@ function startApplication() {
         createdAt: now - 60_000,
         finalizedAt: now - 60_000,
       });
-      historyWindow.open();
+      openSettings("history");
       if (process.env.VIBE_HALO_HISTORY_SCREENSHOT) {
-        smokeTasks.schedule(1000, async () => {
+        smokeTasks.schedule(1200, async () => {
           try {
-            await captureSmokeWindow(historyWindow.window, process.env.VIBE_HALO_HISTORY_SCREENSHOT, "Boolean(document.querySelector('.event-card'))");
+            await captureSmokeWindow(settingsWindow.window, process.env.VIBE_HALO_HISTORY_SCREENSHOT, "Boolean(document.querySelector('.event-card'))");
             if (process.env.VIBE_HALO_HISTORY_DETAIL_SCREENSHOT) {
-              await historyWindow.window.webContents.executeJavaScript(`document.querySelector('.event-card:last-child')?.click()`, true);
-              await new Promise(resolve => setTimeout(resolve, 180));
-              await captureSmokeWindow(historyWindow.window, process.env.VIBE_HALO_HISTORY_DETAIL_SCREENSHOT, "document.querySelector('#detail-view')?.hidden === false && Boolean(document.querySelector('#detail-sections')?.children.length)");
+              await settingsWindow.window.webContents.executeJavaScript(`document.querySelector('.event-card:last-child')?.click()`, true);
+              await new Promise(resolve => setTimeout(resolve, 240));
+              await captureSmokeWindow(settingsWindow.window, process.env.VIBE_HALO_HISTORY_DETAIL_SCREENSHOT, "Boolean(document.querySelector('#detail-view')) && Boolean(document.querySelector('#detail-sections')?.children.length)");
             }
           } catch (error) {
             logger.warn("Demo history screenshot failed", { message: error.message });

@@ -10,7 +10,9 @@ const { agent, listAgents } = require("../src/agent-registry");
 const { createLocalizer, catalogDifferences } = require("../src/i18n");
 const { InputRequestStore } = require("../src/input-request-store");
 const { IntegrationManager } = require("../src/integration-manager");
-const { SettingsService, supportedFeatures, validateSettingsAction } = require("../src/settings-service");
+const { HistoryStore } = require("../src/history-store");
+const { performCompanionAction, validCompanionInput } = require("../src/remote/companion-actions");
+const { CLIENT_ICONS, SettingsService, supportedFeatures, validateSettingsAction } = require("../src/settings-service");
 const { SettingsStore } = require("../src/settings-store");
 const { SettingsWindowController } = require("../src/settings-window-controller");
 
@@ -47,6 +49,8 @@ function serviceFixture(options = {}) {
     localization: createLocalizer({ preference: options.locale || "en-US" }),
     platform: "win32",
     version: "1.2.3",
+    history: options.history,
+    companion: options.companion,
     effects: {
       onClientChanged: (id, change) => effects.changed.push([id, change]),
       copyText: value => effects.copied.push(value),
@@ -57,7 +61,7 @@ function serviceFixture(options = {}) {
   return { root, settings, integrationManager, service, effects, cleanup: () => fs.rmSync(root, { recursive: true, force: true }) };
 }
 
-test("clients default to off while existing healthy installs migrate as enabled", () => {
+test("only Codex, Claude Code and DSH default on; existing installs migrate as enabled", () => {
   const root = tempDir("vibe-halo-settings-default-");
   try {
     const filePath = path.join(root, "settings.json");
@@ -74,8 +78,12 @@ test("clients default to off while existing healthy installs migrate as enabled"
     assert.equal(settings.isClientEnabled("zcode"), false);
     assert.equal(settings.isClientEnabled("qoder"), false);
     assert.equal(settings.isClientEnabled("kiro"), true);
-    assert.equal(settings.isClientEnabled("claude-code"), false);
-    assert.equal(settings.getIntegration("claude-code").disabledByUser, true);
+    assert.equal(settings.isClientEnabled("claude-code"), true, "default client without stored state");
+    assert.equal(settings.isClientEnabled("deepseek-harness"), true);
+    assert.equal(settings.isClientEnabled("gemini-cli"), false);
+    assert.equal(settings.getIntegration("gemini-cli").disabledByUser, true);
+    settings.setIntegration("claude-code", { enabled: false });
+    assert.equal(new SettingsStore(filePath).isClientEnabled("claude-code"), false, "an explicit off wins over the default");
 
     settings.setIntegration("qoder", { disabledByUser: false });
     assert.equal(settings.isClientEnabled("qoder"), true);
@@ -83,6 +91,28 @@ test("clients default to off while existing healthy installs migrate as enabled"
     assert.equal(settings.isClientEnabled("qoder"), true, "status patches keep the user's choice");
     settings.setIntegration("qoder", { enabled: false });
     assert.equal(new SettingsStore(filePath).getIntegration("qoder").disabledByUser, true, "older builds read the off state");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("sidebar visibility defaults to the default and enabled clients and persists", () => {
+  const root = tempDir("vibe-halo-settings-visible-");
+  try {
+    const filePath = path.join(root, "settings.json");
+    const settings = new SettingsStore(filePath);
+    assert.equal(settings.isClientVisible("codex"), true);
+    assert.equal(settings.isClientVisible("claude-code"), true);
+    assert.equal(settings.isClientVisible("deepseek-harness"), true);
+    assert.equal(settings.isClientVisible("zcode"), false);
+    settings.setIntegration("zcode", { enabled: true });
+    assert.equal(settings.isClientVisible("zcode"), true, "an enabled client is shown until hidden");
+    assert.equal(settings.setClientVisible("codex", false), true);
+    assert.equal(settings.setClientVisible("codex", "no"), false);
+    const reloaded = new SettingsStore(filePath);
+    assert.equal(reloaded.isClientVisible("codex"), false);
+    assert.equal(reloaded.isClientEnabled("codex"), true, "hiding does not turn a client off");
+    assert.equal(reloaded.getClientPreferences("codex").approvals, true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -158,6 +188,15 @@ test("settings actions are strictly validated", () => {
   assert.equal(validateSettingsAction({ type: "shell", command: "rm -rf /" }), null);
   assert.equal(validateSettingsAction({ type: "rescan", padding: "x".repeat(2000) }), null);
   assert.equal(validateSettingsAction([]), null);
+  assert.deepEqual(validateSettingsAction({ type: "client-visible", agentId: "zcode", value: false }, id => !!agent(id)), { type: "client-visible", agentId: "zcode", value: false });
+  const id = "11111111-1111-4111-8111-111111111111";
+  assert.deepEqual(validateSettingsAction({ type: "history-get", id }), { type: "history-get", id });
+  assert.equal(validateSettingsAction({ type: "history-get", id: "../../settings.json" }), null);
+  assert.equal(validateSettingsAction({ type: "history-copy", id, section: "arbitrary" }), null);
+  assert.deepEqual(validateSettingsAction({ type: "history-copy", id, section: "primary" }), { type: "history-copy", id, section: "primary" });
+  assert.equal(validateSettingsAction({ type: "mobile", request: "pair" }), null);
+  assert.deepEqual(validateSettingsAction({ type: "mobile", request: { action: "status" } }), { type: "mobile", request: { action: "status" } });
+  assert.equal(validateSettingsAction({ type: "client-open-config", agentId: "zcode" }), null, "configuration paths are no longer exposed");
   assert.equal(validateSettingsAction(null), null);
 });
 
@@ -168,15 +207,22 @@ test("supported features follow adapter capabilities", () => {
   assert.deepEqual(supportedFeatures(agent("gemini-cli")), { approvals: false, questions: false, reminders: false, completions: true });
 });
 
-test("settings state lists every client off by default with localized strings", () => {
+test("settings state exposes defaults, visibility, icons and localized strings", () => {
   const fixture = serviceFixture({ locale: "zh-CN" });
   try {
     const state = fixture.service.state();
     assert.equal(state.locale, "zh-CN");
     assert.equal(state.strings.general, "通用");
     assert.equal(state.clients.length, listAgents().length);
-    assert.equal(state.summary.enabled, 0);
-    assert.ok(state.clients.every(client => client.enabled === false && client.status === "off"));
+    assert.equal(state.strings["mobile.title"], "手机伴侣");
+    assert.equal(state.strings["history.title"], "最近事件");
+    assert.deepEqual(state.clients.filter(client => client.enabled).map(client => client.id).sort(), ["claude-code", "codex", "deepseek-harness"]);
+    assert.deepEqual(state.clients.filter(client => client.visible).map(client => client.id).sort(), ["claude-code", "codex", "deepseek-harness"]);
+    assert.equal(state.clients.find(client => client.id === "gemini-cli").status, "off");
+    assert.equal(state.icons.codex.src, "icons/codex.svg");
+    assert.equal(state.icons.zcode.mono, true);
+    assert.equal(state.icons.codewhale, undefined, "clients without a bundled icon keep their glyph");
+    assert.equal(Object.hasOwn(state.clients[0], "configPaths"), false);
     const kiro = state.clients.find(client => client.id === "kiro");
     assert.equal(kiro.canToggle, false, "undetected clients cannot be switched on");
     const zcode = state.clients.find(client => client.id === "zcode");
@@ -249,6 +295,70 @@ test("destructive general actions require confirmation", async () => {
     assert.deepEqual(accepted.effects.copied, ["/hooks"]);
   } finally {
     accepted.cleanup();
+  }
+});
+
+test("bundled client icons exist and contain no active content", () => {
+  const dir = path.resolve(__dirname, "..", "src", "settings-renderer", "icons");
+  for (const id of Object.keys(CLIENT_ICONS)) {
+    assert.ok(agent(id), `${id} is a registered client`);
+    const svg = fs.readFileSync(path.join(dir, `${id}.svg`), "utf8");
+    assert.match(svg, /^<svg[^>]+viewBox="0 0 24 24"/);
+    assert.doesNotMatch(svg, /<script|href=|<foreignObject|\son[a-z]+=/i);
+    assert.equal(CLIENT_ICONS[id] === "mono", svg.includes("currentColor"), `${id} icon mode matches its fill`);
+  }
+  assert.match(fs.readFileSync(path.join(dir, "LICENSE.txt"), "utf8"), /MIT License[\s\S]*LobeHub/);
+});
+
+test("visibility and history actions go through the settings service", async () => {
+  const history = new HistoryStore({ filePath: "", safeStorage: null });
+  history.load();
+  const saved = history.append({
+    kind: "approval", agentId: "zcode", agentName: "ZCode", sessionId: "s", toolName: "Bash",
+    toolInput: { command: "npm test" }, outcome: "allow", reason: "allow", createdAt: Date.now() - 5, finalizedAt: Date.now(),
+  });
+  const fixture = serviceFixture({ history });
+  try {
+    const hidden = await fixture.service.perform({ type: "client-visible", agentId: "codex", value: false });
+    assert.equal(hidden.state.clients.find(client => client.id === "codex").visible, false);
+    assert.equal(hidden.state.clients.find(client => client.id === "codex").enabled, true);
+    const list = await fixture.service.perform({ type: "history-list" });
+    assert.equal(list.history.items.length, 1);
+    const detail = await fixture.service.perform({ type: "history-get", id: saved.id });
+    assert.equal(detail.detail.presentation.primary, "npm test");
+    const copied = await fixture.service.perform({ type: "history-copy", id: saved.id, section: "primary" });
+    assert.equal(copied.ok, true);
+    assert.deepEqual(fixture.effects.copied, ["npm test"]);
+    const removed = await fixture.service.perform({ type: "history-delete", id: saved.id });
+    assert.equal(removed.history.items.length, 0);
+    assert.equal((await fixture.service.perform({ type: "history-clear" })).error, "empty");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("phone companion actions are validated and bounded", async () => {
+  const calls = [];
+  const remote = {
+    snapshot: () => ({ enabled: true, status: "connected", bindings: [] }),
+    setControl: value => { calls.push(["control", value]); return { enabled: true, controlEnabled: value, bindings: [] }; },
+    beginPairing: async () => { throw new Error("relay exploded with secret token"); },
+  };
+  assert.equal(validCompanionInput({ action: "status" }), true);
+  assert.equal(validCompanionInput({ action: "shell" }), false);
+  assert.equal(validCompanionInput({ action: "rename", name: "x".repeat(20000) }), false);
+  assert.deepEqual(await performCompanionAction(remote, { action: "nope" }), { error: "invalid_request" });
+  assert.deepEqual(await performCompanionAction(remote, { action: "pair", scopes: [] }), { error: "operation_failed" });
+  const fixture = serviceFixture({ companion: { snapshot: remote.snapshot, perform: input => performCompanionAction(remote, input) } });
+  try {
+    assert.equal(fixture.service.state().companion.status, "connected");
+    const result = await fixture.service.perform({ type: "mobile", request: { action: "control", enabled: true } });
+    assert.equal(result.ok, true);
+    assert.equal(result.companion.controlEnabled, true);
+    assert.deepEqual(calls, [["control", true]]);
+    assert.equal((await fixture.service.perform({ type: "mobile", request: { action: "pair" } })).error, "operation_failed");
+  } finally {
+    fixture.cleanup();
   }
 });
 
@@ -347,7 +457,7 @@ test("settings window is sandboxed, opens on a page, and rejects foreign senders
   assert.equal(win.destroyed, true);
 });
 
-test("settings renderer uses a sidebar, safe DOM APIs, themes, and an isolated preload", () => {
+test("settings renderer has general, history, companion and client pages with safe DOM APIs", () => {
   const root = path.resolve(__dirname, "..", "src", "settings-renderer");
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const css = fs.readFileSync(path.join(root, "style.css"), "utf8");
@@ -356,7 +466,12 @@ test("settings renderer uses a sidebar, safe DOM APIs, themes, and an isolated p
   assert.match(html, /Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'/);
   assert.match(html, /<aside class="sidebar"/);
   assert.match(html, /id="client-nav"/);
-  assert.match(html, /id="search"/);
+  for (const pageId of ["general", "history", "mobile"]) assert.match(html, new RegExp(`data-page="${pageId}"`));
+  assert.doesNotMatch(html, /id="search"/);
+  assert.match(javascript, /client\.visible && client\.detected/);
+  assert.match(javascript, /className: "event-card"/);
+  assert.match(javascript, /id: "detail-view"/);
+  assert.match(javascript, /safeIconSource/);
   assert.doesNotMatch(javascript, /innerHTML|insertAdjacentHTML|eval\(|new Function/);
   assert.match(javascript, /settingsAPI\.action|api\.action\(payload\)/);
   assert.match(css, /:root\[data-theme="dark"\]/);

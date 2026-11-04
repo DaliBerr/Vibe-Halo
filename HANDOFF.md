@@ -1,39 +1,52 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-04 (settings window and opt-in clients; 0.6.7 published)
+Updated: 2026-11-04 (unified settings window and default clients; 0.6.7 published)
 Current version: `0.6.7` (Windows and Android); `0.6.3` (macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
 
-## 2026-11-04 — Settings window and opt-in clients (unreleased)
+## 2026-11-04 — Unified settings window and default clients (unreleased)
 
-Added a foreground settings window (`src/settings-service.js`,
+Added one foreground settings window (`src/settings-service.js`,
 `src/settings-window-controller.js`, `src/settings-preload.js`,
 `src/settings-renderer/`). It opens from tray **Settings…**, a tray click with
-nothing pending (Windows/Linux), a second launch, and the first launch. The
-sidebar has **General** plus a searchable client list grouped as enabled,
-detected and not detected; each client page has an enable switch, per-client
-approval/question/reminder/completion switches limited to adapter
-capabilities, status, configuration paths, repair and Codex hook guidance. The
-tray now keeps only status, Settings, recent events, mobile companion, the two
-global quick switches, updates and quit.
+nothing pending (Windows/Linux), a second launch, and the first launch. Its
+sidebar has **General**, **Recent events**, **Mobile companion** and the
+clients the user chose to show. The old tray-opened history panel
+(`history-window-controller.js`, `history-preload.js`, `history-renderer/`) and
+the old companion window (`src/remote/settings-window.js`, its preload and
+renderer) were removed; their logic now lives in `src/history-presenter.js` and
+`src/remote/companion-actions.js` behind validated `settings:action` IPC. The
+tray keeps status, Settings, recent events, mobile companion, the two global
+quick switches, updates and quit; the latter two items open settings pages.
 
-Clients are now opt-in. `SettingsStore` stores a canonical `enabled` flag per
-integration (still writing `disabledByUser = !enabled` for older builds) and
-per-client preferences under `clients`. Migration keeps an integration enabled
-only when it was previously installed and not user-disabled; all other and new
-clients default to off, and startup scans no longer install them. Runtime
-gating is fail-open: the server passes the request kind to
-`isApprovalEnabled(agentId, kind)`, and events from a disabled client or
-feature are ignored after the hook has received its no-decision reply.
-Disabling a client or feature clears its pending reminders/completion notices.
+Only Codex, Claude Code and DeepSeek Harness default to enabled and shown.
+`SettingsStore` stores a canonical `enabled` flag per integration (still
+writing `disabledByUser = !enabled` for older builds) and per-client
+preferences plus `visible` under `clients`. Migration keeps previously
+installed integrations enabled and respects earlier user disables; startup
+scans install only enabled, detected clients. The sidebar shows detected
+clients whose `visible` flag is on; General lists every detected client with a
+show/hide switch and hides undetected ones. Hiding never disables a client.
+Client pages replace the technical integration details with a plain connection
+status and Reconnect/Check again actions; Codex shows a dedicated "review
+needed" state with Copy /hooks. Runtime gating is fail-open: the server passes
+the request kind to `isApprovalEnabled(agentId, kind)`, and events from a
+disabled client or feature are ignored after the hook got its no-decision
+reply. Disabling a client or feature clears its pending reminders/completions.
 
-Verification: `npm test` 295 tests (294 pass, the existing POSIX-only skip),
-including 13 new settings regressions. Source-mode Electron screenshots of the
-General and Codex pages (dark) and a mocked-API harness run in Electron
-(navigation, feature toggle, enabling a client, search, disabled undetected
-client, light theme) showed no renderer errors. Pending manual acceptance: the
-native title-bar overlay controls, live enable/disable against real client
-configurations, DPI/multi-display placement, and macOS/Linux window chrome.
+Client icons are LobeHub Icons 1.95.1 (MIT, attribution in `NOTICE.md` and
+`src/settings-renderer/icons/LICENSE.txt`) for 17 clients; CodeWhale, Pi and
+Reasonix keep glyph badges because no reliable icon source was found. The
+ZCode mark uses Z.ai's logo. Mono icons are tinted via CSS masks.
+
+Verification: `npm test` 291 tests (290 pass, the existing POSIX-only skip).
+Sandbox-mode Electron smoke screenshots (isolated USERPROFILE, APPDATA, user
+data and runtime directory) of General, Codex, Recent events list/detail and
+Mobile companion showed the expected pages; the CI `--demo-history` screenshot
+selectors still match. A real Windows dark-mode window showed working title-bar
+overlay controls. Pending manual acceptance: live companion pairing from the
+new page, live enable/disable against real client configurations, light-mode
+review on a real window, DPI/multi-display placement, and macOS/Linux chrome.
 
 ## 2026-11-04 — 0.6.7 published
 

@@ -18,25 +18,24 @@
           <span id="brand-version"></span>
         </div>
       </div>
-      <nav class="nav-top">
-        <button id="nav-general" class="nav-item" type="button" data-page="general">
+      <nav class="nav-top" aria-label="Pages">
+        <button class="nav-item" type="button" data-page="general">
           <span class="nav-icon" data-icon="gear" aria-hidden="true"></span>
-          <span class="nav-label" id="nav-general-label">General</span>
+          <span class="nav-label" data-label="general">General</span>
+        </button>
+        <button class="nav-item" type="button" data-page="history">
+          <span class="nav-icon" data-icon="clock" aria-hidden="true"></span>
+          <span class="nav-label" data-label="recentEvents">Recent events</span>
+          <span class="nav-count" id="history-count"></span>
+        </button>
+        <button class="nav-item" type="button" data-page="mobile">
+          <span class="nav-icon" data-icon="phone" aria-hidden="true"></span>
+          <span class="nav-label" data-label="mobileCompanion">Mobile companion</span>
+          <span class="status-dot" id="mobile-dot" aria-hidden="true"></span>
         </button>
       </nav>
-      <div class="search">
-        <span class="search-icon" data-icon="search" aria-hidden="true"></span>
-        <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="Search clients">
-      </div>
+      <div class="nav-group-title" id="clients-title"><span data-label="clients">Clients</span></div>
       <nav id="client-nav" class="client-nav" aria-label="Clients"></nav>
-      <div class="sidebar-footer">
-        <button id="open-history" class="footer-link" type="button">
-          <span class="nav-icon" data-icon="clock" aria-hidden="true"></span><span class="footer-label"></span>
-        </button>
-        <button id="open-mobile" class="footer-link" type="button">
-          <span class="nav-icon" data-icon="phone" aria-hidden="true"></span><span class="footer-label"></span>
-        </button>
-      </div>
     </aside>
     <main class="content">
       <div class="content-drag"></div>

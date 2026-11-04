@@ -23,12 +23,15 @@ const CLIENT_PREFERENCE_DEFAULTS = Object.freeze({
   completions: true,
 });
 const AGENT_ID = /^[a-z0-9-]{1,80}$/;
+// Clients that are enabled and shown in the settings sidebar until the user decides otherwise.
+const DEFAULT_CLIENTS = Object.freeze(["codex", "claude-code", "deepseek-harness"]);
 
-function integrationEnabled(state) {
+function integrationEnabled(state, agentId) {
   if (typeof state.enabled === "boolean") return state.enabled;
-  // Migration: integrations that were already installed and not switched off stay on;
-  // every other client is off until the user enables it in Settings.
-  return state.disabledByUser !== true && state.installed === true;
+  if (state.disabledByUser === true) return false;
+  // Migration: integrations that were already installed stay on; the default clients
+  // start on; every other client is off until the user enables it in Settings.
+  return state.installed === true || DEFAULT_CLIENTS.includes(agentId);
 }
 
 function cleanIntegrationState(value) {
@@ -36,7 +39,7 @@ function cleanIntegrationState(value) {
   const output = {};
   for (const [agentId, state] of Object.entries(value).slice(0, 64)) {
     if (!AGENT_ID.test(agentId) || !state || typeof state !== "object" || Array.isArray(state)) continue;
-    const enabled = integrationEnabled(state);
+    const enabled = integrationEnabled(state, agentId);
     output[agentId] = {
       enabled,
       disabledByUser: !enabled,
@@ -57,7 +60,7 @@ function cleanClientPreferences(value) {
   for (const [agentId, prefs] of Object.entries(value).slice(0, 64)) {
     if (!AGENT_ID.test(agentId) || !prefs || typeof prefs !== "object" || Array.isArray(prefs)) continue;
     const cleaned = {};
-    for (const key of Object.keys(CLIENT_PREFERENCE_DEFAULTS)) {
+    for (const key of [...Object.keys(CLIENT_PREFERENCE_DEFAULTS), "visible"]) {
       if (typeof prefs[key] === "boolean") cleaned[key] = prefs[key];
     }
     if (Object.keys(cleaned).length) output[agentId] = cleaned;
@@ -124,8 +127,9 @@ class SettingsStore {
   }
 
   getIntegration(agentId) {
+    const enabled = DEFAULT_CLIENTS.includes(agentId);
     return this.integrations()[agentId] || {
-      enabled: false, disabledByUser: true, detected: false, installed: false, healthy: false,
+      enabled, disabledByUser: !enabled, detected: false, installed: false, healthy: false,
       verification: "none", reason: "not-scanned", checkedAt: 0,
     };
   }
@@ -147,7 +151,23 @@ class SettingsStore {
   }
 
   getClientPreferences(agentId) {
-    return { ...CLIENT_PREFERENCE_DEFAULTS, ...(this.clientPreferences[agentId] || {}) };
+    const stored = this.clientPreferences[agentId] || {};
+    const output = { ...CLIENT_PREFERENCE_DEFAULTS };
+    for (const key of Object.keys(CLIENT_PREFERENCE_DEFAULTS)) if (typeof stored[key] === "boolean") output[key] = stored[key];
+    return output;
+  }
+
+  isClientVisible(agentId) {
+    const stored = this.clientPreferences[agentId]?.visible;
+    if (typeof stored === "boolean") return stored;
+    return DEFAULT_CLIENTS.includes(agentId) || this.isClientEnabled(agentId);
+  }
+
+  setClientVisible(agentId, value) {
+    if (!AGENT_ID.test(agentId) || typeof value !== "boolean") return false;
+    this.clientPreferences[agentId] = { ...(this.clientPreferences[agentId] || {}), visible: value };
+    this.save();
+    return true;
   }
 
   setClientPreference(agentId, key, value) {
@@ -160,6 +180,7 @@ class SettingsStore {
 
 module.exports = {
   CLIENT_PREFERENCE_DEFAULTS,
+  DEFAULT_CLIENTS,
   DEFAULTS,
   LANGUAGE_VALUES,
   SettingsStore,

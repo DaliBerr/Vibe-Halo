@@ -29,7 +29,7 @@ Windows packages may show an unknown-publisher warning. Preview desktop packages
 - Structured answers where the client exposes an exact answer protocol; Codex questions remain reminders to answer in Codex.
 - Codex mid-turn async questions also reach the paired phone, even with desktop input reminders disabled. Unanswered async reminders survive turn completion and unrelated prompts, until answered, dismissed or timed out (up to 30 minutes). Requires desktop 0.6.4 or later; Android 0.6.3 and the existing relay remain compatible.
 - Windows 0.6.5 removes repeated external executable lookups during tray refresh, preventing client discovery from blocking phone notification delivery. Stage timing diagnostics help distinguish desktop processing, relay waiting and phone handling.
-- A settings window with a client sidebar: every client is off by default and has its own switches for island approvals, questions, reminders and completion notices.
+- One settings window with a sidebar for General, Recent events, Mobile companion and your clients (with their app icons). Codex, Claude Code and DeepSeek Harness are on by default; each client has its own switches for island approvals, questions, reminders and completion notices.
 - Completion notifications and optional tray-opened recent-event history.
 - Desktop 0.6.6 gives the island a wider shadow; clicks in its shadow and transparent rounded corners reach the window behind it.
 - Paired Android notifications, explicitly authorized remote control, readable history cards and editable device names.
@@ -44,9 +44,9 @@ The registry includes 20 integrations with different capabilities. See the [clie
 
 ## Get started
 
-1. Install and launch Vibe Halo. **Settings** opens on first launch (later: tray → **Settings…**). Clients are off by default: pick yours in the sidebar, turn it on, and choose what it may show. **General** summarizes all **Client integrations**.
+1. Install and launch Vibe Halo. **Settings** opens on first launch (later: tray → **Settings…**). Codex, Claude Code and DeepSeek Harness are on by default; show other detected clients under **General**, then turn them on and choose what they may show. **General** also lists your **Client integrations**.
 2. For Codex, review Vibe Halo's command hooks with `/hooks` when requested.
-3. To connect Android, open **Phone companion** on the computer and follow the phone's pairing wizard. Compare fingerprints before completing pairing; enable remote control on the computer only if needed.
+3. To connect Android, open **Mobile companion** in Settings and follow the phone's pairing wizard. Compare fingerprints before completing pairing; enable remote control on the computer only if needed.
 4. On Android, allow notifications and follow the background-settings guidance. Manufacturer-specific settings may need adjustment on the device.
 
 The desktop connects to the default companion relay automatically; you can disable remote access in companion settings. Pairing is required to connect a phone. The original Hook server stays loopback-only, and companion traffic is encrypted. History can contain task content; review the [privacy and security details](docs/GUIDE.md#security-and-privacy).

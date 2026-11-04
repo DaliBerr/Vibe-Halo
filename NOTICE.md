@@ -21,3 +21,8 @@ image references use commonmark (BSD-2-Clause) and image-size (MIT). Node crypto
 jose; LAN transport uses ws, bonjour-service and @peculiar/x509. Lockfiles and the
 Android version catalog identify versions; generated notices identify transitive
 Android artifacts. Source and modifications: https://github.com/DaliBerr/Vibe-Halo
+
+Client icons in `src/settings-renderer/icons/` come from LobeHub Icons
+(`@lobehub/icons-static-svg` 1.95.1, MIT, Copyright (c) 2023 LobeHub; license
+text in that folder). The marks are trademarks of their respective owners and
+are used only to identify the supported clients.
