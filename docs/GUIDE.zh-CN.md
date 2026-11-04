@@ -45,11 +45,11 @@
 
 ### 更新
 
-- 只有官方 Windows 稳定构建才启用自动更新。默认稳定通道不签名，使用 GitHub Releases 和 SHA-512 完整性元数据；macOS/Linux 保持关闭。
+- 只有官方 Windows 稳定构建才启用自动更新。默认稳定通道不签名，使用 GitHub Releases 和 SHA-512 完整性元数据。
 - 正式构建从 GitHub Releases 后台检查并下载稳定版本。
 - 下载完成后必须从托盘明确选择“重启并更新”；普通退出不会自动安装。
 - 更新前先关闭本地服务，把待处理审批和问题交回客户端原生流程。
-- 源码、本地构建和预览安装包有意禁用自动更新。
+- 源码和本地构建有意禁用自动更新。
 
 ## 客户端支持
 
@@ -109,15 +109,13 @@ flowchart LR
 
 ### 使用发行版
 
-前往 [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases) 下载 Windows 稳定版或最新三平台预览版：
+前往 [GitHub Releases](https://github.com/DaliBerr/Vibe-Halo/releases/latest) 下载 Windows 安装包：
 
-| 平台 | 支持基线 | 通道与产物 |
+| 平台 | 支持基线 | 产物 |
 | --- | --- | --- |
-| Windows | Windows 10/11 x64 | 最新稳定版或预览版：`Vibe-Halo-Setup-<version>-x64.exe` |
-| macOS | macOS 12+，Apple Silicon 或 Intel | 三平台预览版：`Vibe-Halo-<version>-arm64.dmg` / `.zip`、`Vibe-Halo-<version>-x64.dmg` / `.zip` |
-| Linux | Ubuntu 22.04/24.04 或 Debian 12 x64 | 三平台预览版：`Vibe-Halo-<version>-x64.AppImage`、`Vibe-Halo-<version>-x64.deb` |
+| Windows | Windows 10/11 x64 | `Vibe-Halo-Setup-<version>-x64.exe` |
 
-其他 Linux 发行版可尝试 AppImage，但不属于首版保证范围。预览包有意不签名，请只从本仓库下载并核对发布页的 SHA-256。
+从 0.7.0 起只发布 Windows 安装包。源码中仍保留 macOS/Linux 平台代码，但不再发布对应安装包，也不再在 CI 中测试。安装包未签名，请只从本仓库下载并核对发布页的 SHA-256。
 
 安装并启动后：
 
@@ -132,21 +130,13 @@ Windows 安装器会根据系统显示语言自动选择英文或简体中文，
 > [!WARNING]
 > Codex 0.129.0 及后续版本要求用户亲自信任新增或变化的 command Hook。Vibe Halo 可以写入和修复配置，但不会绕过这个信任步骤。
 
-#### macOS 首次启动
-
-预览版仅带有保证 Apple Silicon 可靠启动所需的 ad-hoc 临时签名，未使用 Apple Developer ID 签名，也未公证。从 DMG 将应用拖入“应用程序”后，请在 Finder 中按住 Control 点击或右键 Vibe Halo，选择“打开”并确认一次。Vibe Halo 以 accessory 应用运行，不显示 Dock 图标，也不申请辅助功能或屏幕录制权限。
-
-#### Linux 窗口后端
-
-Vibe Halo 优先使用 X11。Wayland 会话只要存在 `DISPLAY` 就使用 XWayland，以保留窗口定位和展开动画；缺少 XWayland 时进入原生 Wayland 降级模式，诊断会明确提示定位、缩放和焦点能力受限。仅在确实需要强制原生模式时设置 `VIBE_HALO_NATIVE_WAYLAND=1`。
-
 ### 从源码运行
 
 从源码运行适合贡献、调试集成或验证未发布功能。它同样会检测并增量修改真实客户端配置，因此请先阅读上面的集成行为。
 
 #### 前置条件
 
-- Windows x64、macOS 12+ arm64/x64 或 Linux x64；真实客户端人工验收仍以 Windows 为主。
+- Windows 10/11 x64。
 - [Node.js 24](https://nodejs.org/) 与 npm（与发布 CI 一致）。
 - Git。
 - 至少一个受支持客户端，用于真实集成测试；只运行自动测试时不需要。
@@ -212,7 +202,7 @@ npm start
 npm start -- --uninstall-hooks
 ```
 
-Windows NSIS 卸载程序也会调用相同清理流程。macOS 将应用拖入废纸篓无法执行集成清理，因此删除应用前必须先运行“卸载全部…”。Linux 删除 AppImage 或软件包前也建议先执行同一操作。遗留启动器会安全回退，但显式清理可以避免客户端留下失效 Hook。清理只删除 Vibe Halo 自己的 Hook/插件记录；第三方配置、首次备份以及应用用户数据会保留。
+Windows NSIS 卸载程序也会调用相同清理流程。遗留启动器会安全回退，但显式清理可以避免客户端留下失效 Hook。清理只删除 Vibe Halo 自己的 Hook/插件记录；第三方配置、首次备份以及应用用户数据会保留。
 
 ## 安全与隐私
 
@@ -256,8 +246,8 @@ Windows NSIS 卸载程序也会调用相同清理流程。macOS 将应用拖入�
 | UI | 原生 HTML、CSS、JavaScript；一个实时灵动岛窗口加一个设置窗口 |
 | 本地通信 | Node HTTP、仅 loopback、每进程令牌 |
 | 平台集成 | `PlatformAdapter`、Windows `koffi`、POSIX 启动器、系统托盘 |
-| 打包 | x64 NSIS、arm64/x64 DMG 与 ZIP、x64 AppImage 与 deb |
-| 自动更新 | 官方 Windows 稳定通道（默认未签名，可选 SignPath）；macOS/Linux 关闭 |
+| 打包 | Windows x64 NSIS |
+| 自动更新 | 官方 Windows 稳定通道（默认未签名，可选 SignPath） |
 | 测试 | Node 内置 test runner |
 | 发布 | GitHub Actions、electron-builder、SignPath Foundation |
 
@@ -343,8 +333,6 @@ Codex 的 `inbox-item`、`code-comment`、`archive-thread`、`created-thread`、
 | `npm run build:dir` | 生成当前宿主平台的未安装目录 |
 | `npm run build` | 生成当前宿主平台的未签名安装包 |
 | `npm run build:win` | 生成 Windows x64 NSIS 包 |
-| `npm run build:mac:arm64` / `npm run build:mac:x64` | 在 macOS 生成 DMG 与 ZIP |
-| `npm run build:linux:x64` | 在 Linux 生成 x64 AppImage 与 deb |
 | `npm run build:prepackaged` | 从预打包目录生成 NSIS；主要供签名工作流使用 |
 | `npm run release:metadata` | 为已签名安装包重新生成 blockmap、哈希和 `latest.yml` |
 
@@ -394,7 +382,7 @@ npm test
 - Windows/POSIX Hook mock-server 端到端、稳定启动器路径与离线回退。
 - 无签名/签名发布门控、公开更新配置、SignPath 暂存和最终字节元数据生成。
 
-Windows 的透明窗口、阴影、焦点、动画、多屏/DPI、真实客户端 Hook 回传、托盘、NSIS 卸载和真实 N→N+1 更新仍需人工验收。macOS/Linux 当前仅完成 CI 协议、打包、启动器与启动冒烟；真实客户端回传尚未实机验证。
+Windows 的透明窗口、阴影、焦点、动画、多屏/DPI、真实客户端 Hook 回传、托盘、NSIS 卸载和真实 N→N+1 更新仍需人工验收。
 
 ## 构建与发布
 
@@ -405,19 +393,9 @@ npm run build:dir
 npm run build
 ```
 
-各平台输出：
-
-```text
-Windows: Vibe-Halo-Setup-<version>-x64.exe
-macOS:   Vibe-Halo-<version>-arm64|x64.dmg 与 .zip
-Linux:   Vibe-Halo-<version>-x64.AppImage 与 .deb
-```
+输出：`dist/Vibe-Halo-Setup-<version>-x64.exe`。
 
 本地产物预期为未签名，并且 `autoUpdateEnabled=false`。不要把本地产物冒充正式更新发布。
-
-### 三平台预览版
-
-`preview-<version>` 标签会触发跨平台工作流：在 Windows 2025、macOS 15 arm64/Intel、Ubuntu 24.04 上测试；在 Windows 2025、两种 macOS 架构与 Ubuntu 22.04 上构建；最终把所有安装包和 `SHA256SUMS.txt` 发布为 GitHub Pre-release。该流程不会发布稳定更新元数据。
 
 ### Windows 稳定版
 
@@ -457,9 +435,9 @@ Linux:   Vibe-Halo-<version>-x64.AppImage 与 .deb
 
 ## 常见问题
 
-### Vibe Halo 是 Vibe Island 的跨平台替代方案吗？
+### Vibe Halo 是 Vibe Island 的替代方案吗？
 
-Vibe Halo 在 Windows、macOS 与常见 x64 Linux 上提供类似的顶部审批与通知工作流，但它是独立维护的开源项目，并非 Vibe Island 的官方版本。只有在 AI 编程客户端需要支持的权限决定、提出支持的交互问题或完成任务时，它才会出现。
+Vibe Halo 在 Windows 上提供类似的顶部审批与通知工作流，但它是独立维护的开源项目，并非 Vibe Island 的官方版本。只有在 AI 编程客户端需要支持的权限决定、提出支持的交互问题或完成任务时，它才会出现。
 
 ### 不切回终端也能批准 Codex 权限吗？
 
@@ -467,7 +445,7 @@ Vibe Halo 在 Windows、macOS 与常见 x64 Linux 上提供类似的顶部审批
 
 ### Vibe Halo 支持 Claude Code 和 OpenCode 吗？
 
-仓库包含 Claude Code 与 OpenCode 的适配器、安装器和自动契约测试，但维护者环境目前只有 Codex 与 ZCode 完成了完整的真实客户端往返验证。请把 Claude Code、OpenCode 及其他未实测客户端视为预览支持，并保留它们的原生审批界面。
+支持。Claude Code 默认开启；在 Windows 上已用真实客户端确认完成通知和 AskUserQuestion 提问能送达灵动岛（由于 Claude Code 通过 Git Bash 执行 Hook，Vibe Halo 使用 PowerShell 启动器）。OpenCode 有适配器、安装器和自动契约测试，但尚未实测，请保留它的原生审批界面。
 
 ## 故障排查
 
@@ -499,12 +477,11 @@ Vibe Halo 在 Windows、macOS 与常见 x64 Linux 上提供类似的顶部审批
 
 ### 托盘中没有更新选项
 
-源码运行、本地打包和预览构建会有意禁用自动更新。只有使用 `VIBE_HALO_AUTO_UPDATE=1` 构建的官方 Windows 稳定版才显示更新控制；macOS/Linux 安装包始终关闭。
+源码运行和本地打包会有意禁用自动更新。只有使用 `VIBE_HALO_AUTO_UPDATE=1` 构建的官方 Windows 稳定版才显示更新控制。
 
 ## 已知边界
 
-- 发布目标为 Windows x64、macOS 12+ arm64/x64，以及 Ubuntu 22.04/24.04 或 Debian 12 x64。其他 Linux 仅通过 AppImage 尽力支持；不提供 Linux arm64、RPM、Snap、Flatpak 或 Mac App Store 包。
-- 原生 Wayland 无法保证同等的自由定位、缩放和聚焦能力；默认优先 XWayland，原生模式会在诊断中明确标记降级。
+- 只发布 Windows 10/11 x64。macOS 与 Linux 安装包（此前最高为 0.6.3 预览版）不再发布，这些平台上的真实客户端回传尚未实机验证。
 - 应用和 Windows 安装器支持英文与简体中文；不支持的系统 locale 默认回退英文，也可手动选择简体中文。
 - 不包含上游 Clawd on Desk 的桌宠、动画主题、会话 Dashboard、终端聚焦、远程 SSH 或 PWA。可选 Android 伴侣使用独立实现的加密协议。
 - 桌面默认连接公共中继；手机需配对，远程控制需在电脑上明确授权。伴侣使用独立局域网监听器，原 Hook 服务仍只监听 127.0.0.1。
@@ -514,7 +491,7 @@ Vibe Halo 在 Windows、macOS 与常见 x64 Linux 上提供类似的顶部审批
 - Codex 当前没有在稳定的 `PermissionRequest` Hook 载荷中提供实际审批者。Auto-review 绕过因此只会有界、只读地查询精确当前回合；无法识别本地会话格式时会保守地继续显示灵动岛。
 - 状态型客户端只显示完成或注意事件，不展示持续工作动画。
 - 最近事件只保存在本机，但仍可能包含敏感内容；结构化可疑字段会清理，共享设备上仍应谨慎启用。普通任务完成通知永远不记录。
-- 当前只有 Windows 上的 Codex 与 ZCode 完成真实客户端端到端验证；macOS/Linux 和其他集成即使 CI 与契约测试通过，也可能存在尚未发现的兼容性 Bug。
+- Windows 上的 Codex、ZCode、DeepSeek Harness 与 Claude Code 已有真实客户端检查（范围见 `HANDOFF.md`）；其他集成即使契约测试通过，也可能存在尚未发现的兼容性 Bug。
 
 ## 参与贡献
 
@@ -534,7 +511,7 @@ Vibe Halo 派生自 [rullerzhou-afk/clawd-on-desk](https://github.com/rullerzhou
 
 与上游相比，本仓库进行的是产品方向明确的二次开发：
 
-- 从跨平台桌宠收敛为聚焦三平台的顶部灵动岛。
+- 从跨平台桌宠收敛为聚焦 Windows 的顶部灵动岛。
 - 删除桌宠美术、主题系统与动画状态机；可选 Android 手机伴侣独立于上游远程/移动端代码实现。
 - 保留并重构适合本地审批、结构化问答和完成通知的协议部分。
 - 强化全局 FIFO、Renderer 隔离、配置所有权、安全回退和签名更新链。

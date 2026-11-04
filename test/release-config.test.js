@@ -65,25 +65,13 @@ test("ordinary packages stay update-disabled while release builds opt into updat
   assert.deepEqual(signedRelease.win.signtoolOptions.signingHashAlgorithms, ["sha256"]);
 });
 
-test("cross-platform preview workflow tests and packages every promised architecture", () => {
-  const workflow = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "cross-platform.yml"), "utf8");
-  for (const runner of ["windows-2025", "macos-15", "macos-15-intel", "ubuntu-22.04", "ubuntu-24.04"]) {
-    assert.match(workflow, new RegExp(runner.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  }
-  assert.match(workflow, /build:win/);
-  assert.match(workflow, /build:mac:\$\{\{ matrix\.arch \}\}/);
-  assert.match(workflow, /arch: arm64/);
-  assert.match(workflow, /arch: x64/);
-  assert.match(workflow, /build:linux:x64/);
-  assert.match(workflow, /SHA256SUMS\.txt/);
-  assert.match(workflow, /--prerelease/);
-  assert.match(workflow, /VIBE_HALO_HISTORY_SCREENSHOT/);
-  assert.match(workflow, /VIBE_HALO_HISTORY_DETAIL_SCREENSHOT/);
-  assert.match(workflow, /--demo-history/);
-  assert.match(workflow, /Cross-platform preview of Vibe Halo \$version\./);
-  assert.match(workflow, /--title "Vibe Halo \$version — Cross-platform Preview"/);
-  assert.doesNotMatch(workflow, /Cross-platform preview of Vibe Halo \d/);
-  assert.doesNotMatch(workflow, /latest(?:-mac)?\.(?:yml|yaml)/);
+test("only the Windows stable release workflow runs automatically", () => {
+  const dir = path.join(__dirname, "..", ".github", "workflows");
+  assert.deepEqual(fs.readdirSync(dir).sort(), ["mobile-companion.yml", "release.yml"]);
+  const mobile = fs.readFileSync(path.join(dir, "mobile-companion.yml"), "utf8");
+  assert.match(mobile, /^on:\r?\n  workflow_dispatch:\r?\n/m);
+  assert.doesNotMatch(mobile, /^\s+(?:push|pull_request):/m);
+  assert.match(fs.readFileSync(path.join(dir, "release.yml"), "utf8"), /tags:\r?\n\s+- "v\*"/);
 });
 
 test("release workflow defaults to unsigned updates while preserving the optional SignPath path", () => {

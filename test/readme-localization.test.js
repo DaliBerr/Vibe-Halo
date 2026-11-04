@@ -13,7 +13,7 @@ const chinese = chineseHome + "\n" + fs.readFileSync(path.join(root, "docs/GUIDE
 
 test("English README uses real English tray labels and links the Chinese edition", () => {
   assert.match(english, /\[简体中文\]\(README\.zh-CN\.md\)/);
-  assert.match(english, /\*\*Client integrations\*\*/);
+  assert.match(english, /\*\*Clients in the sidebar\*\*/);
   assert.match(english, /\*\*Language\*\*/);
   assert.doesNotMatch(english, /`(?:客户端集成|启用审批|等待输入提醒|开机启动|诊断信息)`/);
 });
@@ -25,13 +25,11 @@ test("both documentation editions document live language switching and system lo
   assert.match(chinese, /即时切换，无需重启/);
 });
 
-test("both documentation editions describe all preview platforms and honest validation boundaries", () => {
+test("both documentation editions describe Windows-only releases and honest validation boundaries", () => {
   for (const document of [english, chinese]) {
-    assert.match(document, /Windows/);
-    assert.match(document, /macOS/);
-    assert.match(document, /Linux/);
-    assert.match(document, /AppImage/);
+    assert.match(document, /Windows 10\/11 x64/);
     assert.match(document, /SHA-256/);
+    assert.doesNotMatch(document, /AppImage|\.dmg|three-platform|三平台/);
   }
   assert.match(english, /real client response round trips on those platforms remain unverified/);
   assert.match(chinese, /真实客户端回传尚未实机验证/);

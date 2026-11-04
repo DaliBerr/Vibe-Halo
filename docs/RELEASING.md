@@ -1,18 +1,12 @@
 # Vibe Halo stable releases
 
-Vibe Halo uses GitHub Releases and `electron-builder` for Windows, macOS, and Linux previews. The stable update channel remains Windows x64 only and uses `electron-updater` with NSIS, `latest.yml`, blockmaps, and SHA-512 integrity metadata. Official stable builds opt into updates with `VIBE_HALO_AUTO_UPDATE=1`; source, local, and preview builds remain update-disabled.
+Vibe Halo publishes Windows x64 only, through GitHub Releases and `electron-builder`. The stable update channel and uses `electron-updater` with NSIS, `latest.yml`, blockmaps, and SHA-512 integrity metadata. Official stable builds opt into updates with `VIBE_HALO_AUTO_UPDATE=1`; source, local, and preview builds remain update-disabled.
 
 The default stable workflow is unsigned. It accepts the Windows unknown-publisher/SmartScreen tradeoff and does not provide a publisher-identity guarantee. The retained SignPath route is an optional enhancement activated only when the repository variable `VIBE_HALO_SIGNPATH_ENABLED` is exactly `1`.
 
-## Three-platform preview procedure
+## Continuous integration
 
-1. Keep `package.json`, `package-lock.json`, both READMEs, and `HANDOFF.md` on the same version.
-2. Push the release branch and wait for `.github/workflows/cross-platform.yml` to pass on Windows 2025, macOS 15 arm64/Intel, Ubuntu 22.04, and Ubuntu 24.04.
-3. Merge the exact verified commit to `main`, create `preview-<version>`, and push it.
-4. The workflow builds Windows x64 NSIS, macOS arm64/x64 DMG and ZIP, and Linux x64 AppImage/deb. It publishes a GitHub Pre-release with `SHA256SUMS.txt`; macOS packages carry only an ad-hoc signature.
-5. Do not upload `latest.yml`, `latest-mac.yml`, Linux update metadata, or mark the preview as latest. Every preview package must contain `autoUpdateEnabled: false`.
-
-macOS preview packages are ad-hoc signed for reliable Apple Silicon launch, but are not Developer ID signed or notarized. Linux support is guaranteed only for Ubuntu 22.04/24.04 and Debian 12 x64 in the initial release; other AppImage-compatible distributions are best effort.
+Only `.github/workflows/release.yml` runs automatically, when a `v<version>` tag is pushed. macOS/Linux packages are no longer built or published (the last preview was `preview-0.6.3`). `.github/workflows/mobile-companion.yml` (relay, protocol and Android checks) runs only on manual dispatch; run it before shipping Android or relay changes.
 
 ## Default unsigned Windows stable release
 
@@ -52,7 +46,7 @@ Configure `SIGNPATH_API_TOKEN` as a GitHub Actions secret. Never place the token
 ## Release checklist
 
 1. Update `package.json`, `package-lock.json`, `HANDOFF.md`, both READMEs, and release notes to the same stable semantic version.
-2. Run `npm ci`, `npm test`, normal package verification, an update-enabled Windows package verification, and an NSIS build locally.
+2. Run `npm ci`, `npm test`, normal package verification and an NSIS build locally.
 3. Merge the verified release commit into `main` and create `v<version>` on that exact commit.
 4. Push the tag and monitor `.github/workflows/release.yml` through publication.
 5. Confirm that the Release is Latest, non-draft, non-prerelease, and includes the installer, blockmap, `latest.yml`, `SHA256SUMS.txt`, `LICENSE`, and `NOTICE.md`.

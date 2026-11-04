@@ -2,58 +2,53 @@
 
 <p align="center"><img src="docs/assets/vibe-halo-icon-black.png" width="160" alt="Vibe Halo"></p>
 
+<p align="center"><strong>A Dynamic Island for AI coding clients on Windows.</strong><br>
+Approve tool calls, answer questions and see when a task finishes — without switching windows.</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.7.0-6d7cff" alt="Version 0.7.0">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4" alt="Windows 10/11">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-blue" alt="AGPL-3.0-only"></a>
+</p>
+
 **English** · [简体中文](README.zh-CN.md)
-
-A desktop Dynamic Island for AI coding clients: handle supported approvals and questions, and see when a task needs attention or finishes. An optional Android companion brings paired notifications, approvals and history to your phone.
-
-![Version](https://img.shields.io/badge/version-0.6.7-6d7cff)
-[![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
 ![Vibe Halo displaying an approval request](docs/assets/vibe-halo-demo.gif)
 
+## Highlights
+
+- **Approvals in one place** — every client's permission requests share one queue at the top of your screen. Close or ignore a request and the client simply asks natively, so nothing is ever approved by accident.
+- **Answer questions in the island** — clients with an exact answer protocol (Claude Code, ZCode, DeepSeek Harness, Hermes) can be answered without leaving your editor.
+- **Reminders and completion notices** — know when a client is waiting for you or a task is done.
+- **One settings window** — General, Recent events, Mobile companion and each of your clients (with its app icon) in a single sidebar. Choose per client what it may show.
+- **Phone companion (optional)** — paired, encrypted Android notifications, history and explicitly authorized remote decisions.
+- English/Chinese UI that follows your system light/dark appearance.
+
 ## Download
 
-| Platform | Package | Status |
-| --- | --- | --- |
-| Windows x64 | [NSIS installer](https://github.com/DaliBerr/Vibe-Halo/releases/latest) | Stable; explicit-restart updates |
-| macOS 12+ | [Apple Silicon / Intel DMG and ZIP](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | Preview; ad-hoc signed, not notarized |
-| Linux x64 | [AppImage / deb](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | Preview |
-| Android 8+ | [Signed companion APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.7/Vibe-Halo-Mobile-0.6.7.apk) | Preview; Xiaomi background settings need device verification |
+| Platform | Package |
+| --- | --- |
+| Windows 10/11 x64 | [Installer (latest release)](https://github.com/DaliBerr/Vibe-Halo/releases/latest) — updates install after you confirm a restart |
+| Android 8+ | [Companion APK 0.6.7](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.7/Vibe-Halo-Mobile-0.6.7.apk) — preview |
 
-Windows packages may show an unknown-publisher warning. Preview desktop packages have automatic updates disabled. Codex and ZCode have real-client coverage on Windows; macOS/Linux have CI packaging and smoke coverage. Other integrations remain subject to client compatibility.
-
-## What it does
-
-- Version 0.6.7 adds DeepSeek Harness (**DSH**) approvals and structured questions. Answer in either the native DSH window or the island; the first answer wins and withdraws the other UI. Android supports the corresponding question details and answer format. Restart DSH after installing or updating its integration.
-- One desktop approval queue, with native-client fallback when no valid decision is made.
-- Structured answers where the client exposes an exact answer protocol; Codex questions remain reminders to answer in Codex.
-- Codex mid-turn async questions also reach the paired phone, even with desktop input reminders disabled. Unanswered async reminders survive turn completion and unrelated prompts, until answered, dismissed or timed out (up to 30 minutes). Requires desktop 0.6.4 or later; Android 0.6.3 and the existing relay remain compatible.
-- Windows 0.6.5 removes repeated external executable lookups during tray refresh, preventing client discovery from blocking phone notification delivery. Stage timing diagnostics help distinguish desktop processing, relay waiting and phone handling.
-- One settings window with a sidebar for General, Recent events, Mobile companion and your clients (with their app icons). Codex, Claude Code and DeepSeek Harness are on by default; each client has its own switches for island approvals, questions, reminders and completion notices.
-- Completion notifications and optional tray-opened recent-event history.
-- Desktop 0.6.6 gives the island a wider shadow; clicks in its shadow and transparent rounded corners reach the window behind it.
-- Paired Android notifications, explicitly authorized remote control, readable history cards and editable device names.
-- Android 0.6.6 fetches and encrypts the full message in the background after a notification arrives, showing cached content on opening while refreshing its current status. Upgrade the APK to enable this behavior; existing pairing is preserved.
-- The Android 0.6.6 replacement build adds **Devices → App updates**: check for a release, download its verified APK in the app, then confirm installation with Android. Install this replacement APK once to enable future in-app updates; its visible version remains 0.6.6.
-- Phone/watch notifications show the client and a short task preview; updated phones deduplicate LAN/cloud delivery, and Codex follow-up suggestions no longer trigger completion alerts.
-- Markdown and Codex cards in phone records; encrypted project-image snapshots from new completion/plan records, with tap-to-zoom viewing.
-- Codex completion/plan titles use the local chat-name index when available. Phone record details show a compact colored status badge below the title; list cards show a matching status dot and short label.
-- English/Chinese UI with system light/dark appearance.
-
-The registry includes 20 integrations with different capabilities. See the [client support table](docs/GUIDE.md#client-support).
+The installer is not publisher-signed, so Windows may show an unknown-publisher warning. Only Windows is released; macOS and Linux packages are no longer published.
 
 ## Get started
 
-1. Install and launch Vibe Halo. **Settings** opens on first launch (later: tray → **Settings…**). Codex, Claude Code and DeepSeek Harness are on by default; show other detected clients under **General**, then turn them on and choose what they may show. **General** also lists your **Client integrations**.
-2. For Codex, review Vibe Halo's command hooks with `/hooks` when requested.
-3. To connect Android, open **Mobile companion** in Settings and follow the phone's pairing wizard. Compare fingerprints before completing pairing; enable remote control on the computer only if needed.
-4. On Android, allow notifications and follow the background-settings guidance. Manufacturer-specific settings may need adjustment on the device.
+1. Install and launch Vibe Halo. **Settings** opens on first launch; later open it from the tray (**Settings…**) or by clicking the tray icon.
+2. **Codex**, **Claude Code** and **DeepSeek Harness** are on by default. Other detected clients can be shown under **General → Clients in the sidebar**, then turned on from their own page.
+3. Codex asks you to trust new hooks: run `/hooks` in Codex and approve the Vibe Halo entries (the Codex page offers **Copy /hooks**).
+4. Optional: open **Mobile companion** in Settings to pair an Android phone. Compare the fingerprint on both devices before confirming.
 
-The desktop connects to the default companion relay automatically; you can disable remote access in companion settings. Pairing is required to connect a phone. The original Hook server stays loopback-only, and companion traffic is encrypted. History can contain task content; review the [privacy and security details](docs/GUIDE.md#security-and-privacy).
+## Supported clients
+
+20 integrations are available, each with different capabilities: approvals, exact answers, reminders or completion notices. Codex, ZCode, DeepSeek Harness and Claude Code have been checked with the live client on Windows; the others are covered by contract tests. See the [client support table](docs/GUIDE.md#client-support).
+
+## Privacy
+
+The hook server listens only on `127.0.0.1` with a per-launch token. Recent events stay on this computer (encrypted when the system allows it). The phone companion is encrypted end to end and needs explicit pairing; remote decisions stay off until you allow them on the computer. Details: [security and privacy](docs/GUIDE.md#security-and-privacy).
 
 ## Development
-
-Use Node.js 24 and npm:
 
 ```sh
 npm ci
@@ -61,17 +56,15 @@ npm test
 npm start
 ```
 
-Android development also requires JDK 21 and Android SDK 36. Build instructions and configuration are in the guides below.
+Node.js 24 and npm. The Android companion additionally needs JDK 21 and Android SDK 36.
 
 ## Documentation
 
-- [User and contributor guide](docs/GUIDE.md): integrations, troubleshooting, architecture and local builds.
-- [Android companion setup](docs/REMOTE_SETUP.md): pairing, Firebase, self-hosting and Android builds.
-- [Release guide](docs/RELEASING.md): packages, signing and updates.
-- [Report a bug](https://github.com/DaliBerr/Vibe-Halo/issues): include OS/client versions and reproduction steps; omit secrets and private task content.
+- [User and contributor guide](docs/GUIDE.md) — integrations, troubleshooting, architecture and local builds
+- [Android companion setup](docs/REMOTE_SETUP.md) — pairing, Firebase, self-hosting and Android builds
+- [Release guide](docs/RELEASING.md) — Windows releases, signing and updates
+- [Report a bug](https://github.com/DaliBerr/Vibe-Halo/issues) — include Windows and client versions; leave out secrets and private task content
 
-## License and attribution
+## License
 
-Derived from [Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk), independently maintained with a focused island interface and an independently implemented Android companion. Not affiliated with the upstream maintainers or supported client vendors.
-
-Licensed under [AGPL-3.0-only](LICENSE). Retain upstream attribution and comply with source-availability obligations; see [NOTICE.md](NOTICE.md).
+Derived from [Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk) and independently maintained; not affiliated with the upstream maintainers or any supported client vendor. Licensed under [AGPL-3.0-only](LICENSE); see [NOTICE.md](NOTICE.md) for attribution, including the bundled client icons.

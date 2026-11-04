@@ -1,8 +1,18 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-04 (unified settings window and default clients; 0.6.7 published)
-Current version: `0.6.7` (Windows and Android); `0.6.3` (macOS/Linux preview)
+Updated: 2026-11-05 (0.7.0 Windows-only release prepared)
+Current version: `0.7.0` (Windows); Android companion `0.6.7`; macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-05 — 0.7.0 release scope
+
+0.7.0 ships the unified settings window, default clients and the Windows Claude
+Code hook fix described below. Distribution is now Windows-only: the
+cross-platform preview workflow was removed, the mobile companion workflow runs
+only on manual dispatch, and `release.yml` (tag `v*`) is the only automatic
+workflow. macOS/Linux platform code, local build scripts and builder targets are
+kept in the source but are no longer built, tested in CI or published. READMEs
+were rewritten as concise Windows-focused pages; the Android APK is unchanged.
 
 ## 2026-11-04 — Unified settings window and default clients (unreleased)
 

@@ -1,10 +1,5 @@
 name: Mobile companion checks
 on:
-  push:
-    branches: [main, "codex/**"]
-    paths: ["apps/android/**", "services/relay/**", "packages/protocol/**", "src/remote/**", ".github/workflows/mobile-companion.yml"]
-  pull_request:
-    paths: ["apps/android/**", "services/relay/**", "packages/protocol/**", "src/remote/**", ".github/workflows/mobile-companion.yml"]
   workflow_dispatch:
 permissions:
   contents: read

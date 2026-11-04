@@ -2,58 +2,53 @@
 
 <p align="center"><img src="docs/assets/vibe-halo-icon-black.png" width="160" alt="Vibe Halo"></p>
 
+<p align="center"><strong>Windows 上的 AI 编程客户端灵动岛。</strong><br>
+批准工具调用、回答提问、得知任务完成——都不用切换窗口。</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.7.0-6d7cff" alt="版本 0.7.0">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4" alt="Windows 10/11">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-blue" alt="AGPL-3.0-only"></a>
+</p>
+
 [English](README.md) · **简体中文**
-
-为 AI 编程客户端提供桌面灵动岛：处理支持的审批和问答，接收待处理提醒与任务完成通知。可选 Android 伴侣支持配对通知、审批和历史记录。
-
-![Version](https://img.shields.io/badge/version-0.6.7-6d7cff)
-[![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
 ![Vibe Halo 审批界面](docs/assets/vibe-halo-demo.gif)
 
-## 下载
+## 亮点
 
-| 平台 | 安装包 | 状态 |
-| --- | --- | --- |
-| Windows x64 | [NSIS 安装程序](https://github.com/DaliBerr/Vibe-Halo/releases/latest) | 稳定版；确认重启后安装更新 |
-| macOS 12+ | [Apple Silicon / Intel DMG、ZIP](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | 预览版；仅临时签名，未经公证 |
-| Linux x64 | [AppImage、deb](https://github.com/DaliBerr/Vibe-Halo/releases/tag/preview-0.6.3) | 预览版 |
-| Android 8+ | [原签名伴侣 APK](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.7/Vibe-Halo-Mobile-0.6.7.apk) | 预览版；小米后台设置仍需真机验证 |
-
-Windows 可能提示未知发布者。桌面预览版不启用自动更新。Codex、ZCode 已在 Windows 上完成真实客户端验证；macOS/Linux 目前有 CI 打包和启动检查，其他集成仍可能存在客户端兼容问题。
-
-## 主要功能
-
-- 0.6.7 新增 DeepSeek Harness（**DSH**）审批和结构化问答。DSH 原生窗口与灵动岛均可回答，先提交的答案生效，另一边自动收起；Android 同步支持对应的问答详情与答案格式。安装或更新集成后重启 DSH。
-- 所有桌面审批进入同一队列；没有有效决定时返回客户端原有流程。
-- 客户端支持精确答案协议时可在岛内回答；Codex 问题提醒回到 Codex 作答。
-- Codex 中途异步提问也会同步到已配对的手机，关闭桌面问题提醒不影响手机通知。未回答的异步提醒跨回合结束和无关的新消息保留，直至回答、忽略或超时（最长 30 分钟）。需桌面版 0.6.4 或更新版本，现有 Android 0.6.3 和中继继续兼容。
-- Windows 0.6.5 修复托盘刷新时反复启动外部查询命令的问题，避免客户端扫描卡住手机通知发送；新增分阶段时间记录，方便区分电脑处理、云端等待和手机处理耗时。
-- 统一的设置窗口：侧边栏包含通用、最近事件、手机伴侣和你的客户端（带应用图标）。Codex、Claude Code 和 DeepSeek Harness 默认开启，每个客户端可分别开关岛内审批、问答、等待提醒和完成通知。
-- 任务完成通知，以及从托盘打开的可选历史窗口。
-- 桌面版 0.6.6 扩大灵动岛阴影范围，阴影和圆角外的透明区域可点击穿透到后面的窗口。
-- Android 配对通知、明确授权后的远程控制、易读历史卡片和设备改名。
-- Android 0.6.6 收到通知后会后台拉取对应的完整消息并加密保存，打开时先显示缓存，再刷新最新状态；更新 APK 即可启用，现有配对保留。
-- Android 0.6.6 补发包新增“设备 → 应用更新”：在应用内检查、下载并校验 APK，再由安卓系统确认安装。先覆盖安装一次此补发包，以后即可在应用里更新；显示版本号仍为 0.6.6。
-- 手机／手表通知显示客户端名称和简短任务摘要；新版手机对局域网与云推送统一去重，Codex 自动建议不再触发完成提醒。
-- 手机记录正文支持 Markdown 和 Codex 信息卡片；新完成／计划记录的项目内图片可加密同步、点击放大查看。
-- Codex 完成／计划记录优先读取本地聊天名称；手机详情页标题下方用简短的彩色圆角标签显示状态，列表卡片也有对应的状态小点与短文字。
+- **审批集中处理**：所有客户端的权限请求进入屏幕顶部的同一个队列。关闭或不处理时，客户端会照常在自己的界面里询问，绝不会被误批准。
+- **在灵动岛里回答提问**：支持精确答案协议的客户端（Claude Code、ZCode、DeepSeek Harness、Hermes）无需离开编辑器即可作答。
+- **等待提醒与完成通知**：客户端在等你、或者任务完成时及时提示。
+- **统一的设置窗口**：侧边栏包含通用、最近事件、手机伴侣和你的各个客户端（带应用图标），可按客户端分别选择要显示的内容。
+- **手机伴侣（可选）**：配对后的加密 Android 通知、历史记录，以及需要你明确授权的远程决定。
 - 中英文界面，跟随系统深浅色。
 
-共注册 20 种客户端集成，能力各有不同，详见[客户端支持表](docs/GUIDE.zh-CN.md#客户端支持)。
+## 下载
 
-## 开始使用
+| 平台 | 安装包 |
+| --- | --- |
+| Windows 10/11 x64 | [安装程序（最新版）](https://github.com/DaliBerr/Vibe-Halo/releases/latest)——确认重启后安装更新 |
+| Android 8+ | [伴侣 APK 0.6.7](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.7/Vibe-Halo-Mobile-0.6.7.apk)——预览版 |
 
-1. 安装并启动 Vibe Halo，首次启动会打开“设置”（之后可从托盘“设置…”打开）。Codex、Claude Code 和 DeepSeek Harness 默认开启；其他已检测到的客户端可在“通用”中显示，再开启并决定它能显示哪些内容。
-2. 使用 Codex 时，按提示通过 `/hooks` 审核 Vibe Halo 的命令 Hook。
-3. 连接手机时，在电脑打开“手机伴侣”，再按手机引导配对。核对两端指纹后完成绑定；需要远程控制时，在电脑上明确授权。
-4. 手机允许通知后，按引导调整后台设置。不同厂商的具体操作需要在设备上确认。
+安装程序未签名，Windows 可能提示未知发布者。现在只发布 Windows 版，不再发布 macOS 和 Linux 安装包。
 
-桌面默认连接公共伴侣中继，可在伴侣设置中关闭远程访问；手机必须配对才能连接。原 Hook 服务仅监听本机回环地址，伴侣通信加密。历史可能包含任务内容，详见[安全与隐私说明](docs/GUIDE.zh-CN.md#安全与隐私)。
+## 快速上手
+
+1. 安装并启动 Vibe Halo。首次启动会打开“设置”；之后可从托盘“设置…”打开，或直接单击托盘图标。
+2. **Codex**、**Claude Code** 和 **DeepSeek Harness** 默认开启。其他检测到的客户端可在“通用 → 侧边栏中的客户端”中显示，再到它自己的页面开启。
+3. Codex 会要求你信任新的 Hook：在 Codex 中运行 `/hooks` 并批准 Vibe Halo 的条目（Codex 页面提供“复制 /hooks”按钮）。
+4. 可选：在设置中打开“手机伴侣”配对 Android 手机，确认前请核对两端显示的指纹。
+
+## 支持的客户端
+
+共提供 20 种客户端集成，能力各不相同：审批、精确回答、等待提醒或完成通知。Codex、ZCode、DeepSeek Harness 和 Claude Code 已在 Windows 上用真实客户端检查过，其余集成由契约测试覆盖。详见[客户端支持表](docs/GUIDE.zh-CN.md#客户端支持)。
+
+## 隐私
+
+Hook 服务只监听 `127.0.0.1`，每次启动生成新令牌。最近事件只保存在本机（系统支持时会加密）。手机伴侣全程加密且必须配对；远程决定默认关闭，需要你在电脑上明确开启。详见[安全与隐私](docs/GUIDE.zh-CN.md#安全与隐私)。
 
 ## 本地开发
-
-使用 Node.js 24 和 npm：
 
 ```sh
 npm ci
@@ -61,17 +56,15 @@ npm test
 npm start
 ```
 
-Android 开发还需要 JDK 21 和 Android SDK 36。构建步骤与配置见下方文档。
+需要 Node.js 24 和 npm；Android 伴侣还需要 JDK 21 和 Android SDK 36。
 
 ## 文档
 
-- [使用与开发指南](docs/GUIDE.zh-CN.md)：集成、排障、架构和本地打包。
-- [Android 伴侣配置](docs/REMOTE_SETUP.md)：配对、Firebase、自托管与 Android 构建。
-- [发布指南](docs/RELEASING.md)：安装包、签名和更新。
-- [反馈问题](https://github.com/DaliBerr/Vibe-Halo/issues)：附系统、客户端版本及复现步骤，不要上传密钥或私人任务内容。
+- [使用与开发指南](docs/GUIDE.zh-CN.md)：集成、排障、架构和本地打包
+- [Android 伴侣配置](docs/REMOTE_SETUP.md)：配对、Firebase、自托管与 Android 构建
+- [发布指南](docs/RELEASING.md)：Windows 发布、签名和更新
+- [反馈问题](https://github.com/DaliBerr/Vibe-Halo/issues)：请附上 Windows 和客户端版本，不要上传密钥或私人任务内容
 
-## 许可证与致谢
+## 许可证
 
-基于 [Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk) 二次开发，独立维护，专注灵动岛界面；Android 伴侣为独立实现。与上游维护者和受支持客户端厂商无隶属关系。
-
-采用 [AGPL-3.0-only](LICENSE) 许可证。分发和部署修改版时，请遵守源码提供义务并保留上游归属，详见 [NOTICE.md](NOTICE.md)。
+本项目源自 [Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk)，独立维护，与上游维护者及所支持的客户端厂商均无关联。采用 [AGPL-3.0-only](LICENSE) 许可；署名信息（包括内置的客户端图标）见 [NOTICE.md](NOTICE.md)。
