@@ -1,8 +1,39 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-04 (0.6.7 published and public downloads verified)
+Updated: 2026-11-04 (settings window and opt-in clients; 0.6.7 published)
 Current version: `0.6.7` (Windows and Android); `0.6.3` (macOS/Linux preview)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-04 — Settings window and opt-in clients (unreleased)
+
+Added a foreground settings window (`src/settings-service.js`,
+`src/settings-window-controller.js`, `src/settings-preload.js`,
+`src/settings-renderer/`). It opens from tray **Settings…**, a tray click with
+nothing pending (Windows/Linux), a second launch, and the first launch. The
+sidebar has **General** plus a searchable client list grouped as enabled,
+detected and not detected; each client page has an enable switch, per-client
+approval/question/reminder/completion switches limited to adapter
+capabilities, status, configuration paths, repair and Codex hook guidance. The
+tray now keeps only status, Settings, recent events, mobile companion, the two
+global quick switches, updates and quit.
+
+Clients are now opt-in. `SettingsStore` stores a canonical `enabled` flag per
+integration (still writing `disabledByUser = !enabled` for older builds) and
+per-client preferences under `clients`. Migration keeps an integration enabled
+only when it was previously installed and not user-disabled; all other and new
+clients default to off, and startup scans no longer install them. Runtime
+gating is fail-open: the server passes the request kind to
+`isApprovalEnabled(agentId, kind)`, and events from a disabled client or
+feature are ignored after the hook has received its no-decision reply.
+Disabling a client or feature clears its pending reminders/completion notices.
+
+Verification: `npm test` 295 tests (294 pass, the existing POSIX-only skip),
+including 13 new settings regressions. Source-mode Electron screenshots of the
+General and Codex pages (dark) and a mocked-API harness run in Electron
+(navigation, feature toggle, enabling a client, search, disabled undetected
+client, light theme) showed no renderer errors. Pending manual acceptance: the
+native title-bar overlay controls, live enable/disable against real client
+configurations, DPI/multi-display placement, and macOS/Linux window chrome.
 
 ## 2026-11-04 — 0.6.7 published
 

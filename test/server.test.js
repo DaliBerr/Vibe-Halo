@@ -150,6 +150,18 @@ test("headless, disabled and oversized permissions fail open", async () => {
   assert.equal(oversized.body, "{}");
 });
 
+test("per-client approval switches receive the agent and request kind and fail open", async () => {
+  const seen = [];
+  const { approvals, server } = await fixture({
+    isApprovalEnabled: (agentId, kind) => { seen.push([agentId, kind]); return agentId !== "codex"; },
+  });
+  const codex = await request(server, "/permission", permission({ tool_use_id: "client-off" }));
+  assert.equal(codex.status, 200);
+  assert.equal(codex.body, "{}");
+  assert.equal(approvals.size, 0);
+  assert.deepEqual(seen, [["codex", "approval"]]);
+});
+
 test("accepts completion events with bounded Codex plan mode and cleans its runtime file", async () => {
   const { events, root, server } = await fixture();
   const response = await request(server, "/event", { event: "Stop", agent_id: "codex", session_id: "s1", permission_mode: "plan" });

@@ -575,7 +575,6 @@ class IntegrationManager {
       detected: status.detected === true,
       installed: status.installed === true,
       healthy: status.healthy === true,
-      disabledByUser: current.disabledByUser,
       verification: current.verification === "live" ? "live" : (status.installed ? "contract" : "none"),
       reason: String(reason || "").slice(0, 240),
       checkedAt: Date.now(),
@@ -587,22 +586,26 @@ class IntegrationManager {
     const installDetected = options.install !== false;
     const results = [];
     for (const descriptorValue of listAgents()) {
-      const current = this.settings?.getIntegration ? this.settings.getIntegration(descriptorValue.id) : { disabledByUser: false };
+      // Without a settings store (CLI/tests) every detected client is treated as enabled;
+      // the application store defaults every client to off until the user enables it.
+      const current = this.settings?.getIntegration ? this.settings.getIntegration(descriptorValue.id) : { enabled: true };
+      const enabled = current.enabled === true;
       const detection = this.detect(descriptorValue.id);
       let installResult = null;
-      if (installDetected && detection.detected && !current.disabledByUser) {
+      if (installDetected && detection.detected && enabled) {
         try { installResult = this.install(descriptorValue.id); }
         catch (error) { installResult = { ok: false, reason: error.message }; }
       }
       const status = this.status(descriptorValue.id);
       this.updateSetting(descriptorValue.id, status, installResult?.reason || status.reason);
-      results.push({ agent: descriptorValue, ...status, installResult, disabledByUser: current.disabledByUser });
+      results.push({ agent: descriptorValue, ...status, installResult, enabled, disabledByUser: !enabled });
     }
     return results;
   }
 
   enable(agentId) {
-    this.settings?.setIntegration?.(agentId, { disabledByUser: false });
+    this.settings?.setIntegration?.(agentId, { enabled: true });
+    this.detectionCache.delete(agentId);
     const result = this.install(agentId);
     this.updateSetting(agentId, this.status(agentId), result.reason);
     return result;
@@ -610,7 +613,7 @@ class IntegrationManager {
 
   disable(agentId) {
     const result = this.uninstall(agentId);
-    this.settings?.setIntegration?.(agentId, { disabledByUser: true, installed: false, healthy: false, reason: "disabled-by-user", checkedAt: Date.now() });
+    this.settings?.setIntegration?.(agentId, { enabled: false, installed: false, healthy: false, reason: "disabled-by-user", checkedAt: Date.now() });
     return result;
   }
 

@@ -32,15 +32,16 @@
 - The list can be filtered by all events, approvals, questions, plans, or source client. Selecting an entry opens read-only details with separate copy controls for commands, parameters, answers, content, and working directories.
 - Approval outcomes—including allow, deny, return-to-client, timeout, disconnect, and close—are retained. Exact in-island answers and best-effort Codex `request_user_input` answers are retained; incompatible Codex output is marked as unavailable.
 - Codex and ZCode plan-ready output is retained. Ordinary task-completion notifications are deliberately excluded.
-- History keeps at most 200 events for 30 days and caps its file at 16 MiB. Moving the pointer away closes the panel after five seconds; the tray is its only entry point.
+- History keeps at most 200 events for 30 days and caps its file at 16 MiB. Moving the pointer away closes the panel after five seconds; it opens only from the tray or the Settings sidebar.
 
 ### Integration management
 
-- At startup, Vibe Halo detects clients by executable or initialized configuration and incrementally installs or repairs detected integrations.
+- Clients are off by default. At startup, Vibe Halo detects clients by executable or initialized configuration, but installs or repairs only the clients you enabled in **Settings**. Integrations that were already installed and active before this change stay enabled.
 - Each client receives its own first-state backup before any edit. JSON, JSONC, TOML, and plugin installers preserve third-party content.
 - Explicit client disables—such as Codex `hooks=false`—are respected and are never silently reversed.
-- The tray can disable or re-enable each client, rescan, repair all integrations, or uninstall all Vibe Halo-managed entries.
-- A user-disabled client is recorded as an override and is not automatically reinstalled on the next launch.
+- **Settings** lists every client in a sidebar grouped as enabled, detected, or not detected. Each client page turns the integration on or off and chooses what it may show: island approvals, island questions, waiting-for-input reminders, and completion notices (only the features its adapter supports).
+- Turning a client off removes only Vibe Halo's own entries. Events from a client that is off, or from a feature that is off, return the client's native no-decision fallback.
+- **General** in Settings also offers rescan, repair of enabled clients, and uninstall-all.
 
 ### Updates
 
@@ -120,16 +121,16 @@ Other Linux distributions may work with the AppImage, but are not part of the fi
 
 After installation:
 
-1. Launch Vibe Halo. It stays in the system tray and shows no main window until an event arrives.
-2. The app scans installed or initialized supported clients and incrementally adds its own hook/plugin entries.
-3. Open the tray's **Client integrations** submenu to inspect detection and health.
+1. Launch Vibe Halo. It stays in the system tray; the first launch opens **Settings**, and launching it again or clicking the tray icon brings Settings back.
+2. The app scans for installed or initialized supported clients. Every client is off until you enable it.
+3. In Settings, select your client in the sidebar, turn it on, and check its detection and health. The **Client integrations** section of **General** summarizes all clients.
 4. For Codex, enter `/hooks` in Codex and review the Vibe Halo `PermissionRequest`, `Stop`, and `UserPromptSubmit` entries under the user-level `~/.codex/hooks.json`.
 5. Trigger one approval or completion from the client and confirm that the island appears and that the result returns correctly.
 
 > [!WARNING]
 > Codex 0.129.0 and later require the user to trust new or changed command hooks. Vibe Halo can write and repair the configuration, but it does not bypass the official trust review.
 
-The Windows installer and the application contain English and Simplified Chinese resources. Vibe Halo follows the operating-system UI locale by default; use **Language** in the tray to switch immediately without restarting the app.
+The Windows installer and the application contain English and Simplified Chinese resources. Vibe Halo follows the operating-system UI locale by default; use **Language** in Settings → General to switch immediately without restarting the app.
 
 #### macOS first launch
 
@@ -177,27 +178,31 @@ Use `npm install` and commit the updated `package-lock.json` when intentionally 
 - **Copy content** — copy the primary displayed content from the expanded view; IPC enforces a length bound.
 - **Inspect full parameters** — open the details section to view the sanitized structured input.
 
-### Tray menu
+### Settings window
 
-The tray exposes the following controls in English mode:
+Open **Settings…** from the tray (or click the tray icon when nothing is pending). The sidebar has **General** at the top, a client search box, and every supported client grouped as enabled, detected, or not detected.
+
+| Page | Controls |
+| --- | --- |
+| **General** | **Client integrations** summary with **Rescan** and **Repair enabled**; global **Approvals in the island**, **Waiting-for-input reminders**, and **Record recent events** switches; **Launch at login**; **Language** (Follow system, English, Simplified Chinese); version, updates, **Copy diagnostics**, **Open log folder**, and **Remove all…** |
+| A client | **Enable** switch; per-client island approvals, island questions, waiting-for-input reminders, and completion notices; detection, hook, verification, and configuration paths; **Repair** and **Show in folder**. Codex additionally shows hooks-feature and `/hooks` review guidance |
+
+Global switches win over per-client switches: when **Approvals in the island** is off, every client handles approvals and questions natively.
+
+### Tray menu
 
 | Menu item | Purpose |
 | --- | --- |
-| **Enable approvals** | Global island-approval switch; when disabled, approvals return to the client while completion notifications continue |
-| **Input reminders** | Controls read-only input reminders and native-approval reminders |
+| **Settings…** | Opens the settings window |
 | **Recent events** | Opens the independent right-side history panel and shows the current retained count |
-| **Record recent events** | Stops or resumes future history capture without deleting existing records |
-| **Launch at login** | Controls operating-system login startup |
-| **Client integrations** | Shows status and provides per-client disable/enable, rescan, repair, and uninstall-all actions |
-| **Review Codex Hook…** | Explains how to complete the official Codex `/hooks` trust review |
-| **Repair Codex Hook** | Incrementally repairs Vibe Halo-managed Codex configuration |
-| **Diagnostics** | Shows service, queue, integration verification, update status, active locale, and log location |
-| **Language** | Chooses Follow system, English, or Simplified Chinese; the island and queued items update immediately |
+| **Mobile companion…** | Opens phone pairing and remote settings |
+| **Enable approvals** | Quick global island-approval switch |
+| **Input reminders** | Quick switch for read-only input reminders and native-approval reminders |
 | **Check for updates** | Appears only in official Windows stable builds |
 
 ### Remove integrations
 
-Use **Client integrations → Uninstall all…** to remove every Vibe Halo-managed integration, or run this from a source checkout:
+Use **Settings → General → Remove all…** to remove every Vibe Halo-managed integration, or run this from a source checkout:
 
 ```shell
 npm start -- --uninstall-hooks
@@ -366,7 +371,7 @@ npm start -- --smoke-test
 
 ### Development principles
 
-- Preserve CommonJS and the native renderers. Keep the window boundary to one live island plus one optional tray-opened history window.
+- Preserve CommonJS and the native renderers. Keep the window boundary to one live island, one tray-opened settings window, and one optional history window.
 - Protocol, queue, timeout, IPC, window-size, and integration-installer changes require regression tests.
 - Never commit `node_modules/`, `dist/`, `.smoke/`, logs, credentials, or local runtime data.
 - After changing hook command paths, run “Repair all” and review the changed commands again in Codex `/hooks`.
@@ -472,22 +477,22 @@ Vibe Halo includes adapters, installers, and automated contract tests for Claude
 
 1. Confirm that the tray reports a running service or healthy client integrations.
 2. Confirm that **Enable approvals** or **Input reminders** is enabled.
-3. Open **Client integrations** and run **Rescan** or **Repair all**.
-4. Open diagnostics and check whether the client is healthy, needs repair, or was not detected.
-5. Use the diagnostics dialog to open the log directory and inspect `main.log`.
+3. Open **Settings**, select the client, and confirm it is enabled and that the relevant feature switch is on; use **Rescan** or **Repair** if needed.
+4. Check whether the client page reports connected, needs repair, or not detected.
+5. Use **Open log folder** in Settings → General to inspect `main.log`.
 
 ### Codex reports pending hook review
 
 1. Enter `/hooks` in Codex.
 2. Locate the user-level `~/.codex/hooks.json` entry.
 3. Review and trust the Vibe Halo `PermissionRequest`, `Stop`, and `UserPromptSubmit` commands.
-4. Run **Repair Codex Hook** from the tray and inspect diagnostics again.
+4. Open **Settings → Codex** and use **Repair**, then check the page status again.
 
 ### A client is detected but cannot be installed
 
 - If diagnostics say that the client disabled hooks, enable them explicitly in the client first. Vibe Halo does not override that setting.
 - If only the executable exists and the configuration directory is not initialized, launch the client once before rescanning.
-- A user-disabled integration is not automatically restored; re-enable it in the client-integration submenu.
+- A client that is off is never installed automatically; enable it on its page in **Settings**.
 - Client updates can change unstable hook protocols. Include the client version and sanitized diagnostics in an issue.
 
 ### The client still waits after the island is closed

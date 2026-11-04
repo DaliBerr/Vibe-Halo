@@ -49,6 +49,12 @@ for (const required of [
   "/src/history-renderer/index.html",
   "/src/history-renderer/style.css",
   "/src/history-renderer/renderer.js",
+  "/src/settings-service.js",
+  "/src/settings-window-controller.js",
+  "/src/settings-preload.js",
+  "/src/settings-renderer/index.html",
+  "/src/settings-renderer/style.css",
+  "/src/settings-renderer/renderer.js",
   "/hooks/vibe-halo-hook.js",
 ]) {
   if (!entries.has(required)) throw new Error(`packaged file missing: ${required}`);

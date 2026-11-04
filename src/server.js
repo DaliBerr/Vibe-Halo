@@ -168,10 +168,11 @@ class IslandServer {
       });
     }
     catch (error) { this.logger.warn("Permission origin handler failed", { agentId, message: error.message }); }
-    if (!this.isApprovalEnabled(agentId) || data.codex_session_role === "subagent" || data.headless === true) {
+    const approvalEnabled = this.isApprovalEnabled(agentId, normalized.kind) !== false;
+    if (!approvalEnabled || data.codex_session_role === "subagent" || data.headless === true) {
       this.logger.info("Permission fell back to native client", {
         agentId,
-        reason: !this.isApprovalEnabled() ? "disabled" : "headless",
+        reason: !approvalEnabled ? "disabled" : "headless",
         tool: text(data.tool_name, 160),
       });
       return sendAdapterDecision(res, 200, agentId, noDecisionOutput(agentId));

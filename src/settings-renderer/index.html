@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Vibe Halo Settings</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Settings navigation">
+      <div class="sidebar-drag"></div>
+      <div class="brand">
+        <div class="halo-mark" aria-hidden="true"><span></span></div>
+        <div class="brand-copy">
+          <strong>Vibe Halo</strong>
+          <span id="brand-version"></span>
+        </div>
+      </div>
+      <nav class="nav-top">
+        <button id="nav-general" class="nav-item" type="button" data-page="general">
+          <span class="nav-icon" data-icon="gear" aria-hidden="true"></span>
+          <span class="nav-label" id="nav-general-label">General</span>
+        </button>
+      </nav>
+      <div class="search">
+        <span class="search-icon" data-icon="search" aria-hidden="true"></span>
+        <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="Search clients">
+      </div>
+      <nav id="client-nav" class="client-nav" aria-label="Clients"></nav>
+      <div class="sidebar-footer">
+        <button id="open-history" class="footer-link" type="button">
+          <span class="nav-icon" data-icon="clock" aria-hidden="true"></span><span class="footer-label"></span>
+        </button>
+        <button id="open-mobile" class="footer-link" type="button">
+          <span class="nav-icon" data-icon="phone" aria-hidden="true"></span><span class="footer-label"></span>
+        </button>
+      </div>
+    </aside>
+    <main class="content">
+      <div class="content-drag"></div>
+      <div id="scroller" class="scroller">
+        <div id="page" class="page" aria-live="polite"></div>
+      </div>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="./renderer.js"></script>
+</body>
+</html>

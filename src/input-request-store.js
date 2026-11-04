@@ -175,6 +175,23 @@ class InputRequestStore extends EventEmitter {
     return true;
   }
 
+  clearAgent(agentId, reason = "disabled") {
+    const normalizedAgent = clean(agentId, 80);
+    if (!normalizedAgent) return false;
+    const removed = this.queue.filter(item => item.agentId === normalizedAgent);
+    if (removed.length === 0) return false;
+    for (const item of removed) {
+      this.byRequestKey.delete(item.requestKey);
+      if (item.timer) this.clearTimer(item.timer);
+      this.emit("finalized", {
+        entry: finalizedItem(item), reason, answers: {}, answerAvailable: false, finalizedAt: this.now(),
+      });
+    }
+    this.queue = this.queue.filter(item => !removed.includes(item));
+    this.emit("changed", this.snapshot(), reason);
+    return true;
+  }
+
   clearSession(sessionId, reason = "session-cleared", agentId = null, preserveKeys = new Set()) {
     const normalized = clean(sessionId, 240);
     if (!normalized) return false;

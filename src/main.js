@@ -52,6 +52,8 @@ const { createLogger } = require("./logger");
 const { SessionOriginStore } = require("./session-origin-store");
 const { IslandServer } = require("./server");
 const { SettingsStore } = require("./settings-store");
+const { SettingsService } = require("./settings-service");
+const { SettingsWindowController } = require("./settings-window-controller");
 const { ShutdownCoordinator } = require("./shutdown-coordinator");
 const { createTrayImage } = require("./tray-icon");
 const { UpdateManager } = require("./update-manager");
@@ -133,6 +135,7 @@ function startApplication() {
   let shutdownCoordinator = null;
   let remote = null;
   let remoteWindow = null;
+  let settingsWindow = null;
   let localization = createLocalizer({ preference: "system", systemLocale: "en-US" });
   const t = (key, params) => localization.t(key, params);
   const approvals = new ApprovalStore();
@@ -170,6 +173,13 @@ function startApplication() {
             run: () => {
               inputRequests.clear("shutdown");
               completions.clear("shutdown");
+            },
+          },
+          {
+            name: "settings-window",
+            run: () => {
+              settingsWindow?.destroy();
+              settingsWindow = null;
             },
           },
           {
@@ -355,7 +365,78 @@ function startApplication() {
     if (island) island.refresh("language");
     else rebuildTray();
     historyWindow?.refresh();
+    settingsWindow?.refresh();
     return true;
+  }
+
+  function openSettings(page = "general") {
+    return settingsWindow?.open(page) || false;
+  }
+
+  function clientAllows(agentId, feature) {
+    if (!settings?.isClientEnabled(agentId)) return false;
+    return feature ? settings.getClientPreferences(agentId)[feature] === true : true;
+  }
+
+  function onClientSettingChanged(agentId, change = {}) {
+    const descriptor = agent(agentId);
+    if (!descriptor) return;
+    const enabled = settings.isClientEnabled(descriptor.id);
+    if (!enabled || (change.key === "reminders" && change.value === false)) {
+      inputRequests.clearAgent(descriptor.id, "disabled");
+    }
+    if (!enabled || (change.key === "completions" && change.value === false)) {
+      completions.clear("disabled", null, descriptor.id);
+    }
+    if (descriptor.id === "codex" && enabled && change.key === "reminders" && change.value === true
+      && settings.get("inputReminderEnabled")) inputMonitor?.replayPending();
+    rebuildTray();
+  }
+
+  function onGeneralSettingChanged(key, value) {
+    if (key === "inputReminderEnabled") {
+      if (value) inputMonitor?.replayPending();
+      else inputRequests.clear("disabled");
+    }
+    rebuildTray();
+  }
+
+  function showConfigPath(agentId) {
+    let candidates = [];
+    try { candidates = integrationManager.paths(agentId) || []; } catch {}
+    for (const target of candidates) {
+      try {
+        if (!fs.existsSync(target)) continue;
+        if (fs.statSync(target).isDirectory()) shell.openPath(target);
+        else shell.showItemInFolder(target);
+        return true;
+      } catch {}
+    }
+    for (const target of candidates) {
+      const parent = path.dirname(target);
+      try {
+        if (fs.existsSync(parent)) {
+          shell.openPath(parent);
+          return true;
+        }
+      } catch {}
+    }
+    return false;
+  }
+
+  async function confirmFromSettings({ message, detail, confirm, type }) {
+    const options = {
+      type: type || "question",
+      buttons: [t("dialog.cancel"), confirm || t("dialog.enable")],
+      defaultId: type === "warning" ? 0 : 1,
+      cancelId: 0,
+      title: APP_NAME,
+      message,
+      ...(detail ? { detail } : {}),
+    };
+    const parent = settingsWindow?.window && !settingsWindow.window.isDestroyed() ? settingsWindow.window : null;
+    const result = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+    return result.response === 1;
   }
 
   async function openHistory() {
@@ -380,47 +461,17 @@ function startApplication() {
     const hook = hookManager.status();
     const local = server ? server.status() : { listening: false, port: null };
     const descriptors = listAgents();
-    const statuses = new Map(descriptors.map(descriptor => [descriptor.id, integrationManager.status(descriptor.id)]));
-    const healthyCount = descriptors.filter(descriptor => statuses.get(descriptor.id).healthy).length;
-    const detectedCount = descriptors.filter(descriptor => statuses.get(descriptor.id).detected).length;
+    const enabledCount = descriptors.filter(descriptor => settings.isClientEnabled(descriptor.id)).length;
+    const codexEnabled = settings.isClientEnabled("codex");
     const statusLabel = !local.listening
       ? t("tray.serviceNotRunning")
-      : hook.feature === "false"
+      : codexEnabled && hook.feature === "false"
         ? t("tray.codexHooksDisabled")
-        : hook.trust.pendingCount > 0
+        : codexEnabled && hook.trust.pendingCount > 0
           ? t("tray.codexHookPending")
-          : t("tray.integrationsHealthy", { healthy: healthyCount, detected: detectedCount });
-    const integrationItems = descriptors.map(descriptor => {
-      const state = settings.getIntegration(descriptor.id);
-      const status = statuses.get(descriptor.id);
-      const suffix = state.disabledByUser
-        ? t("tray.integrationDisabledByUser")
-        : status.disabled
-          ? t("tray.integrationDisabledByClient")
-          : status.healthy
-            ? t("tray.integrationHealthy")
-            : status.detected
-              ? t("tray.integrationNeedsRepair")
-              : t("tray.integrationNotDetected");
-      return {
-        label: `${descriptor.name} (${suffix})`,
-        type: "checkbox",
-        checked: !state.disabledByUser,
-        enabled: status.detected || state.disabledByUser,
-        click: item => {
-          const result = item.checked ? integrationManager.enable(descriptor.id) : integrationManager.disable(descriptor.id);
-          if (!result?.ok && item.checked) {
-            dialog.showMessageBox({
-              type: "warning",
-              title: APP_NAME,
-              message: t("dialog.integrationEnableFailed", { agentName: descriptor.name }),
-              detail: translateReason(localization, result?.reason),
-            });
-          }
-          rebuildTray();
-        },
-      };
-    });
+          : enabledCount === 0
+            ? t("tray.noClientsEnabled")
+            : t("tray.integrationsEnabled", { enabled: enabledCount });
     const update = updateManager?.snapshot() || { enabled: false, status: "disabled" };
     const updateItems = [{ label: t("tray.version", { version: app.getVersion() }), enabled: false }];
     if (update.enabled) {
@@ -445,174 +496,40 @@ function startApplication() {
       }
     }
     const items = [
-      { label: statusLabel, enabled: false },
+      { label: statusLabel, enabled: enabledCount === 0, click: () => openSettings("general") },
       { type: "separator" },
-      ...updateItems,
+      { label: t("tray.settings"), click: () => openSettings("general") },
+      { label: t("tray.recentEvents", { count: history?.snapshot().count || 0 }), click: () => openHistory() },
+      { label: t("tray.mobileCompanion"), click: () => remoteWindow?.show() },
+    ];
+    if (codexEnabled && (hook.feature === "false" || hook.trust.pendingCount > 0)) {
+      items.push({
+        label: hook.feature === "false" ? t("tray.enableCodexHooks") : t("tray.reviewCodexHook"),
+        click: () => openSettings("codex"),
+      });
+    }
+    items.push(
       { type: "separator" },
       {
         label: t("tray.enableApprovals"),
         type: "checkbox",
         checked: settings.get("approvalEnabled"),
-        click: item => { settings.set("approvalEnabled", item.checked); rebuildTray(); },
+        click: item => { settings.set("approvalEnabled", item.checked); onGeneralSettingChanged("approvalEnabled", item.checked); },
       },
       {
         label: t("tray.inputReminders"),
         type: "checkbox",
         checked: settings.get("inputReminderEnabled"),
-        click: item => {
-          settings.set("inputReminderEnabled", item.checked);
-          if (item.checked) inputMonitor?.replayPending();
-          else inputRequests.clear("disabled");
-          rebuildTray();
-        },
+        click: item => { settings.set("inputReminderEnabled", item.checked); onGeneralSettingChanged("inputReminderEnabled", item.checked); },
       },
-      {
-        label: t("tray.recentEvents", { count: history?.snapshot().count || 0 }),
-        click: () => openHistory(),
-      },
-      {
-        label: t("tray.recordHistory"),
-        type: "checkbox",
-        checked: settings.get("historyEnabled"),
-        click: item => { settings.set("historyEnabled", item.checked); rebuildTray(); },
-      },
-      {
-        label: t("tray.launchAtLogin"),
-        type: "checkbox",
-        checked: settings.get("openAtLogin"),
-        click: item => { setLogin(item.checked); rebuildTray(); },
-      },
-      {
-        label: t("tray.clientIntegrations"),
-        submenu: [
-          ...integrationItems,
-          { type: "separator" },
-          {
-            label: t("tray.rescan"),
-            click: () => { integrationManager.scan({ install: true }); rebuildTray(); },
-          },
-          {
-            label: t("tray.repairAll"),
-            click: () => { integrationManager.repairAll(); rebuildTray(); },
-          },
-          {
-            label: t("tray.uninstallAll"),
-            click: async () => {
-              const result = await dialog.showMessageBox({
-                type: "warning", buttons: [t("dialog.cancel"), t("dialog.uninstallAll")], defaultId: 0, cancelId: 0,
-                title: APP_NAME, message: t("dialog.removeAllIntegrations"),
-                detail: t("dialog.removeAllIntegrationsDetail"),
-              });
-              if (result.response === 1) {
-                integrationManager.uninstallAll();
-                for (const descriptor of listAgents()) settings.setIntegration(descriptor.id, { disabledByUser: true, installed: false, healthy: false, reason: "disabled-by-user" });
-                rebuildTray();
-              }
-            },
-          },
-        ],
-      },
-      {
-        label: t("tray.language"),
-        submenu: [
-          {
-            label: t("tray.followSystem"),
-            type: "radio",
-            checked: settings.get("language") === "system",
-            click: () => setLanguage("system"),
-          },
-          {
-            label: "English",
-            type: "radio",
-            checked: settings.get("language") === "en-US",
-            click: () => setLanguage("en-US"),
-          },
-          {
-            label: "简体中文",
-            type: "radio",
-            checked: settings.get("language") === "zh-CN",
-            click: () => setLanguage("zh-CN"),
-          },
-        ],
-      },
-    ];
-    if (hook.feature === "false") {
-      items.push({
-        label: t("tray.enableCodexHooks"),
-        click: async () => {
-          const result = await dialog.showMessageBox({
-            type: "question",
-            buttons: [t("dialog.cancel"), t("dialog.enable")],
-            defaultId: 1,
-            cancelId: 0,
-            title: APP_NAME,
-            message: t("dialog.enableCodexHooksQuestion"),
-          });
-          if (result.response === 1) {
-            hookManager.enableFeature();
-            settings.setIntegration("codex", { disabledByUser: false });
-            integrationManager.enable("codex");
-            rebuildTray();
-          }
-        },
-      });
-    }
-    if (hook.trust.pendingCount > 0) {
-      items.push({
-        label: t("tray.reviewCodexHook"),
-        click: async () => {
-          const result = await dialog.showMessageBox({
-            type: "warning",
-            buttons: [t("renderer.close"), t("dialog.copyHooks")],
-            defaultId: 1,
-            cancelId: 0,
-            title: APP_NAME,
-            message: t("dialog.codexHookUntrusted"),
-            detail: t("dialog.codexHookUntrustedDetail"),
-          });
-          if (result.response === 1) clipboard.writeText("/hooks");
-        },
-      });
-    }
-    items.push(
-      {
-        label: t("tray.repairCodexHook"),
-        click: async () => {
-          settings.setIntegration("codex", { disabledByUser: false });
-          const result = integrationManager.enable("codex");
-          rebuildTray();
-          await dialog.showMessageBox({
-            type: result.ok ? "info" : "error",
-            title: APP_NAME,
-            message: result.ok ? t("dialog.codexHookRepaired") : t("dialog.codexHookRepairFailed"),
-            detail: result.reason ? translateReason(localization, result.reason) : (hookManager.status().trust.pendingCount > 0
-              ? t("dialog.codexHookReviewStillRequired")
-              : t("dialog.hooksFeatureState", { state: result.feature })),
-          });
-        },
-      },
-      {
-        label: t("tray.diagnostics"),
-        click: async () => {
-          const detail = diagnosticText();
-          const result = await dialog.showMessageBox({
-            type: "info",
-            buttons: [t("renderer.close"), t("dialog.copy"), t("dialog.openLogDirectory")],
-            defaultId: 0,
-            title: t("dialog.diagnosticsTitle", { appName: APP_NAME }),
-            message: t("dialog.runtimeStatus"),
-            detail,
-          });
-          if (result.response === 1) clipboard.writeText(detail);
-          if (result.response === 2) shell.openPath(path.dirname(logger.filePath));
-        },
-      },
+      { type: "separator" },
+      ...updateItems,
       { type: "separator" },
       { label: t("tray.quit"), click: () => requestQuit() },
     );
-    items.splice(Math.max(0, items.length - 1), 0, { label: localization.locale === "zh-CN" ? "手机伴侣…" : "Mobile companion…", click: () => remoteWindow?.show() });
     tray.setContextMenu(Menu.buildFromTemplate(items));
     tray.setToolTip(`${APP_NAME} — ${statusLabel}`);
+    settingsWindow?.refresh();
   }
 
   function rememberAgentOrigin(data) {
@@ -636,6 +553,8 @@ function startApplication() {
     const agentName = descriptor.name;
     const sessionId = typeof data.sessionId === "string" ? data.sessionId
       : (typeof data.session_id === "string" ? data.session_id : `${agentId}:unknown`);
+    // Clients are opt-in: events from a client that is off are ignored (the hook already got its fail-open reply).
+    if (!clientAllows(agentId)) return;
     rememberAgentOrigin({ ...data, agentId, sessionId });
     // Async Codex questions can remain unanswered across prompts and turn completion.
     // Read replies before taking the preservation snapshot (the hook may win the poll).
@@ -651,6 +570,7 @@ function startApplication() {
       return;
     }
     if (data.event === "PermissionRequest" && descriptor.capabilities.passiveApproval) {
+      if (!clientAllows(agentId, "reminders")) return;
       remote?.recordReminder({ agentId, sessionId, requestKey: `${agentId}:${sessionId}:permission:${data.requestId || data.request_id || data.toolUseId || "pending"}` }, "input");
       if (!settings.get("inputReminderEnabled")) return;
       const requestId = typeof data.requestId === "string" ? data.requestId : (typeof data.request_id === "string" ? data.request_id : data.toolUseId || Date.now());
@@ -668,14 +588,16 @@ function startApplication() {
     const remoteCompletion = completionFromStop(data, descriptor, sessionId);
     if (!remoteCompletion) return;
     remote?.resolveSessionReminders(agentId, sessionId, preserveInputKeys);
-    remote?.recordReminder(remoteCompletion, remoteCompletion.completionKind === "plan" ? "plan" : "completion");
     inputRequests.clearSession(sessionId, "session-stopped", agentId, preserveInputKeys);
+    if (!clientAllows(agentId, "completions")) return;
+    remote?.recordReminder(remoteCompletion, remoteCompletion.completionKind === "plan" ? "plan" : "completion");
     if (approvals.size > 0 || inputRequests.size > 0) return;
     completions.show(remoteCompletion);
   }
 
   app.on("second-instance", () => {
-    showSystemNotification(APP_NAME, t("notification.background"));
+    // Launching Vibe Halo again brings the settings window to the foreground.
+    if (!openSettings("general")) showSystemNotification(APP_NAME, t("notification.background"));
   });
 
   app.on("window-all-closed", event => event?.preventDefault?.());
@@ -692,14 +614,15 @@ function startApplication() {
     remote.getLocale = () => localization.locale;
     integrationManager = createIntegrationManager(logger, settings);
     hookManager = integrationManager.codexManager;
-    if (!settings.get("initialized")) {
+    const firstRun = !settings.get("initialized");
+    if (firstRun) {
       setLogin(true);
       settings.set("initialized", true);
     }
 
     const integrationResults = integrationManager.scan({ install: true });
     for (const result of integrationResults) {
-      if (result.detected && !result.disabledByUser && !result.installResult?.ok) {
+      if (result.detected && result.enabled && !result.installResult?.ok) {
         logger.warn("Client integration not installed", { agentId: result.agent.id, reason: result.installResult?.reason || result.reason });
       }
     }
@@ -755,9 +678,12 @@ function startApplication() {
 
     inputMonitor = new CodexInputMonitor({
       logger,
-      onRemoteRequested: request => remote?.recordReminder({ ...request, agentId: "codex" }, "input"),
+      onRemoteRequested: request => {
+        if (!clientAllows("codex", "reminders")) return;
+        remote?.recordReminder({ ...request, agentId: "codex" }, "input");
+      },
       onRequested: request => {
-        if (!settings.get("inputReminderEnabled")) return false;
+        if (!settings.get("inputReminderEnabled") || !clientAllows("codex", "reminders")) return false;
         const origin = sessionOrigins.get("codex", request.sessionId);
         return !!inputRequests.enqueue({
           ...request,
@@ -777,7 +703,8 @@ function startApplication() {
 
     server = new IslandServer({
       approvalStore: approvals,
-      isApprovalEnabled: () => settings.get("approvalEnabled"),
+      isApprovalEnabled: (agentId, kind) => settings.get("approvalEnabled")
+        && clientAllows(agentId, kind === "elicitation" ? "questions" : "approvals"),
       logger,
       onPermission: rememberAgentOrigin,
       onEvent: handleAgentEvent,
@@ -810,20 +737,73 @@ function startApplication() {
       }
     });
 
+    const settingsService = new SettingsService({
+      settings,
+      integrationManager,
+      listAgents,
+      agent,
+      localization,
+      platform: platformAdapter.platform,
+      version: app.getVersion(),
+      getUpdate: () => updateManager?.snapshot(),
+      getHistoryCount: () => history?.snapshot().count || 0,
+      getTheme: () => (nativeTheme.shouldUseDarkColors ? "dark" : "light"),
+      effects: {
+        setLogin,
+        setLanguage,
+        onGeneralChanged: onGeneralSettingChanged,
+        onClientChanged: onClientSettingChanged,
+        confirm: confirmFromSettings,
+        copyText: value => clipboard.writeText(String(value || "")),
+        showConfigPath,
+        openHistory: () => openHistory(),
+        openMobile: () => remoteWindow?.show(),
+        openLogs: () => shell.openPath(path.dirname(logger.filePath)),
+        diagnostics: () => diagnosticText(),
+        checkUpdates: () => updateManager?.check({ manual: true }),
+        installUpdate: () => installDownloadedUpdate(),
+      },
+    });
+    settingsWindow = new SettingsWindowController({
+      BrowserWindow,
+      ipcMain,
+      nativeTheme,
+      service: settingsService,
+      platform: platformAdapter.platform,
+      logger,
+    });
+
     tray = new Tray(trayImage());
     tray.on("click", () => {
       if (approvals.current) island.expand(approvals.current.id);
       else if (inputRequests.current) island.expand(inputRequests.current.id);
       else if (completions.current) island.expand(completions.current.id);
+      else if (process.platform !== "darwin") openSettings("general");
     });
     rebuildTray();
     updateManager.start();
+    if (firstRun && process.env.VIBE_HALO_TEST !== "1") openSettings("general");
     logger.info("Application ready", { version: app.getVersion(), packaged: app.isPackaged, ...platformAdapter.status() });
     const demoApproval = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-approval");
     const demoPlanReady = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-plan-ready");
     const demoHistory = process.env.VIBE_HALO_TEST === "1" && process.argv.includes("--demo-history");
     const { createSmokeTasks, captureSmokeWindow } = require("./smoke-test");
     const smokeTasks = createSmokeTasks();
+    const demoSettingsArg = process.argv.find(value => value === "--demo-settings" || value.startsWith("--demo-settings="));
+    if (process.env.VIBE_HALO_TEST === "1" && demoSettingsArg) {
+      const demoPage = demoSettingsArg.includes("=") ? demoSettingsArg.split("=")[1] : "general";
+      openSettings(demoPage);
+      if (process.env.VIBE_HALO_SETTINGS_SCREENSHOT) {
+        smokeTasks.schedule(1500, async () => {
+          try {
+            await captureSmokeWindow(settingsWindow.window, process.env.VIBE_HALO_SETTINGS_SCREENSHOT, "Boolean(document.querySelector('.page .page-header'))");
+          } catch (error) {
+            logger.warn("Demo settings screenshot failed", { message: error.message });
+            throw error;
+          }
+        });
+      }
+    }
     if (demoApproval || demoPlanReady) {
       let demo;
       if (demoApproval) {
