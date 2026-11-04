@@ -54,6 +54,7 @@ for (const required of [
   "/src/settings-renderer/style.css",
   "/src/settings-renderer/renderer.js",
   "/hooks/vibe-halo-hook.js",
+  "/hooks/vibe-halo-hook.ps1",
 ]) {
   if (!entries.has(required)) throw new Error(`packaged file missing: ${required}`);
 }

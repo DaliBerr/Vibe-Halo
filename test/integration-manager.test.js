@@ -209,6 +209,44 @@ test("installs exact elicitation hooks for Claude and CodeBuddy", () => {
   }
 });
 
+test("Windows Claude Code hooks avoid cmd switches that Git Bash rewrites", () => {
+  const exe = "C:\\Program Files\\Vibe Halo\\Vibe Halo.exe";
+  const script = "C:\\Program Files\\Vibe Halo\\resources\\app.asar.unpacked\\hooks\\vibe-halo-hook.js";
+  const command = commandFor(exe, script, "claude-code", "PermissionRequest", { platform: "win32" });
+  assert.equal(command, 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File '
+    + '"C:\\Program Files\\Vibe Halo\\resources\\app.asar.unpacked\\hooks\\vibe-halo-hook.ps1" '
+    + `-Executable "${exe}" -Script "${script}" -Agent claude-code -Event PermissionRequest`);
+  assert.doesNotMatch(command, /(^|\s)\/[a-z]\b/i, "no slash switches for MSYS path conversion to rewrite");
+  assert.equal(containsMarker(command), true);
+  assert.match(commandFor(exe, script, "qwen-code", "Stop", { platform: "win32" }), /^cmd\.exe \/d \/s \/c "/, "other clients keep their verified command");
+
+  const launcher = fs.readFileSync(path.resolve(__dirname, "..", "hooks", "vibe-halo-hook.ps1"), "utf8");
+  assert.match(launcher, /\$env:ELECTRON_RUN_AS_NODE = '1'/);
+  assert.match(launcher, /Start-Process -FilePath \$Executable -ArgumentList \$arguments -NoNewWindow -Wait -PassThru/);
+  assert.match(launcher, /ValidatePattern\('\^\[a-z0-9-\]\{1,80\}\$'\)\]\[string\]\$Agent/);
+});
+
+test("legacy Windows Claude Code commands report repair and are replaced on install", () => {
+  const { manager } = fixture();
+  const target = manager.paths("claude-code")[0];
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const legacy = 'cmd.exe /d /s /c "set VIBE_HALO_HOOK=vibe-halo-hook.js&&powershell.exe -NoProfile -EncodedCommand AAAA"';
+  fs.writeFileSync(target, JSON.stringify({
+    hooks: { Stop: [{ hooks: [{ type: "command", command: legacy }] }], Notification: [{ hooks: [{ type: "command", command: "my-own-hook" }] }] },
+  }));
+  const before = manager.status("claude-code");
+  assert.equal(before.installed, true);
+  assert.equal(before.healthy, false);
+  assert.equal(before.reason, "legacy-windows-command");
+  assert.equal(manager.install("claude-code").ok, true);
+  const config = readJson(target);
+  assert.match(config.hooks.Stop[0].hooks[0].command, /^powershell\.exe .*vibe-halo-hook\.ps1/);
+  assert.equal(config.hooks.Stop.length, 1, "the legacy entry was replaced, not duplicated");
+  assert.equal(config.hooks.Notification[0].hooks[0].command, "my-own-hook", "third-party hooks are preserved");
+  const after = manager.status("claude-code");
+  assert.equal(after.healthy, true);
+});
+
 test("merges and safely removes JSON and TOML integrations", () => {
   const { home, manager } = fixture();
   const cursor = path.join(home, ".cursor", "hooks.json");

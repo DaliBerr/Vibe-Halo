@@ -39,7 +39,22 @@ Client icons are LobeHub Icons 1.95.1 (MIT, attribution in `NOTICE.md` and
 Reasonix keep glyph badges because no reliable icon source was found. The
 ZCode mark uses Z.ai's logo. Mono icons are tinted via CSS masks.
 
-Verification: `npm test` 291 tests (290 pass, the existing POSIX-only skip).
+Windows Claude Code hook fix: Claude Code runs hook commands through Git Bash,
+whose MSYS path conversion rewrote `cmd.exe /d /s /c` into drive paths. cmd.exe
+then started interactively and read the hook's stdin JSON as commands, so no
+Claude Code event ever reached Vibe Halo on Windows (this predates the settings
+work; Codex uses its own PowerShell command and was unaffected). Claude Code now
+uses `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File
+hooks/vibe-halo-hook.ps1 -Executable … -Script … -Agent … -Event …`, which only
+uses `-` switches and double-quoted paths. Old cmd entries report
+`legacy-windows-command` and are replaced by the next install/repair (startup
+scans repair enabled clients). Verified through Git Bash against a sandbox
+instance with `C:\Program Files` paths: the PermissionRequest was queued with
+the correct tool and stdin/stdout passed intact. Other Windows clients keep
+their existing cmd form; CodeBuddy may need the same change if it also uses
+Git Bash (unverified).
+
+Verification: `npm test` 293 tests (292 pass, the existing POSIX-only skip).
 Sandbox-mode Electron smoke screenshots (isolated USERPROFILE, APPDATA, user
 data and runtime directory) of General, Codex, Recent events list/detail and
 Mobile companion showed the expected pages; the CI `--demo-history` screenshot

@@ -10,6 +10,10 @@ const { createPlatformAdapter } = require("./platform-adapter");
 const { DshIntegration } = require("./dsh-integration");
 
 const MARKER = "vibe-halo-hook.js";
+const WINDOWS_LAUNCHER = "vibe-halo-hook.ps1";
+// Clients that run Windows hook commands through Git Bash. Bash rewrites `cmd.exe /d /s /c`
+// switches into drive paths, so these use the shell-neutral PowerShell launcher instead.
+const BASH_HOOK_CLIENTS = Object.freeze(["claude-code"]);
 const GROUP_ID = "vibe-halo";
 const EVENTS = Object.freeze({
   zcode: ["PermissionRequest", "Stop", "UserPromptSubmit", "SessionStart"],
@@ -135,8 +139,30 @@ function commandFor(executablePath, scriptPath, agentId, event, options = {}) {
     });
     return platformAdapter.hookCommand(agentId, event) || "";
   }
+  if (BASH_HOOK_CLIENTS.includes(agentId)) return powershellLauncherCommand(executablePath, scriptPath, agentId, event);
   const command = processCommandFor(executablePath, scriptPath, agentId, event);
   return `cmd.exe /d /s /c "${command}"`;
+}
+
+/** A command that runs identically under Git Bash, cmd.exe and PowerShell (only `-` switches and double-quoted paths). */
+function powershellLauncherCommand(executablePath, scriptPath, agentId, event) {
+  const launcher = path.join(path.dirname(String(scriptPath)), WINDOWS_LAUNCHER);
+  return `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${launcher}"`
+    + ` -Executable "${executablePath}" -Script "${scriptPath}" -Agent ${agentId} -Event ${event}`;
+}
+
+function usesLegacyWindowsCommand(agentId, config, platform) {
+  if (platform !== "win32" || !BASH_HOOK_CLIENTS.includes(agentId)) return false;
+  const commands = [];
+  const collect = value => {
+    if (Array.isArray(value)) value.forEach(collect);
+    else if (value && typeof value === "object") {
+      if (typeof value.command === "string") commands.push(value.command);
+      Object.values(value).forEach(collect);
+    }
+  };
+  collect(config?.hooks);
+  return commands.some(command => command.startsWith("cmd.exe /d /s /c ") && command.includes(`VIBE_HALO_HOOK=${MARKER}`));
 }
 
 function processCommandFor(executablePath, scriptPath, agentId, event) {
@@ -558,10 +584,11 @@ class IntegrationManager {
       const config = readJson(target);
       const disabled = explicitDisabled(agentId, config);
       const installed = containsMarker(config);
-      const healthy = installed && !disabled && (agentId !== "zcode" || isHealthyZcodeIntegration(config, this.commandOptions()));
+      const legacy = installed && usesLegacyWindowsCommand(agentId, config, this.platform);
+      const healthy = installed && !disabled && !legacy && (agentId !== "zcode" || isHealthyZcodeIntegration(config, this.commandOptions()));
       const reason = disabled
         ? "hooks-explicitly-disabled"
-        : (!installed ? "missing" : (healthy ? "healthy" : "invalid-zcode-process-hook"));
+        : (!installed ? "missing" : (healthy ? "healthy" : (legacy ? "legacy-windows-command" : "invalid-zcode-process-hook")));
       return { ...detection, installed, healthy, disabled, reason };
     } catch (error) {
       return { ...detection, installed: false, healthy: false, disabled: false, reason: error.message };
@@ -677,6 +704,8 @@ module.exports = {
   atomicWrite,
   backupOnce,
   commandFor,
+  powershellLauncherCommand,
+  usesLegacyWindowsCommand,
   containsMarker,
   explicitDisabled,
   isHealthyZcodeIntegration,
