@@ -4,6 +4,21 @@ Updated: 2026-11-05 (0.7.0 published, Windows only)
 Current version: `0.7.0` (Windows); Android companion `0.6.7`; macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
 
+## 2026-11-05 — Local build artifact cleanup
+
+Old local Windows unpacked builds, earlier local installers and older Android
+preview/test APKs were removed; the later directory cleanup used the Windows
+Recycle Bin. Historical paths below
+identify the artifacts used at the time; the removed binaries are no longer at
+those paths. The 0.7.0 local Windows build remains in `dist/release-070-local/`,
+and the 0.6.7 Android build remains in `dist/companion-release-067/`. Existing
+smoke screenshots, logs and acceptance records were retained. Copies of old
+Windows build configurations are in `.smoke/old-dist-build-metadata/`;
+`dist/companion-preview/` retains its usage guide and checksum list, and
+`dist/companion-update-066/` retains its update metadata and checksum list.
+GitHub Releases provide published versions, but old local installers had different
+hashes and should not be described as byte-identical to the published installers.
+
 ## 2026-11-05 — 0.7.0 release scope
 
 0.7.0 ships the unified settings window, default clients and the Windows Claude
@@ -165,8 +180,9 @@ Verification for this correction:
   screenshots checked). All three model turns completed.
   Evidence: `.smoke/dsh-parallel-live/`; no real user session was answered.
 - Windows local package built and verified at
-  `.smoke/dsh-parallel-package/win-unpacked/`; its unpacked plugin exactly matches
-  source. The default output directory was busy with the owner's running app,
+  `.smoke/dsh-parallel-package/win-unpacked/` (removed in the 2026-11-05
+  cleanup); at the time its unpacked plugin exactly matched source. The default
+  output directory was busy with the owner's running app,
   so the build used this separate output directory. Version remains 0.6.6;
   there is no public release or installed stable-app replacement.
 - The shared local DSH plugin asset was updated without rewriting either
@@ -457,8 +473,9 @@ tests include multiline Wrangler capture parsing. Relay typecheck and
 20 tests passed. Android debug Kotlin compilation and unit tests passed. The
 Windows directory build and 0.6.4 package verification passed. Android release
 assembly and lint passed; the diagnostic APK in ignored
-`dist/companion-timing/Vibe-Halo-Mobile-0.6.3-timing.apk` preserves the existing
-release certificate and package/version identity for data-preserving replacement.
+`dist/companion-timing/Vibe-Halo-Mobile-0.6.3-timing.apk` (removed in the
+2026-11-05 cleanup) preserved the existing release certificate and
+package/version identity for data-preserving replacement.
 Relay production-config dry-run passed. After replacing the USB cable, the
 owner's Xiaomi 15 connected and the signed APK installed successfully with
 `adb install -r`, preserving pairing. The diagnostic relay was deployed as
@@ -477,8 +494,8 @@ fallbacks. The same discovery benchmark took 129 ms. Tests cover quoted and
 case-insensitive PATH/PATHEXT, absent files, directories and invalid names.
 POSIX discovery is unchanged.
 
-After switching to `dist/timing-optimized/win-unpacked/Vibe Halo.exe`, samples
-3/4 took 265/391 ms from source JSONL time to local socket submission. Their
+After switching to `dist/timing-optimized/win-unpacked/Vibe Halo.exe` (removed
+in the 2026-11-05 cleanup), samples 3/4 took 265/391 ms from source JSONL time to local socket submission. Their
 relay event-stored-to-push-due intervals were 1,896/1,732 ms; FCM request durations
 were 84/93 ms; Android receipt-to-result durations were 61/64 ms. The owner
 confirmed sample 4 was noticeably faster. The relay's 1.5–2 second LAN-ack
@@ -557,9 +574,9 @@ Verification:
   detected all nine and matched all nine replies; no phone notifications were
   sent and no conversation text was saved to the repository.
 - Windows directory packaging and packaged-resource verification passed at
-  `dist/codex-async-input/win-unpacked`. All four changed production modules
-  match the ASAR contents; the packaged monitor passes a synthetic mobile-only
-  request/ack/reply smoke check.
+  `dist/codex-async-input/win-unpacked` (removed in the 2026-11-05 cleanup).
+  All four changed production modules matched the ASAR contents; the packaged
+  monitor passed a synthetic mobile-only request/ack/reply smoke check.
 
 No Android update, relay deployment, protocol migration or re-pairing is needed.
 Hook commands/trust are unchanged. This is a source change only: no version
@@ -648,8 +665,9 @@ Verification:
   config-discovery test now isolates executable detection from host-installed
   clients; its first run otherwise selected the local Copilot executable.
 - Windows directory packaging and packaged-resource verification passed under
-  `dist/history-title/win-unpacked`; its unpacked hook independently resolved the
-  owner-referenced chat's expected title from the real local index.
+  `dist/history-title/win-unpacked` (removed in the 2026-11-05 cleanup); its
+  unpacked hook independently resolved the owner-referenced chat's expected
+  title from the real local index.
 - Android: 9 JVM tests and all 17 selected history/setup/rich-content emulator
   cases passed. The four new header/card cases cover badge placement below the
   title, status semantics, list markers, and English dark mode at 200% font size.
@@ -740,7 +758,7 @@ Verification on Windows and the local Android emulator:
   binding/signature/event validation. NotificationPersistenceTest passed in two
   separate processes with an explicit force-stop between seed and replay.
 - Windows directory build and packaged-resource verification passed under
-  `dist/notification-preview/win-unpacked` (ignored).
+  `dist/notification-preview/win-unpacked` (removed in the 2026-11-05 cleanup).
 
 Source changes only: no version bump, public release, production relay deployment,
 installed desktop replacement, or phone update. Rollout needs the compatible relay,
@@ -1056,7 +1074,8 @@ zh-CN sync. Physical watch mirroring is still for the user to verify after updat
 Worker version 139d683d-f449-4afc-90d7-fd18e2080d6a deployed at the existing origin.
 No schema migration or credential rotation. Windows package and local approval
 smoke passed; the installed desktop matches the fixed build. Signed APK and Windows
-installer refreshed in dist/companion-preview. Synthetic public root/bridge are
+installer were refreshed in `dist/companion-preview/`; those binaries were
+removed in the 2026-11-05 cleanup. Synthetic public root/bridge are
 cleaned up after the check; actual user bindings are preserved. No remote CI/CD or
 release tag; the wider companion acceptance gates below still apply.
 
@@ -1100,8 +1119,9 @@ product choices in the historical entry below; remote control still defaults off
   optional self-hosted settings collapsed. A transient emulator System UI ANR was
   dismissed using the earlier Android Studio task guidance; app UI recovered.
 - Both synthetic public PC roots were revoked, and bridge/ADB forwards were stopped.
-  The actual installed desktop identity is preserved. Updated deliverables remain
-  in dist/companion-preview, including refreshed usage instructions and hashes.
+  The actual installed desktop identity is preserved. Updated deliverables were
+  placed in `dist/companion-preview/`. The 2026-11-05 cleanup removed the
+  binaries; the usage instructions and hashes remain there.
 
 No remote CI/CD, store upload or release tag was requested or run. Physical phone,
 watch/cellular and real-client acceptance from the earlier task remain open; the
@@ -1227,10 +1247,11 @@ request-ID rejection. Actual decision deadlines still belong to the PC. Terminal
 notification reconciliation also cancels Firebase's auto-display ID, verified
 alongside the app's foreground notification ID in instrumentation.
 
-Local test deliverables are collected in ignored `dist/companion-preview/`: the
-Firebase-configured debug APK, minified release APK, Windows x64 NSIS companion
-preview and SHA-256 checksums. The installable `Vibe-Halo-Mobile-0.1.0.apk` uses
-the release Firebase app and a dedicated RSA-3072 signing key, with verified APK
+Local test deliverables were collected in ignored `dist/companion-preview/`:
+the Firebase-configured debug APK, minified release APK, Windows x64 NSIS
+companion preview and SHA-256 checksums. The 2026-11-05 cleanup removed the
+binaries and retained the checksum list and guide. The installable
+`Vibe-Halo-Mobile-0.1.0.apk` used the release Firebase app and a dedicated RSA-3072 signing key, with verified APK
 v2/v3 signatures. Key and DPAPI-encrypted password are retained outside temporary
 files at `C:\Users\15933\.vibe-halo\android-signing\`; preserve them for updates.
 Certificate SHA-256 is
@@ -1262,7 +1283,8 @@ APK includes the matching release Firebase app ID, clock challenge and explicit
 terminal-state strings (verified in packaged DEX). SHA-256 of the installable
 release APK is `96fe6dc4a3ec09a4b6d81e24972c19395d90508503159987ddb61c5608707acd`;
 the full binary checksum list and Chinese physical-test guide are in ignored
-`dist/companion-preview/`. Subsequent handoff-only commits do not change binaries.
+`dist/companion-preview/`. The corresponding local binaries were removed in
+the 2026-11-05 cleanup. Subsequent handoff-only commits did not change binaries.
 The branch remains pushed but unmerged while the plan's real-client/physical
 acceptance and production budget gates remain open; no tag or app-store release
 was created.
@@ -1444,9 +1466,10 @@ The application now includes an optional, default-disabled Android companion wit
   Earlier intermediate syntax-check failure during refactoring was fixed before
   these final runs. Logs: `.smoke/mobile-foundation-tests.log` (untracked).
 - `npm run build:dir` and `npm run verify:package --
-  dist/win-unpacked/resources 0.5.9` passed on Windows x64. The asar contains the
+  dist/win-unpacked/resources 0.5.9` passed on Windows x64; that local build was
+  removed in the 2026-11-05 cleanup. The asar contained the
   service, projector and protocol runtime; relay/Android sources, schema/test
-  tooling and known credential filenames are excluded. The local package keeps
+  tooling and known credential filenames were excluded. The local package kept
   auto-update disabled. Build log: `.smoke/mobile-foundation-build.log`.
 - Packaged isolated action smoke returned `resolved`, captured the history list
   and detail, and exited with code 0. The action intentionally resolves before
