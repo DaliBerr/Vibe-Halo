@@ -1,23 +1,42 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-11 (Android 0.7.0 publication preparation)
-Current version: `0.7.0` (Windows); Android companion `0.7.0` prepared (published `0.6.7`); macOS/Linux no longer published (last preview `0.6.3`)
+Updated: 2026-11-11 (Android 0.7.0 published)
+Current version: `0.7.0` (Windows); Android companion `0.7.0` (versionCode 9); macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
 
-## 2026-11-11 — Android 0.7.0 update preparation
+## 2026-11-11 — Android 0.7.0 published for watch notification testing
 
 The owner authorized publishing the watch-notification fix as a phone update.
 Android now uses versionName `0.7.0` and versionCode `9`, retaining its package,
-release certificate, Firebase configuration and pairing data. The intended
-distribution is an Android-only addition to the existing `v0.7.0` release:
+release certificate, Firebase configuration and pairing data. Published as an
+Android-only addition to the existing stable, Latest `v0.7.0` release:
 APK, `android-update.json`, corresponding checksums and Android release notes.
-The existing Windows installer, blockmap, `latest.yml`, license assets and
-immutable desktop tag are preserved. The manifest and notes identify the new
-committed Android source separately from the original desktop release commit.
-Publication and public-download verification are pending; physical phone/watch
-notification behavior remains owner acceptance after updating.
+The manifest and release notes identify Android source
+`60bd3994c80d2f1b60705e5479447771857f4360`; the original desktop tag remains at
+`1f2af315d9555352839815c6838f8dd5c2cb0877`.
 
-## 2026-11-11 — Phone-only group summaries for duplicate watch cards (unreleased)
+Verification: nine local release/metadata/localization tests passed. The local
+minified release build, all 13 release JVM tests and release lint passed (zero
+errors, 31 warnings). The APK's original signing certificate, package/version,
+Firebase configuration, alignment and notification-fix receiver were verified.
+Manual mobile/relay workflow `43030804626` passed both jobs on the exact Android
+source commit, covering protocol, relay, debug/release builds, JVM tests and lint.
+
+Anonymous public API discovery selected Android 0.7.0 using the app's stable
+release scan rules, with versionCode 9 newer than the installed code-8 builds.
+The public APK, manifest and checksums were downloaded and checked against GitHub
+asset digests and the local signed bytes; all five checksum entries match. APK
+size is 2,691,426 bytes; SHA-256:
+`d79132afd431b4948cad991e98ab2aab555adbd4c1c1d9f05576dff3abe99011`.
+The existing Windows installer, blockmap, `latest.yml`, LICENSE and NOTICE retain
+their original asset IDs and digests. No new tag, Windows build or relay
+deployment was made.
+
+The owner can use Devices → Check for updates in the phone app. Physical phone
+installation, watch mirroring and vibration count remain owner acceptance after
+updating; this publication did not install the update on the owner's phone.
+
+## 2026-11-11 — Phone-only group summaries for duplicate watch cards
 
 The owner reported two identical task cards on the watch and confirmed the phone
 showed only one. A read-only check of the installed 0.7.0 desktop's encrypted
@@ -58,8 +77,9 @@ asynchronous. Final verification:
 Physical phone/watch behavior remains an acceptance gate:
 Android's local-only flag is a bridge hint, and an emulator cannot prove that a
 vendor's companion app honors it. This change requires only an updated Android
-APK; the desktop, relay and existing pairing can stay in place. No version bump,
-public release, production deployment or physical-device installation is included.
+APK; the desktop, relay and existing pairing can stay in place. The initial fix
+task did not bump versions, publish or install on physical devices; the authorized
+Android 0.7.0 publication is recorded above.
 
 ## 2026-11-05 — Local build artifact cleanup
 
