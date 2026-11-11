@@ -29,7 +29,7 @@
 | 平台 | 安装包 |
 | --- | --- |
 | Windows 10/11 x64 | [安装程序（最新版）](https://github.com/DaliBerr/Vibe-Halo/releases/latest)——确认重启后安装更新 |
-| Android 8+ | [伴侣 APK 0.6.7](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.7/Vibe-Halo-Mobile-0.6.7.apk)——预览版 |
+| Android 8+ | [伴侣 APK 0.7.0](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.7.0/Vibe-Halo-Mobile-0.7.0.apk)——预览版 |
 
 安装程序未签名，Windows 可能提示未知发布者。现在只发布 Windows 版，不再发布 macOS 和 Linux 安装包。
 

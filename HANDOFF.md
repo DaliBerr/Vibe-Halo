@@ -1,8 +1,21 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-11 (Android watch grouping fix, unreleased)
-Current version: `0.7.0` (Windows); Android companion `0.6.7`; macOS/Linux no longer published (last preview `0.6.3`)
+Updated: 2026-11-11 (Android 0.7.0 publication preparation)
+Current version: `0.7.0` (Windows); Android companion `0.7.0` prepared (published `0.6.7`); macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-11 — Android 0.7.0 update preparation
+
+The owner authorized publishing the watch-notification fix as a phone update.
+Android now uses versionName `0.7.0` and versionCode `9`, retaining its package,
+release certificate, Firebase configuration and pairing data. The intended
+distribution is an Android-only addition to the existing `v0.7.0` release:
+APK, `android-update.json`, corresponding checksums and Android release notes.
+The existing Windows installer, blockmap, `latest.yml`, license assets and
+immutable desktop tag are preserved. The manifest and notes identify the new
+committed Android source separately from the original desktop release commit.
+Publication and public-download verification are pending; physical phone/watch
+notification behavior remains owner acceptance after updating.
 
 ## 2026-11-11 — Phone-only group summaries for duplicate watch cards (unreleased)
 

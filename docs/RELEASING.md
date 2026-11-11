@@ -60,6 +60,13 @@ release keystore. Never commit the keystore, passwords or service-account keys.
 Verify the signing certificate against the previous APK before publication;
 changing the key or application ID prevents a normal upgrade preserving pairing.
 
+An authorized Android-only follow-up can add the aligned Android version to an
+existing desktop release without moving its tag or rebuilding Windows. Keep the
+full committed Android source SHA in the manifest and Android release notes when
+it differs from the original desktop tag, and preserve all existing Windows
+assets. Verify the newly published APK/manifest and the unchanged desktop asset
+IDs and digests before declaring the update available.
+
 The mobile CI validates builds and lint; its unsigned/debug APKs are not the
 public download. Attach the locally verified, original-key-signed
 `Vibe-Halo-Mobile-<version>.apk` to the stable tag's release, clearly labeled as

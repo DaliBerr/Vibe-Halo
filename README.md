@@ -29,7 +29,7 @@ Approve tool calls, answer questions and see when a task finishes — without sw
 | Platform | Package |
 | --- | --- |
 | Windows 10/11 x64 | [Installer (latest release)](https://github.com/DaliBerr/Vibe-Halo/releases/latest) — updates install after you confirm a restart |
-| Android 8+ | [Companion APK 0.6.7](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.6.7/Vibe-Halo-Mobile-0.6.7.apk) — preview |
+| Android 8+ | [Companion APK 0.7.0](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.7.0/Vibe-Halo-Mobile-0.7.0.apk) — preview |
 
 The installer is not publisher-signed, so Windows may show an unknown-publisher warning. Only Windows is released; macOS and Linux packages are no longer published.
 
