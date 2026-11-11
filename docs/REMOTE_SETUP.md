@@ -220,8 +220,18 @@ signed and encrypted for the paired phone, and decrypted locally before display;
 it is not plaintext in FCM. Common inline credentials are masked. Watches mirror
 the phone's single-language text, subject to device notification privacy settings.
 
-For the notification upgrade, deploy the compatible relay, update the desktop
-and phone, and open the phone app once while online. No re-pairing or database
+The Android app owns one silent, phone-only group summary per computer. Only
+individual event cards are eligible for watch mirroring; the summary uses generic
+app text rather than copying the latest task. Opening, dismissing or resolving the
+last event removes its summary. Existing LAN/FCM event deduplication still applies.
+This prevents a group summary from becoming a second copy of a task on bridges
+that honor Android's
+[local-only flag](https://developer.android.com/reference/android/app/Notification.Builder#setLocalOnly(boolean)).
+Vendor phone/watch behavior needs device acceptance after installing the updated
+APK. No desktop/relay update or re-pairing is required for this grouping change.
+
+For the encrypted-preview/data-only upgrade, deploy the compatible relay, update
+the desktop and phone, and open the phone app once while online. No re-pairing or database
 migration is required. Old phones retain generic cloud notifications; old
 desktops provide client/kind fallback without excerpts. Codex Desktop's exact
 single-field `{"suggestion": ...}` follow-up responses are excluded from desktop

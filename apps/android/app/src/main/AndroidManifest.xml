@@ -15,6 +15,7 @@
         <service android:name=".notifications.CompanionMessagingService" android:exported="false">
             <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
         </service>
+        <receiver android:name=".notifications.CompanionNotificationDismissedReceiver" android:exported="false" />
         <provider android:name=".updates.UpdateFileProvider" android:authorities="${applicationId}.updates"
             android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />

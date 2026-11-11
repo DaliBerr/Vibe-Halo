@@ -51,7 +51,10 @@ class MainActivity : ComponentActivity() {
     private fun route(intent: Intent?) {
         val pcId = intent?.getStringExtra("pcId"); val eventId = intent?.getStringExtra("eventId")
         val epoch = intent?.getStringExtra("pcSessionEpoch")
-        if (pcId != null && eventId != null && epoch != null && pcId.length <= 100 && eventId.length <= 240 && epoch.length <= 100) target.value = Triple(pcId, eventId, epoch)
+        if (pcId != null && eventId != null && epoch != null && pcId.length <= 100 && eventId.length <= 240 && epoch.length <= 100) {
+            target.value = Triple(pcId, eventId, epoch)
+            com.vibe.halo.mobile.notifications.CompanionNotifications.dismissEvent(this, pcId, eventId)
+        }
     }
     override fun onStop() { super.onStop(); repository.close() }
 }

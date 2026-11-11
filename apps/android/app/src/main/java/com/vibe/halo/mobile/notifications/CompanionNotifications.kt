@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -17,6 +18,27 @@ import com.vibe.halo.mobile.tr
 import com.vibe.halo.mobile.security.SecureStore
 
 object CompanionNotifications {
+    private fun groupKey(pcId: String) = "vibe-halo-$pcId"
+    // The leading underscore cannot be an event ID, so this cannot replace a task.
+    private fun summaryTag(pcId: String) = "$pcId/_summary"
+
+    private fun showPhoneSummary(context: Context, pcId: String, channel: String) {
+        val tag = summaryTag(pcId)
+        val intent = Intent(context, MainActivity::class.java).setAction("com.vibe.halo.mobile.OPEN_NOTIFICATIONS")
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val pending = PendingIntent.getActivity(context, tag.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val english = com.vibe.halo.mobile.UiLanguage.resolvedLocale() == "en-US"
+        val summary = Notification.Builder(context, channel).setSmallIcon(R.drawable.ic_halo)
+            .setContentTitle("Vibe Halo").setContentText(if (english) "Open Vibe Halo to view notifications." else "打开 Vibe Halo 查看通知。")
+            .setContentIntent(pending).setAutoCancel(true).setVisibility(Notification.VISIBILITY_PRIVATE)
+            .setGroup(groupKey(pcId)).setGroupSummary(true).setGroupAlertBehavior(Notification.GROUP_ALERT_CHILDREN)
+            .setLocalOnly(true).setOnlyAlertOnce(true)
+        if (Build.VERSION.SDK_INT >= 29) summary.setAllowSystemGeneratedContextualActions(false)
+        // Explicitly own the summary: system/OEM summaries may clone the latest
+        // task and be bridged to a watch alongside the real event notification.
+        context.getSystemService(NotificationManager::class.java).notify(tag, 0, summary.build())
+    }
+
     fun copy(kind: String): Pair<String, String> {
         val english = com.vibe.halo.mobile.UiLanguage.resolvedLocale() == "en-US"
         return when (kind) {
@@ -68,13 +90,17 @@ object CompanionNotifications {
         val intent = Intent(context, MainActivity::class.java).setAction("com.vibe.halo.mobile.OPEN_EVENT").putExtra("pcId", pcId).putExtra("eventId", eventId).putExtra("pcSessionEpoch", data["pcSessionEpoch"])
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pending = PendingIntent.getActivity(context, key.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val dismissed = Intent(context, CompanionNotificationDismissedReceiver::class.java).setAction(key)
+            .putExtra("pcId", pcId).putExtra("eventId", eventId)
+        val deleteIntent = PendingIntent.getBroadcast(context, key.hashCode(), dismissed, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = Notification.Builder(context, channel).setSmallIcon(R.drawable.ic_halo).setContentTitle(title)
-            .setContentText(body).setStyle(Notification.BigTextStyle().bigText(body)).setContentIntent(pending).setAutoCancel(true)
+            .setContentText(body).setStyle(Notification.BigTextStyle().bigText(body)).setContentIntent(pending).setDeleteIntent(deleteIntent).setAutoCancel(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE).setOnlyAlertOnce(true).setCategory(if (channel != "completions") Notification.CATEGORY_REMINDER else Notification.CATEGORY_STATUS)
-            .setGroup("vibe-halo-$pcId")
+            .setGroup(groupKey(pcId)).setGroupAlertBehavior(Notification.GROUP_ALERT_CHILDREN)
         if (Build.VERSION.SDK_INT >= 29) builder.setAllowSystemGeneratedContextualActions(false)
         val notification = builder.build()
         // No decision action, inline reply, full-screen intent, or custom watch UI.
+        showPhoneSummary(context, pcId, channel)
         context.getSystemService(NotificationManager::class.java).notify(key, 0, notification)
         NotificationTiming.record("android_notify_returned", data, transport, timingStart)
         remember(context, key, revision, true)
@@ -84,11 +110,30 @@ object CompanionNotifications {
     fun clearEvent(context: Context, pcId: String, eventId: String, revision: Long) {
         val manager = context.getSystemService(NotificationManager::class.java)
         val tag = "$pcId/$eventId"
+        manager.cancel(tag, 0)
         manager.cancel(tag, 1)
         // FCM's background auto-display uses its own notification ID (currently
         // zero). Cancel matching active tags, not only our foreground builder ID.
         manager.activeNotifications.filter { it.tag == tag }.forEach { manager.cancel(it.tag, it.id) }
         remember(context, tag, revision, false)
+        val seen = context.getSharedPreferences("notification-revisions", Context.MODE_PRIVATE)
+        // cancel() and activeNotifications can race. Ignore every already-cleared
+        // marker as well as this tag so back-to-back clears remove the summary.
+        val remaining = manager.activeNotifications.any {
+            it.tag?.startsWith("$pcId/") == true && it.tag != tag && it.tag != summaryTag(pcId)
+                && (!seen.contains(it.tag) || seen.getBoolean("${it.tag}:posted", false))
+        }
+        if (!remaining) manager.cancel(summaryTag(pcId), 0)
+    }
+    @Synchronized
+    fun dismissEvent(context: Context, pcId: String, eventId: String) {
+        if (!Regex("pc_[A-Za-z0-9-]{1,80}").matches(pcId) || !Regex("[A-Za-z0-9][A-Za-z0-9_.:-]{0,239}").matches(eventId)) return
+        val seen = context.getSharedPreferences("notification-revisions", Context.MODE_PRIVATE)
+        val key = "$pcId/$eventId"
+        // MainActivity is exported. An arbitrary launch intent must not seed
+        // unknown dismissal markers or evict legitimate deduplication entries.
+        if (!seen.contains(key) && context.getSystemService(NotificationManager::class.java).activeNotifications.none { it.tag == key }) return
+        clearEvent(context, pcId, eventId, seen.getLong(key, 1))
     }
     private fun remember(context: Context, key: String, revision: Long, posted: Boolean) {
         val seen = context.getSharedPreferences("notification-revisions", Context.MODE_PRIVATE)
@@ -104,6 +149,14 @@ object CompanionNotifications {
     fun clearPc(context: Context, pcId: String) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.activeNotifications.filter { it.tag?.startsWith("$pcId/") == true }.forEach { manager.cancel(it.tag, it.id) }
+        manager.cancel(summaryTag(pcId), 0)
+    }
+}
+class CompanionNotificationDismissedReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val pcId = intent.getStringExtra("pcId") ?: return
+        val eventId = intent.getStringExtra("eventId") ?: return
+        CompanionNotifications.dismissEvent(context, pcId, eventId)
     }
 }
 class CompanionMessagingService : FirebaseMessagingService() {

@@ -1,8 +1,52 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-05 (0.7.0 published, Windows only)
+Updated: 2026-11-11 (Android watch grouping fix, unreleased)
 Current version: `0.7.0` (Windows); Android companion `0.6.7`; macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-11 — Phone-only group summaries for duplicate watch cards (unreleased)
+
+The owner reported two identical task cards on the watch and confirmed the phone
+showed only one. A read-only check of the installed 0.7.0 desktop's encrypted
+event journal and timing log found one matching Codex completion at
+`2026-11-11T13:10:18.715Z` and one socket enqueue. The previous exact suggestion
+filter remains installed. No conversation bodies, credentials or live device
+configuration were changed by the check.
+
+Android assigned event cards to a per-PC group without posting an explicit
+summary. System/OEM summary mirroring is the working explanation for the
+phone-one/watch-two symptom; it has not been captured on the physical bridge.
+The app now owns a stable, generic summary per PC with `FLAG_LOCAL_ONLY`,
+`GROUP_ALERT_CHILDREN` and only-alert-once behavior. Event cards remain mirrorable
+and keep their persistent LAN/FCM deduplication. Summaries never copy task text or
+add decision actions. An unexported dismissal receiver and notification-open
+cleanup remove empty summaries; resolving events and unpairing also clean them
+up. Cleanup excludes already-cleared markers to handle consecutive cancellations.
+Unknown launch event IDs cannot create or evict dismissal markers.
+
+The new grouped-event regression fails against the old publisher (zero explicit
+summaries), rather than passing without exercising the changed behavior.
+It waits for the summary and every child because OS notification publication is
+asynchronous. Final verification:
+
+- `npm test`: 292 passed, one existing Windows platform skip.
+- Android debug/release JVM tests: 13 passed per variant. Debug/test and minified
+  release builds passed; debug/release lint reported zero errors (30/31 warnings).
+- Android 34 emulator: all 12 notification safety/background-cache tests passed,
+  including five distinct grouped events, revision replay, dismissal, empty-group
+  cleanup, two-PC isolation and unknown-ID rejection. Persistence seed and replay
+  each passed in separate processes with an explicit force-stop between them.
+- Signed local replacement APK:
+  `dist/companion-watch-fix/Vibe-Halo-Mobile-0.6.7-watch-fix.apk`.
+  The public signing certificate, package/version identity, production Firebase
+  configuration and APK alignment were verified. SHA-256:
+  `4c44c6be06f4b525ba11a1bf21b2ebc3568ea40b357d09a5c9b61169d2257cd3`.
+
+Physical phone/watch behavior remains an acceptance gate:
+Android's local-only flag is a bridge hint, and an emulator cannot prove that a
+vendor's companion app honors it. This change requires only an updated Android
+APK; the desktop, relay and existing pairing can stay in place. No version bump,
+public release, production deployment or physical-device installation is included.
 
 ## 2026-11-05 — Local build artifact cleanup
 

@@ -4,8 +4,10 @@ import android.app.NotificationManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.vibe.halo.mobile.notifications.CompanionNotifications
+import com.vibe.halo.mobile.notifications.CompanionNotificationDismissedReceiver
 import com.vibe.halo.mobile.notifications.NotificationPreview
 import android.app.Notification
+import android.content.Intent
 import org.json.JSONObject
 import org.json.JSONArray
 import com.vibe.halo.mobile.security.DeviceCrypto
@@ -17,6 +19,73 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class NotificationSafetyTest {
+    @Test fun groupedEventsHaveOnePhoneOnlySilentSummaryAndOneWatchCardPerEvent() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val pc = "pc_${UUID.randomUUID()}"
+        val group = "vibe-halo-$pc"
+        val events = (0..4).map { "evt_${UUID.randomUUID()}" }
+        try {
+            events.forEachIndexed { index, event ->
+                val kind = listOf("completion", "plan", "approval", "question", "input")[index]
+                val data = mapOf("protocolVersion" to "1", "pcId" to pc, "eventId" to event, "eventRevision" to "1", "kind" to kind)
+                assertEquals("notification_posted", CompanionNotifications.show(context, data, NotificationPreview("Codex", "任务 $index", "已完成 $index")))
+                assertEquals("notification_posted", CompanionNotifications.show(context, data + ("eventRevision" to "2")))
+            }
+            awaitSystem { manager.activeNotifications.count { it.notification.group == group } == events.size + 1 }
+            val cards = manager.activeNotifications.filter { it.notification.group == group }
+            val summaries = cards.filter { it.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0 }
+            assertEquals("An explicit summary prevents a system/OEM summary from duplicating a task on watches", 1, summaries.size)
+            val summary = summaries.single().notification
+            assertTrue(summary.flags and Notification.FLAG_LOCAL_ONLY != 0)
+            assertEquals(Notification.GROUP_ALERT_CHILDREN, summary.groupAlertBehavior)
+            assertEquals("Vibe Halo", summary.extras.getString(Notification.EXTRA_TITLE))
+            assertFalse(summary.extras.getString(Notification.EXTRA_TEXT).orEmpty().contains("已完成"))
+            assertTrue(summary.actions.isNullOrEmpty())
+            val mirrorable = cards.filter { it.notification.flags and Notification.FLAG_LOCAL_ONLY == 0 }
+            assertEquals(events.size, mirrorable.size)
+            assertEquals(events.map { "$pc/$it" }.toSet(), mirrorable.map { it.tag }.toSet())
+            assertTrue(mirrorable.all { it.notification.groupAlertBehavior == Notification.GROUP_ALERT_CHILDREN })
+            events.forEach { CompanionNotifications.clearEvent(context, pc, it, 3) }
+            awaitSystem { manager.activeNotifications.none { it.notification.group == group } }
+        } finally { CompanionNotifications.clearPc(context, pc) }
+    }
+
+    @Test fun dismissingOpeningAndClearingEventsRemoveOnlyTheirComputersSummary() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val pc = "pc_${UUID.randomUUID()}"; val otherPc = "pc_${UUID.randomUUID()}"
+        val event = "evt_${UUID.randomUUID()}"; val next = "evt_${UUID.randomUUID()}"
+        fun post(computer: String, id: String) = CompanionNotifications.show(context, mapOf("protocolVersion" to "1", "pcId" to computer,
+            "eventId" to id, "eventRevision" to "1", "kind" to "completion"))
+        fun cards(computer: String) = manager.activeNotifications.filter { it.notification.group == "vibe-halo-$computer" }
+        try {
+            post(pc, event); post(otherPc, event)
+            awaitSystem { cards(pc).size == 2 && cards(otherPc).size == 2 }
+            // The delete PendingIntent works without an Activity or a running app.
+            val deleteIntent = manager.activeNotifications.single { it.tag == "$pc/$event" }.notification.deleteIntent
+            assertNotNull(deleteIntent)
+            deleteIntent.send()
+            awaitSystem { cards(pc).isEmpty() }
+            assertEquals(2, cards(otherPc).size)
+            assertEquals("suppressed_by_user", post(pc, event))
+            assertTrue(cards(pc).isEmpty())
+            post(pc, next)
+            awaitSystem { cards(pc).size == 2 }
+            // Opening a task uses the same removal path after routing its detail.
+            CompanionNotifications.dismissEvent(context, pc, next)
+            awaitSystem { cards(pc).isEmpty() }
+            CompanionNotificationDismissedReceiver().onReceive(context, Intent().putExtra("pcId", otherPc).putExtra("eventId", "../_summary"))
+            assertEquals(2, cards(otherPc).size)
+            val unknown = "evt_${UUID.randomUUID()}"
+            CompanionNotifications.dismissEvent(context, otherPc, unknown)
+            assertFalse(context.getSharedPreferences("notification-revisions", 0).contains("$otherPc/$unknown"))
+            CompanionNotifications.clearPc(context, otherPc)
+            awaitSystem { cards(otherPc).isEmpty() }
+        } finally { CompanionNotifications.clearPc(context, pc); CompanionNotifications.clearPc(context, otherPc) }
+    }
+
+
     @Test fun notificationCopyFollowsAppLanguageAndDistinguishesNativeInput() {
         val original = UiLanguage.mode
         try {
