@@ -1,10 +1,10 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-13 (all-client Android notification appearance prepared)
-Current version: `0.7.0` (Windows); public Android companion `0.7.0` (versionCode 10), code 11 prepared; macOS/Linux no longer published (last preview `0.6.3`)
+Updated: 2026-11-13 (Android 0.7.0 build 11 published with all-client notification appearance)
+Current version: `0.7.0` (Windows); Android companion `0.7.0` (versionCode 11); macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
 
-## 2026-11-13 — All-client Android notification appearance (prepared)
+## 2026-11-13 — All-client Android notification appearance published
 
 The owner requested the remaining 18 clients' notification icons and content
 accent strips, using the previously listed desktop accent colors, followed by
@@ -24,8 +24,38 @@ that the two earlier test notifications were collected into the Xiaomi 15's
 those system notification preferences.
 
 The artwork includes monochrome LobeHub icons plus Codewhale and Reasonix's own
-MIT-licensed logos. Original licenses are included in APK assets. Build, native
-render checks, mobile CI and publication verification are pending.
+MIT-licensed logos. All three original icon licenses and updated attribution were
+verified in the signed APK. Visual review caught a Microsoft/GitHub Copilot icon
+mix-up before delivery; the final asset uses the existing GitHub Copilot glyph.
+
+Verification:
+
+- `npm test`: 294 passed, one existing Windows platform skip. Two new contract
+  tests keep the Android client roster and palette aligned with the registry.
+- Debug/test and minified release builds passed; all 13 JVM tests per variant
+  passed. Final debug/release lint: zero errors, 36/37 warnings.
+- API 34 emulator: all 16 appearance, notification safety and background-cache
+  tests passed after correcting the Copilot icon. Native layout checks cover 480
+  combinations of 20 clients, two appearances, three font sizes, two widths and
+  compact/expanded views. Every icon was inflated and checked for visible pixels
+  in its expected color; legacy-name and metadata-only paths cover all clients.
+- Eighty native content previews and the light/dark overview sheets were
+  generated and visually reviewed. Overview sheets are in
+  `dist/companion-all-clients-070/previews/`.
+- Manual mobile/relay CI `43327605564` passed both jobs on Android source
+  `af927a5bdff95fdde67edaa821ced503d719f482`.
+
+Published the original-key-signed APK and update metadata under the existing
+stable, Latest `v0.7.0` release. Anonymous public discovery selected build 11 over
+build 10; the downloaded APK, manifest, GitHub asset digests and all five checksum
+entries agree. APK size: 2,742,035 bytes; SHA-256:
+`7728faf90e29ab5962a268e981c34e704b55cb9bc275e9507781214a41c33302`.
+The Windows installer, blockmap, `latest.yml`, LICENSE and NOTICE keep their
+original asset IDs and digests, and the original tag was not moved. No desktop
+build or relay deployment was made.
+
+The phone app's Devices → Check for updates path now offers Android 0.7.0/build
+11. Physical phone/watch rendering remains owner acceptance after installation.
 
 ## 2026-11-12 — Android notification appearance update published
 
