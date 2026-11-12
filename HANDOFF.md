@@ -39,8 +39,8 @@ Verification:
   combinations of 20 clients, two appearances, three font sizes, two widths and
   compact/expanded views. Every icon was inflated and checked for visible pixels
   in its expected color; legacy-name and metadata-only paths cover all clients.
-- Eighty native content previews and the light/dark overview sheets were
-  generated and visually reviewed. Overview sheets are in
+- Eighty native content previews were generated; the light/dark overview sheets
+  were visually reviewed. Overview sheets are in
   `dist/companion-all-clients-070/previews/`.
 - Manual mobile/relay CI `43327605564` passed both jobs on Android source
   `af927a5bdff95fdde67edaa821ced503d719f482`.
