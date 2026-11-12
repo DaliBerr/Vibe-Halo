@@ -13,7 +13,7 @@ android {
         applicationId = "com.vibe.halo.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
+        versionCode = 10
         versionName = "0.7.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val relayOrigin = providers.gradleProperty("relay.origin").orElse("https://vibe-halo-relay.z1593316231.workers.dev").get()

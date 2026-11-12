@@ -1,8 +1,20 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-12 (Android client notification appearance; local build)
-Current version: `0.7.0` (Windows); Android companion `0.7.0` (versionCode 9); macOS/Linux no longer published (last preview `0.6.3`)
+Updated: 2026-11-12 (Android notification appearance update prepared)
+Current version: `0.7.0` (Windows); public Android companion `0.7.0` (versionCode 9), code 10 prepared; macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-12 — Android notification appearance update publication (prepared)
+
+The owner authorized publishing the notification appearance changes through the
+phone app's updater. Android keeps versionName `0.7.0` and advances versionCode to
+`10`, allowing the existing updater to offer it over the public code-9 build.
+The intended publication replaces only the Android APK, `android-update.json`
+and their checksum entries under the existing `v0.7.0` release, and adds dated
+Android release notes with the full committed Android source SHA. The retained
+package, signing identity and Firebase configuration preserve in-place upgrades.
+Windows assets and the original release tag remain unchanged. Publication and
+public download verification are pending the local build and manual mobile CI.
 
 ## 2026-11-12 — Android Codex and Claude Code notification appearance
 
