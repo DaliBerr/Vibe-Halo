@@ -22,9 +22,26 @@ data class NotificationPreview(val agent: String, val context: String = "", val 
             return if (points.size > limit) String(points, 0, limit - 1) + "…" else clean
         }
         fun agentName(id: String): String = when (id) {
-            "codex" -> "Codex"; "claude-code" -> "Claude Code"; "zcode" -> "ZCode"
-            "opencode" -> "OpenCode"; "gemini-cli" -> "Gemini CLI"; "copilot-cli" -> "Copilot CLI"
+            "codex" -> "Codex"
+            "zcode" -> "ZCode"
+            "qwen-code" -> "Qwen Code"
+            "copilot-cli" -> "Copilot CLI"
+            "claude-code" -> "Claude Code"
+            "codebuddy" -> "CodeBuddy"
+            "hermes" -> "Hermes"
+            "opencode" -> "OpenCode"
             "deepseek-harness" -> "DeepSeek Harness"
+            "kimi-code" -> "Kimi Code"
+            "qoder" -> "Qoder"
+            "qoderwork" -> "QoderWork"
+            "gemini-cli" -> "Gemini CLI"
+            "antigravity" -> "Antigravity"
+            "cursor-agent" -> "Cursor Agent"
+            "kiro" -> "Kiro"
+            "codewhale" -> "CodeWhale"
+            "pi" -> "Pi"
+            "openclaw" -> "OpenClaw"
+            "reasonix" -> "Reasonix"
             else -> snippet(id, 40)
         }
         fun fromDetail(detail: JSONObject): NotificationPreview {

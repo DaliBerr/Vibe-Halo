@@ -1,8 +1,31 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-12 (Android 0.7.0 build 10 published)
-Current version: `0.7.0` (Windows); Android companion `0.7.0` (versionCode 10); macOS/Linux no longer published (last preview `0.6.3`)
+Updated: 2026-11-13 (all-client Android notification appearance prepared)
+Current version: `0.7.0` (Windows); public Android companion `0.7.0` (versionCode 10), code 11 prepared; macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-13 — All-client Android notification appearance (prepared)
+
+The owner requested the remaining 18 clients' notification icons and content
+accent strips, using the previously listed desktop accent colors, followed by
+direct Android publication. Android versionName remains `0.7.0`; versionCode
+advances to `11`. Codex and Claude Code keep their approved colors. The remaining
+clients use the shared registry's accent in light mode and its brighter inkDark
+color in dark mode. The complete mapping and immutable artwork provenance are in
+`apps/android/artwork/notification-clients.json`.
+
+All 20 registered client IDs and their canonical preview names use the branded
+collapsed, expanded and heads-up layouts. Metadata-only notifications also use
+canonical display names. Unknown IDs and the app's own generic test notification
+retain standard BigText notifications. Existing channels, grouping, read-only
+intents, deduplication and phone/watch text extras are retained. The user reported
+that the two earlier test notifications were collected into the Xiaomi 15's
+"more notifications" section and manually moved them out; this update preserves
+those system notification preferences.
+
+The artwork includes monochrome LobeHub icons plus Codewhale and Reasonix's own
+MIT-licensed logos. Original licenses are included in APK assets. Build, native
+render checks, mobile CI and publication verification are pending.
 
 ## 2026-11-12 — Android notification appearance update published
 

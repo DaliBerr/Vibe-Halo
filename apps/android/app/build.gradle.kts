@@ -13,7 +13,7 @@ android {
         applicationId = "com.vibe.halo.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
+        versionCode = 11
         versionName = "0.7.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val relayOrigin = providers.gradleProperty("relay.origin").orElse("https://vibe-halo-relay.z1593316231.workers.dev").get()
@@ -34,6 +34,7 @@ android {
     buildFeatures { compose = true; buildConfig = true }
     sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/protocolAssets"))
     sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/noticeAssets"))
+    sourceSets["androidTest"].assets.srcDir("../artwork")
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     packaging { resources.excludes += setOf("META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/DEPENDENCIES") }
 }
@@ -42,6 +43,7 @@ val copyProtocolAssets by tasks.registering(Copy::class) {
     from("../../../packages/protocol/schemas") { into("protocol") }
     from("../../../LICENSE", "../../../NOTICE.md")
     from("../../../src/settings-renderer/icons/LICENSE.txt") { rename { "LOBEHUB_ICONS_LICENSE.txt" } }
+    from("../artwork/licenses")
     into(layout.buildDirectory.dir("generated/protocolAssets"))
 }
 tasks.named("preBuild") { dependsOn(copyProtocolAssets) }

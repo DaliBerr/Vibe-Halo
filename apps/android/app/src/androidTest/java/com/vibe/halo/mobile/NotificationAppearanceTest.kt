@@ -17,6 +17,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.vibe.halo.mobile.notifications.CompanionNotifications
 import com.vibe.halo.mobile.notifications.NotificationPreview
+import org.json.JSONArray
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,11 +31,16 @@ class NotificationAppearanceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     private val manager = context.getSystemService(NotificationManager::class.java)
+    private val clients = JSONArray(instrumentation.context.assets.open("notification-clients.json").bufferedReader().use { it.readText() })
+        .let { rows -> (0 until rows.length()).map { rows.getJSONObject(it) } }
+    private fun colorResource(name: String) = context.resources.getIdentifier(name, "color", context.packageName).also { assertTrue(it != 0) }
 
     @Test fun brandedCardsPreserveNativeTextReadOnlyIntentsAndPhoneOnlySummary() {
         val pc = "pc_${UUID.randomUUID()}"
         try {
-            for ((id, name, color) in listOf(Triple("codex", "Codex", R.color.notification_codex), Triple("claude-code", "Claude Code", R.color.notification_claude))) {
+            assertEquals(20, clients.size)
+            for (client in clients) {
+                val id = client.getString("id"); val name = client.getString("name"); val color = colorResource(client.getString("resource"))
                 for (kind in listOf("completion", "plan", "approval", "question", "input")) {
                     val notification = post(context, pc, id, name, kind)
                     assertEquals(context.getColor(color), notification.color)
@@ -53,20 +59,25 @@ class NotificationAppearanceTest {
                     assertEquals(Notification.GROUP_ALERT_CHILDREN, notification.groupAlertBehavior)
                     assertFalse(notification.extras.getBoolean(Notification.EXTRA_COLORIZED))
                 }
+                val summary = manager.activeNotifications.single { it.tag == "$pc/_summary" }.notification
+                assertTrue(summary.flags and Notification.FLAG_LOCAL_ONLY != 0)
+                assertEquals("Vibe Halo", summary.extras.getString(Notification.EXTRA_TITLE))
+                assertNull(summary.contentView)
+                CompanionNotifications.clearPc(context, pc)
             }
-            val summary = manager.activeNotifications.single { it.tag == "$pc/_summary" }.notification
-            assertTrue(summary.flags and Notification.FLAG_LOCAL_ONLY != 0)
-            assertEquals("Vibe Halo", summary.extras.getString(Notification.EXTRA_TITLE))
-            assertNull(summary.contentView)
         } finally { CompanionNotifications.clearPc(context, pc) }
     }
 
     @Test fun customLayoutsFitNarrowScreensDarkModeAndLargeFonts() {
         val pc = "pc_${UUID.randomUUID()}"
+        val originalLanguage = UiLanguage.mode
         try {
+            UiLanguage.mode = "zh-CN"
             for (night in listOf(false, true)) for (font in listOf(1f, 1.3f, 2f)) {
                 val configured = themedContext(night, font)
-                for ((id, name, color) in listOf(Triple("codex", "Codex", R.color.notification_codex), Triple("claude-code", "Claude Code", R.color.notification_claude))) {
+                for (client in clients) {
+                    val id = client.getString("id"); val name = client.getString("name"); val color = colorResource(client.getString("resource"))
+                    assertEquals(Color.parseColor(client.getString(if (night) "dark" else "light")), configured.getColor(color))
                     val notification = post(configured, pc, id, name, "completion", "通知布局测试，中英文 long preview 😀。".repeat(10))
                     for (width in listOf(280, 360)) for (expanded in listOf(false, true)) {
                         instrumentation.runOnMainSync {
@@ -100,24 +111,53 @@ class NotificationAppearanceTest {
                                 val file = File(context.getExternalFilesDir("notification-previews"), "$id-${if (night) "dark" else "light"}-${if (expanded) "expanded" else "compact"}.png")
                                 file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                                 bitmap.recycle()
+                                if (!expanded) {
+                                    val icon = root.findViewById<ImageView>(R.id.notification_client_icon)
+                                    val iconBitmap = Bitmap.createBitmap(icon.width, icon.height, Bitmap.Config.ARGB_8888)
+                                    icon.draw(Canvas(iconBitmap))
+                                    val pixels = IntArray(icon.width * icon.height)
+                                    iconBitmap.getPixels(pixels, 0, icon.width, 0, 0, icon.width, icon.height)
+                                    assertTrue("Missing or incorrectly colored glyph: $id/$night", pixels.any {
+                                        Color.alpha(it) > 0 && (it and 0xFFFFFF) == (configured.getColor(color) and 0xFFFFFF)
+                                    })
+                                    iconBitmap.recycle()
+                                }
                             }
                         }
                     }
+                    CompanionNotifications.clearPc(context, pc)
                 }
             }
-        } finally { CompanionNotifications.clearPc(context, pc) }
+        } finally { UiLanguage.mode = originalLanguage; CompanionNotifications.clearPc(context, pc) }
     }
 
-    @Test fun legacyPreviewNamesAreBrandedAndOtherClientsKeepStandardNotifications() {
+    @Test fun legacyPreviewNamesAreBrandedAndUnknownClientsKeepStandardNotifications() {
         val pc = "pc_${UUID.randomUUID()}"
         try {
-            assertNotNull(post(context, pc, null, "Codex", "completion").contentView)
-            assertNotNull(post(context, pc, null, "Claude Code", "completion").contentView)
-            for ((id, name) in listOf("deepseek-harness" to "DeepSeek Harness", "unknown-client" to "Codex", "" to "Unknown")) {
+            for (client in clients) {
+                assertEquals(client.getString("name"), NotificationPreview.agentName(client.getString("id")))
+                assertNotNull(post(context, pc, null, client.getString("name"), "completion").contentView)
+                CompanionNotifications.clearPc(context, pc)
+            }
+            for ((id, name) in listOf("vibe-halo" to "Vibe Halo", "unknown-client" to "Codex", "" to "Unknown")) {
                 val notification = post(context, pc, id, name, "completion")
                 assertNull(notification.contentView)
                 assertEquals(Notification.BigTextStyle::class.java.name, notification.extras.getString(Notification.EXTRA_TEMPLATE))
                 assertEquals(Notification.COLOR_DEFAULT, notification.color)
+            }
+        } finally { CompanionNotifications.clearPc(context, pc) }
+    }
+
+    @Test fun metadataOnlyNotificationsKeepEveryClientsCanonicalNameAndBrand() {
+        val pc = "pc_${UUID.randomUUID()}"
+        try {
+            for (client in clients) {
+                val name = client.getString("name")
+                val notification = post(context, pc, client.getString("id"), name, "completion", withPreview = false)
+                assertTrue(notification.extras.getString(Notification.EXTRA_TITLE)!!.startsWith("$name · "))
+                assertNotNull(notification.contentView)
+                assertEquals(context.getColor(colorResource(client.getString("resource"))), notification.color)
+                CompanionNotifications.clearPc(context, pc)
             }
         } finally { CompanionNotifications.clearPc(context, pc) }
     }
@@ -130,11 +170,11 @@ class NotificationAppearanceTest {
         return ContextThemeWrapper(context.createConfigurationContext(configuration), android.R.style.Theme_DeviceDefault_DayNight)
     }
 
-    private fun post(source: Context, pc: String, id: String?, name: String, kind: String, text: String = "修复已完成，点击查看完整消息。"): Notification {
+    private fun post(source: Context, pc: String, id: String?, name: String, kind: String, text: String = "修复已完成，点击查看完整消息。", withPreview: Boolean = true): Notification {
         val event = "evt_${UUID.randomUUID()}"
         val data = mutableMapOf("protocolVersion" to "1", "pcId" to pc, "eventId" to event, "eventRevision" to "1", "kind" to kind)
         if (id != null) data["agentId"] = id
-        assertEquals("notification_posted", CompanionNotifications.show(source, data, NotificationPreview(name, "通知样式演示", text)))
+        assertEquals("notification_posted", CompanionNotifications.show(source, data, if (withPreview) NotificationPreview(name, "通知样式演示", text) else null))
         val deadline = android.os.SystemClock.elapsedRealtime() + 3000
         while (manager.activeNotifications.none { it.tag == "$pc/$event" } && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(50)
         return manager.activeNotifications.single { it.tag == "$pc/$event" }.notification

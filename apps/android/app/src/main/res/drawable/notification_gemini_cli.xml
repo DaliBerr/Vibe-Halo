@@ -1,0 +1,5 @@
+<!-- Client identification artwork. Source and licenses: apps/android/artwork/notification-clients.json and NOTICE.md. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="32dp" android:height="32dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="@color/notification_gemini_cli" android:fillType="evenOdd" android:pathData="M16.793 10.358V14.225L7.236 18.82V16.02L14.987 12.292L7.237 8.564V5.763L16.793 10.358Z" />
+    <path android:fillColor="@color/notification_gemini_cli" android:fillType="evenOdd" android:pathData="M19.608 0C22.034 0 24 1.966 24 4.392V19.608C24 22.034 22.034 24 19.608 24H4.392C1.966 24 0 22.034 0 19.608V4.392C0 1.966 1.966 0 4.392 0H19.608ZM4.26 1.444C2.705 1.444 1.444 2.705 1.444 4.26L1.444 19.74C1.444 21.295 2.705 22.556 4.26 22.556L19.74 22.556C21.295 22.556 22.556 21.295 22.556 19.74L22.556 4.26C22.556 2.705 21.295 1.444 19.74 1.444L4.26 1.444Z" />
+</vector>

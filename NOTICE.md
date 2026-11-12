@@ -26,7 +26,16 @@ Client icons in `src/settings-renderer/icons/` come from LobeHub Icons
 (`@lobehub/icons-static-svg` 1.95.1, MIT, Copyright (c) 2023 LobeHub; license
 text in that folder). The marks are trademarks of their respective owners and
 are used only to identify the supported clients.
-The Android Codex and Claude Code notification vectors under
+The Android client notification vectors under
 `apps/android/app/src/main/res/drawable/notification_*.xml` adapt those same icons
 with client-specific colors. Their MIT license is bundled in the APK as
 `LOBEHUB_ICONS_LICENSE.txt`.
+Additional monochrome LobeHub icons use source commit
+`a177c1e817204f8ddc0c8993610ca674fc6d9767`. The Codewhale icon comes from
+`codewhale-hq/Codewhale` commit `9c10aabf78761b39779d70a5746dbfe70c8f7389`
+(MIT, Copyright (c) 2024-2025 DeepSeek-TUI Contributors). The Reasonix icon comes
+from `esengine/DeepSeek-Reasonix` commit `e81658de81ab957d8f9f6277f6a7b48b8400261f`
+(MIT, Copyright (c) 2026 Reasonix Contributors). Their original licenses are
+bundled as `CODEWHALE_LICENSE.txt` and `REASONIX_LICENSE.txt`. Exact source URLs,
+source digests and the notification palette are recorded in
+`apps/android/artwork/notification-clients.json`.

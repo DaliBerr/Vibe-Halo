@@ -220,13 +220,14 @@ signed and encrypted for the paired phone, and decrypted locally before display;
 it is not plaintext in FCM. Common inline credentials are masked. Watches mirror
 the phone's single-language text, subject to device notification privacy settings.
 
-Android 0.7.0 (versionCode 10) distinguishes Codex notifications with a teal icon and content
-accent strip, and Claude Code notifications with an orange icon and strip. The
+Android 0.7.0 (versionCode 11) gives all 20 registered clients their own icons and
+content accent colors. The additional 18 clients follow the desktop client
+palette; Codex keeps its teal and Claude Code its orange appearance. The
 collapsed, expanded and heads-up layouts use Android's decorated custom-content
 template; the system still controls the outer card. Dark mode uses brighter
 accents. At large text sizes, the collapsed card keeps the title and the expanded
 card shows the preview. Standard title/body text remains available for watch
-mirroring. Other clients keep the standard notification layout. This appearance
+mirroring. Unknown client IDs keep the standard notification layout. This appearance
 change needs only a phone APK update, with no desktop/relay update or re-pairing.
 
 The Android app owns one silent, phone-only group summary per computer. Only

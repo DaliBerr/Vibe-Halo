@@ -1,0 +1,4 @@
+<!-- Client identification artwork. Source and licenses: apps/android/artwork/notification-clients.json and NOTICE.md. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="32dp" android:height="32dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="@color/notification_zcode" android:fillType="evenOdd" android:pathData="M12.105 2 9.927 4.953H0.653L2.83 2H12.106H12.105ZM23.254 19.048 21.078 22H11.836L14.01 19.048H23.254L23.254 19.048ZM24 2 9.264 22H0L14.736 2H24Z" />
+</vector>

@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="notification_codex">#087F82</color>
+    <color name="notification_zcode">#6D5EF7</color>
+    <color name="notification_qwen_code">#4F46E5</color>
+    <color name="notification_copilot_cli">#087EA4</color>
     <color name="notification_claude">#B85C2F</color>
+    <color name="notification_codebuddy">#C026D3</color>
+    <color name="notification_hermes">#B88700</color>
+    <color name="notification_opencode">#0F8B8D</color>
+    <color name="notification_deepseek_harness">#4D6BFE</color>
+    <color name="notification_kimi_code">#00A86B</color>
+    <color name="notification_qoder">#E65A47</color>
+    <color name="notification_qoderwork">#D43F8D</color>
+    <color name="notification_gemini_cli">#4285F4</color>
+    <color name="notification_antigravity">#9333EA</color>
+    <color name="notification_cursor_agent">#475569</color>
+    <color name="notification_kiro">#D946EF</color>
+    <color name="notification_codewhale">#0077B6</color>
+    <color name="notification_pi">#CA8A04</color>
+    <color name="notification_openclaw">#DC2626</color>
+    <color name="notification_reasonix">#65A30D</color>
 </resources>

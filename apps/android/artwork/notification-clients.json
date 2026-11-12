@@ -1,0 +1,182 @@
+[
+  {
+    "id": "codex",
+    "name": "Codex",
+    "resource": "notification_codex",
+    "light": "#087F82",
+    "dark": "#5AD9CC",
+    "source": "https://raw.githubusercontent.com/DaliBerr/Vibe-Halo/54c9fe76366f15d42bd9bcc4d9ecdfbec7e2ff39/src/settings-renderer/icons/codex.svg",
+    "sourceSha256": "cc717dbc3cacd477629da48c339dbb7e5201bf14f279507a80c1bf634e12df3d"
+  },
+  {
+    "id": "zcode",
+    "name": "ZCode",
+    "resource": "notification_zcode",
+    "light": "#6D5EF7",
+    "dark": "#B9B3FF",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/zai.svg",
+    "sourceSha256": "e748cb5108ce37b116d7a5ba97d37e0ae97eadf6849b0de11afb248e244a01e1"
+  },
+  {
+    "id": "qwen-code",
+    "name": "Qwen Code",
+    "resource": "notification_qwen_code",
+    "light": "#4F46E5",
+    "dark": "#A9B4FF",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/qwen.svg",
+    "sourceSha256": "b2c16efc3bd32b88a941842d41222e1e1e0e40441222218b725afc0aef6d9a36"
+  },
+  {
+    "id": "copilot-cli",
+    "name": "Copilot CLI",
+    "resource": "notification_copilot_cli",
+    "light": "#087EA4",
+    "dark": "#7DD3FC",
+    "source": "https://raw.githubusercontent.com/DaliBerr/Vibe-Halo/54c9fe76366f15d42bd9bcc4d9ecdfbec7e2ff39/src/settings-renderer/icons/copilot-cli.svg",
+    "sourceSha256": "f0485449fbe8d0068e475349e075d1c6a3ff23881609ea14a863014d0ef2d6c6"
+  },
+  {
+    "id": "claude-code",
+    "name": "Claude Code",
+    "resource": "notification_claude",
+    "light": "#B85C2F",
+    "dark": "#FFAD82",
+    "source": "https://raw.githubusercontent.com/DaliBerr/Vibe-Halo/54c9fe76366f15d42bd9bcc4d9ecdfbec7e2ff39/src/settings-renderer/icons/claude-code.svg",
+    "sourceSha256": "ad3c6356d6365ed611731554040acd1c57d354fdfade53d479c7053a7de6fe8d"
+  },
+  {
+    "id": "codebuddy",
+    "name": "CodeBuddy",
+    "resource": "notification_codebuddy",
+    "light": "#C026D3",
+    "dark": "#F0ABFC",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/codebuddy.svg",
+    "sourceSha256": "abe926f4acd9d56439bb5568a267d19d5a92201dbd69ad1cf179209b5ef79f91"
+  },
+  {
+    "id": "hermes",
+    "name": "Hermes",
+    "resource": "notification_hermes",
+    "light": "#B88700",
+    "dark": "#F5D36C",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/hermesagent.svg",
+    "sourceSha256": "02d43c0a91fc2ee41f2684fc39613ff6687de29a4b079665bace5303671dd63b"
+  },
+  {
+    "id": "opencode",
+    "name": "OpenCode",
+    "resource": "notification_opencode",
+    "light": "#0F8B8D",
+    "dark": "#67E8E0",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/opencode.svg",
+    "sourceSha256": "7cfa6e9d6726f7c9fa26c7d9aef0dfec52d20a137380454340f30f12ccbfd302"
+  },
+  {
+    "id": "deepseek-harness",
+    "name": "DeepSeek Harness",
+    "resource": "notification_deepseek_harness",
+    "light": "#4D6BFE",
+    "dark": "#A9B8FF",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/deepseek.svg",
+    "sourceSha256": "8f9443e351b6dacce71871790201b799d92e8bf96a45ef79aeb5e9bf4db423e2"
+  },
+  {
+    "id": "kimi-code",
+    "name": "Kimi Code",
+    "resource": "notification_kimi_code",
+    "light": "#00A86B",
+    "dark": "#6EE7B7",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/kimi.svg",
+    "sourceSha256": "ed08131b46acf70e6e2144eceb775e74098b58ea65fa21eaee04be7b05cfe63b"
+  },
+  {
+    "id": "qoder",
+    "name": "Qoder",
+    "resource": "notification_qoder",
+    "light": "#E65A47",
+    "dark": "#FDA08E",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/qoder.svg",
+    "sourceSha256": "f8503aacc41a58e723430488d082f6730c8a6a9ffecdd0a00c522e6bcdb4abb9"
+  },
+  {
+    "id": "qoderwork",
+    "name": "QoderWork",
+    "resource": "notification_qoderwork",
+    "light": "#D43F8D",
+    "dark": "#F9A8D4",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/qoder.svg",
+    "sourceSha256": "f8503aacc41a58e723430488d082f6730c8a6a9ffecdd0a00c522e6bcdb4abb9"
+  },
+  {
+    "id": "gemini-cli",
+    "name": "Gemini CLI",
+    "resource": "notification_gemini_cli",
+    "light": "#4285F4",
+    "dark": "#93C5FD",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/geminicli.svg",
+    "sourceSha256": "bc9b0199cb4c5deee25d6cf49d6e7d60a891171ccbc5520f657d3047b84e5d2e"
+  },
+  {
+    "id": "antigravity",
+    "name": "Antigravity",
+    "resource": "notification_antigravity",
+    "light": "#9333EA",
+    "dark": "#D8B4FE",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/antigravity.svg",
+    "sourceSha256": "43f551fd125c17fb54c8c74eb461924fb97f32bb64ac89f73bb73852753a6461"
+  },
+  {
+    "id": "cursor-agent",
+    "name": "Cursor Agent",
+    "resource": "notification_cursor_agent",
+    "light": "#475569",
+    "dark": "#CBD5E1",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/cursor.svg",
+    "sourceSha256": "0cb51bddf264ae108926fd554c063ef40fc1aac3c5c921ddb39ad184e4e5d0ef"
+  },
+  {
+    "id": "kiro",
+    "name": "Kiro",
+    "resource": "notification_kiro",
+    "light": "#D946EF",
+    "dark": "#F5D0FE",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/kiro.svg",
+    "sourceSha256": "1e56073e35799b0d7075d5376ca2d99c3d3bbf51a000a1ec3d4b0df7612c91d6"
+  },
+  {
+    "id": "codewhale",
+    "name": "CodeWhale",
+    "resource": "notification_codewhale",
+    "light": "#0077B6",
+    "dark": "#7DD3FC",
+    "source": "https://raw.githubusercontent.com/codewhale-hq/Codewhale/9c10aabf78761b39779d70a5746dbfe70c8f7389/web/app/icon.svg",
+    "sourceSha256": "f50bb182947a666955ad732475a5b9bad8c1dd284eeb25b013314cf83d29bf9d"
+  },
+  {
+    "id": "pi",
+    "name": "Pi",
+    "resource": "notification_pi",
+    "light": "#CA8A04",
+    "dark": "#FDE68A",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/pi.svg",
+    "sourceSha256": "d82978781b824273c55473822c1f243a6ed34fc6e8c2dbfe1a90dfc66ae43ee8"
+  },
+  {
+    "id": "openclaw",
+    "name": "OpenClaw",
+    "resource": "notification_openclaw",
+    "light": "#DC2626",
+    "dark": "#FCA5A5",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/openclaw.svg",
+    "sourceSha256": "8ef4de8032b06492af52a2070fc044ce7cc0c1dcef70471b386571eb1c3b2b63"
+  },
+  {
+    "id": "reasonix",
+    "name": "Reasonix",
+    "resource": "notification_reasonix",
+    "light": "#65A30D",
+    "dark": "#BEF264",
+    "source": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/e81658de81ab957d8f9f6277f6a7b48b8400261f/desktop/frontend/src/assets/logo-symbol.svg",
+    "sourceSha256": "9f536615dd8ffc4afa69cb9b80821b4dd536f77d59708da153720b1a246e93be"
+  }
+]
