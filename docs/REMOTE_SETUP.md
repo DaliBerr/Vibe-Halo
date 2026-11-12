@@ -220,6 +220,15 @@ signed and encrypted for the paired phone, and decrypted locally before display;
 it is not plaintext in FCM. Common inline credentials are masked. Watches mirror
 the phone's single-language text, subject to device notification privacy settings.
 
+Current source builds distinguish Codex notifications with a teal icon and content
+accent strip, and Claude Code notifications with an orange icon and strip. The
+collapsed, expanded and heads-up layouts use Android's decorated custom-content
+template; the system still controls the outer card. Dark mode uses brighter
+accents. At large text sizes, the collapsed card keeps the title and the expanded
+card shows the preview. Standard title/body text remains available for watch
+mirroring. Other clients keep the standard notification layout. This appearance
+change needs only a phone APK update, with no desktop/relay update or re-pairing.
+
 The Android app owns one silent, phone-only group summary per computer. Only
 individual event cards are eligible for watch mirroring; the summary uses generic
 app text rather than copying the latest task. Opening, dismissing or resolving the

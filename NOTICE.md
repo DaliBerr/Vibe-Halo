@@ -26,3 +26,7 @@ Client icons in `src/settings-renderer/icons/` come from LobeHub Icons
 (`@lobehub/icons-static-svg` 1.95.1, MIT, Copyright (c) 2023 LobeHub; license
 text in that folder). The marks are trademarks of their respective owners and
 are used only to identify the supported clients.
+The Android Codex and Claude Code notification vectors under
+`apps/android/app/src/main/res/drawable/notification_*.xml` adapt those same icons
+with client-specific colors. Their MIT license is bundled in the APK as
+`LOBEHUB_ICONS_LICENSE.txt`.

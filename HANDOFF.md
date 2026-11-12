@@ -1,8 +1,51 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-11 (Android 0.7.0 published)
+Updated: 2026-11-12 (Android client notification appearance; local build)
 Current version: `0.7.0` (Windows); Android companion `0.7.0` (versionCode 9); macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-12 — Android Codex and Claude Code notification appearance
+
+The owner requested teal Codex notifications and orange Claude Code notifications,
+each with its own icon and a thin content accent strip. These clients now use
+Android's decorated custom-content template for collapsed, expanded and heads-up
+notifications. The content includes a 3dp strip and the matching LobeHub client
+icon, adapted to Android vector paths; the system retains the outer card.
+Light/dark accents are Codex `#087F82` / `#5AD9CC` and Claude Code `#B85C2F` /
+`#FFAD82`. Other clients retain the standard BigText layout. Legacy encrypted
+previews without an agent ID use the exact client display name for branding.
+
+Collapsed content stays within 48dp. Above 1.3x font scale it shows the title,
+with the preview available on expansion. Expanded content limits long previews
+to six lines (four at large font sizes); opening the notification retains access
+to the full message. Native title, body and big-text extras remain available for
+accessibility and watch mirroring. Read-only intents, event channels, persistent
+LAN/FCM deduplication and the silent phone-only summary are unchanged. The APK
+includes the client icons' MIT license and updated attribution.
+
+Verification:
+
+- `npm test`: 292 passed, one existing Windows platform skip.
+- Android debug/release JVM tests: all 13 passed per variant. Debug/test and
+  minified release builds passed. Debug/release lint: zero errors, 31/32 warnings;
+  one new warning concerns the normalized Codex vector path length.
+- API 34 emulator: all 15 appearance, notification safety and background-cache
+  tests passed. The layout test inflates both icons and checks 48 combinations
+  across light/dark mode, 280/360dp widths, 1x/1.3x/2x fonts and compact/expanded
+  content. It caught unsupported compact SVG arc flags before delivery; both
+  icons now use Android-compatible vector paths. Native content previews were
+  visually inspected for the icon, accent and text colors.
+- Signed local replacement:
+  `dist/companion-client-notifications/Vibe-Halo-Mobile-0.7.0-client-notifications.apk`.
+  The public release certificate, package/version, production Firebase
+  configuration, APK alignment and bundled icon license were verified. Size:
+  2,699,920 bytes; SHA-256:
+  `c0a7b290adb35def5a41b35af90bae5c10a651a74b14a29afde5d62dae79151c`.
+  Eight native content previews are in the adjacent `previews/` folder.
+
+The public Android version remains 0.7.0/code 9. This task does not publish a
+release, deploy the relay or install on the owner's physical phone; OEM card
+layout and watch appearance still require physical-device acceptance.
 
 ## 2026-11-11 — Android 0.7.0 published for watch notification testing
 

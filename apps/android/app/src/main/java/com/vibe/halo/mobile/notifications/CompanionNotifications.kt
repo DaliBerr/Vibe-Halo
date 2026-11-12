@@ -97,6 +97,7 @@ object CompanionNotifications {
             .setContentText(body).setStyle(Notification.BigTextStyle().bigText(body)).setContentIntent(pending).setDeleteIntent(deleteIntent).setAutoCancel(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE).setOnlyAlertOnce(true).setCategory(if (channel != "completions") Notification.CATEGORY_REMINDER else Notification.CATEGORY_STATUS)
             .setGroup(groupKey(pcId)).setGroupAlertBehavior(Notification.GROUP_ALERT_CHILDREN)
+        NotificationAppearance.apply(context, builder, data["agentId"], client, title, body)
         if (Build.VERSION.SDK_INT >= 29) builder.setAllowSystemGeneratedContextualActions(false)
         val notification = builder.build()
         // No decision action, inline reply, full-screen intent, or custom watch UI.

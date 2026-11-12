@@ -41,6 +41,7 @@ kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarg
 val copyProtocolAssets by tasks.registering(Copy::class) {
     from("../../../packages/protocol/schemas") { into("protocol") }
     from("../../../LICENSE", "../../../NOTICE.md")
+    from("../../../src/settings-renderer/icons/LICENSE.txt") { rename { "LOBEHUB_ICONS_LICENSE.txt" } }
     into(layout.buildDirectory.dir("generated/protocolAssets"))
 }
 tasks.named("preBuild") { dependsOn(copyProtocolAssets) }

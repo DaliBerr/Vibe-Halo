@@ -1,0 +1,4 @@
+<!-- Adapted from LobeHub Icons (MIT). See NOTICE.md and LOBEHUB_ICONS_LICENSE.txt. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="32dp" android:height="32dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="@color/notification_claude" android:fillType="evenOdd" android:pathData="M20.998 10.949H24.0V14.051H21.0V17.079H19.512999999999998V20.0H18.0V17.079H16.512999999999998V20.0H15.0V17.079H9.0V20.0H7.488V17.079H6.0V20.0H4.487V17.079H3.0V14.05H0.0V10.95H3.0V5.0H20.998V10.949ZM6.0 10.949H7.4879999999999995V8.102H6.0V10.949ZM16.509999999999998 10.949H18.0V8.102H16.51V10.949H16.509999999999998Z" />
+</vector>
