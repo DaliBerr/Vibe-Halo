@@ -220,7 +220,7 @@ signed and encrypted for the paired phone, and decrypted locally before display;
 it is not plaintext in FCM. Common inline credentials are masked. Watches mirror
 the phone's single-language text, subject to device notification privacy settings.
 
-Current source builds distinguish Codex notifications with a teal icon and content
+Android 0.7.0 (versionCode 10) distinguishes Codex notifications with a teal icon and content
 accent strip, and Claude Code notifications with an orange icon and strip. The
 collapsed, expanded and heads-up layouts use Android's decorated custom-content
 template; the system still controls the outer card. Dark mode uses brighter

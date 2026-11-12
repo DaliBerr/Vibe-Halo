@@ -1,20 +1,40 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-12 (Android notification appearance update prepared)
-Current version: `0.7.0` (Windows); public Android companion `0.7.0` (versionCode 9), code 10 prepared; macOS/Linux no longer published (last preview `0.6.3`)
+Updated: 2026-11-12 (Android 0.7.0 build 10 published)
+Current version: `0.7.0` (Windows); Android companion `0.7.0` (versionCode 10); macOS/Linux no longer published (last preview `0.6.3`)
 Source directory: `C:\Tools\Clawd-island`
 
-## 2026-11-12 — Android notification appearance update publication (prepared)
+## 2026-11-12 — Android notification appearance update published
 
 The owner authorized publishing the notification appearance changes through the
 phone app's updater. Android keeps versionName `0.7.0` and advances versionCode to
 `10`, allowing the existing updater to offer it over the public code-9 build.
-The intended publication replaces only the Android APK, `android-update.json`
-and their checksum entries under the existing `v0.7.0` release, and adds dated
-Android release notes with the full committed Android source SHA. The retained
-package, signing identity and Firebase configuration preserve in-place upgrades.
-Windows assets and the original release tag remain unchanged. Publication and
-public download verification are pending the local build and manual mobile CI.
+Published only the Android APK, `android-update.json` and their checksum entries
+under the existing stable, Latest `v0.7.0` release, with dated Android release
+notes. The manifest and release notes identify Android source
+`9abf9cfc85288b7359769cc80c32d65890970f62`. The retained package, original release
+certificate and production Firebase configuration were verified before upload.
+Windows installer, blockmap, `latest.yml`, LICENSE and NOTICE retain their original
+asset IDs and digests; the original Windows tag was not moved.
+
+Verification: `npm test` passed 292 tests with one existing platform skip. The
+local minified release build and all 13 release JVM tests passed; release lint
+reported zero errors and 32 warnings. Manual mobile/relay workflow `43322407385`
+passed both jobs on the exact Android source SHA, covering protocol, relay,
+debug/release builds, debug JVM tests and lint. The notification appearance and
+runtime verification from the preceding implementation task is recorded below.
+
+Anonymous public discovery using the phone updater's stable-release scan rules
+selected code 10, newer than the public code-9 installation. The publicly
+downloaded manifest, APK and all five checksum entries match the GitHub asset
+digests and local signed bytes. Public APK size: 2,699,920 bytes; SHA-256:
+`1ae3776ffa359035e445acacd75f84cc2b2ffe8d3b8af67cc767d20ce32a911b`.
+Local signed APK and metadata: `dist/companion-notification-release-070/`.
+
+The owner can use Devices → Check for updates in the phone app, then download and
+confirm installation. The visible version stays 0.7.0; its newer internal build
+code makes it an available update. Physical phone/watch appearance remains owner
+acceptance after installation. No desktop build or relay deployment was made.
 
 ## 2026-11-12 — Android Codex and Claude Code notification appearance
 
