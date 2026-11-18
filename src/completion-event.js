@@ -22,6 +22,12 @@ function permissionMode(value) {
   return PERMISSION_MODES.has(mode) ? mode : "";
 }
 
+function isContinuationPrompt(data) {
+  const raw = data?.hook_event_name || data?.hookEventName || data?.nativeMeta?.hookEventName || data?.event;
+  return data?.event === "UserPromptSubmit" && data.prompt_submitted !== false
+    && String(raw).toLowerCase().replace(/[.\-\s_]/g, "") !== "sessionstart";
+}
+
 function completionFromStop(data, descriptor, sessionId) {
   if (!data || data.event !== "Stop" || !descriptor) return null;
   const agentId = descriptor.id || "codex";
@@ -50,4 +56,4 @@ function completionFromStop(data, descriptor, sessionId) {
   };
 }
 
-module.exports = { PLAN_READY_AGENTS, completionFromStop, permissionMode, isCodexSuggestion };
+module.exports = { PLAN_READY_AGENTS, completionFromStop, permissionMode, isCodexSuggestion, isContinuationPrompt };

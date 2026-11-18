@@ -279,6 +279,16 @@ describe("device identity and pairing", () => {
       const mobileToken = await login(pair.mobile);
       const page = await (await SELF.fetch(origin + `/v1/pcs/${pair.pc.deviceId}/events`, { headers: privateHeaders(mobileToken) })).json<{ events: object[] }>();
       expect(page.events).toEqual([{ summary, envelope: "encrypted.event.detail" }]);
+      socket.send(JSON.stringify({ ...event, summary: { ...summary, state: "expired", eventRevision: 2, streamSeq: 2 },
+        notificationPreviews: [{ mobileId: pair.mobile.deviceId, envelope: "signed.withdrawal.preview" }] }));
+      await vi.waitFor(async () => {
+        await runInDurableObject(env.RELAY.getByName(pair.pc.deviceId), async (_instance, state) => {
+          const jobs = state.storage.sql.exec<{ revision: number; state: string }>("SELECT revision,state FROM push_jobs WHERE event_id=? ORDER BY revision", summary.eventId).toArray();
+          expect(jobs).toEqual([{ revision: 1, state: "acknowledged" }, { revision: 2, state: "pending" }]);
+          const rows = state.storage.sql.exec<{ recipients: string }>("SELECT recipients FROM events WHERE event_id=?", summary.eventId).toArray();
+          expect(JSON.parse(rows[0].recipients)[0].preview).toBe("signed.withdrawal.preview");
+        });
+      });
     } finally { socket.close(); }
   });
   it("encrypts push tokens and sends only short visible notifications with bounded retry states", async () => {
@@ -302,6 +312,9 @@ describe("device identity and pairing", () => {
       expect(Object.keys(messages[0].message.data).sort()).toEqual(["eventId", "eventRevision", "kind", "pcId", "pcSessionEpoch", "protocolVersion"]);
       expect(messages[0].message.android.notification.channel_id).toBe("approvals");
       expect(messages[0].message.notification.title).toBe("需要审批");
+      const legacyCount = messages.length;
+      expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, { ...summary, kind: "completion", state: "expired" }, () => true, () => {}, "signed.withdrawal")).toBe("skip");
+      expect(messages).toHaveLength(legacyCount);
       const mobileToken = await login(pair.mobile);
       const preferencesUrl = origin + `/v1/pcs/${pair.pc.deviceId}/notification-preferences`;
       const prefs = { enabled: true, approvals: true, questions: true, completions: true, revision: Date.now(), locale: "en-US" };
@@ -329,6 +342,13 @@ describe("device identity and pairing", () => {
       }
       expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, summary, () => true, () => {}, "x".repeat(3001))).toBe("sent");
       expect(messages.at(-1)!.message.data.preview).toBeUndefined();
+      const withdrawal = { ...summary, kind: "completion", state: "expired", eventRevision: 2 };
+      expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, withdrawal)).toBe("skip");
+      expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, withdrawal, () => true, () => {}, "signed.withdrawal")).toBe("sent");
+      expect(messages.at(-1)!.message.data.notificationAction).toBe("dismiss");
+      expect(messages.at(-1)!.message.data.preview).toBe("signed.withdrawal");
+      expect(messages.at(-1)!.message.notification).toBeUndefined();
+      expect(messages.at(-1)!.message.android.notification).toBeUndefined();
       status = 503; expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, summary)).toBe("retry");
       status = 429; expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, summary)).toBe("retry");
       status = 404; expect(await deliverPush(pushEnv, pair.pc.deviceId, pair.mobile.deviceId, summary)).toBe("skip");

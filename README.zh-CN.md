@@ -6,7 +6,7 @@
 批准工具调用、回答提问、得知任务完成——都不用切换窗口。</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.7.0-6d7cff" alt="版本 0.7.0">
+  <img src="https://img.shields.io/badge/version-0.7.1-6d7cff" alt="版本 0.7.1">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4" alt="Windows 10/11">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-blue" alt="AGPL-3.0-only"></a>
 </p>
@@ -21,7 +21,7 @@
 - **在灵动岛里回答提问**：支持精确答案协议的客户端（Claude Code、ZCode、DeepSeek Harness、Hermes）无需离开编辑器即可作答。
 - **等待提醒与完成通知**：客户端在等你、或者任务完成时及时提示。
 - **统一的设置窗口**：侧边栏包含通用、最近事件、手机伴侣和你的各个客户端（带应用图标），可按客户端分别选择要显示的内容。
-- **手机伴侣（可选）**：配对后的加密 Android 通知、历史记录，以及需要你明确授权的远程决定。
+- **手机伴侣（可选）**：配对后的加密 Android 通知、历史记录，以及需要你明确授权的远程决定。通知默认 10 分钟后自动清理，可在手机的“设备”页调整为 3～30 分钟；同一会话继续发消息时，会撤下上一轮的完成通知。
 - 中英文界面，跟随系统深浅色。
 
 ## 下载
@@ -29,7 +29,7 @@
 | 平台 | 安装包 |
 | --- | --- |
 | Windows 10/11 x64 | [安装程序（最新版）](https://github.com/DaliBerr/Vibe-Halo/releases/latest)——确认重启后安装更新 |
-| Android 8+ | [伴侣 APK 0.7.0](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.7.0/Vibe-Halo-Mobile-0.7.0.apk)——预览版 |
+| Android 8+ | [伴侣 APK 0.7.1](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.7.1/Vibe-Halo-Mobile-0.7.1.apk)——预览版 |
 
 安装程序未签名，Windows 可能提示未知发布者。现在只发布 Windows 版，不再发布 macOS 和 Linux 安装包。
 

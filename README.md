@@ -6,7 +6,7 @@
 Approve tool calls, answer questions and see when a task finishes — without switching windows.</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.7.0-6d7cff" alt="Version 0.7.0">
+  <img src="https://img.shields.io/badge/version-0.7.1-6d7cff" alt="Version 0.7.1">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4" alt="Windows 10/11">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-blue" alt="AGPL-3.0-only"></a>
 </p>
@@ -21,7 +21,7 @@ Approve tool calls, answer questions and see when a task finishes — without sw
 - **Answer questions in the island** — clients with an exact answer protocol (Claude Code, ZCode, DeepSeek Harness, Hermes) can be answered without leaving your editor.
 - **Reminders and completion notices** — know when a client is waiting for you or a task is done.
 - **One settings window** — General, Recent events, Mobile companion and each of your clients (with its app icon) in a single sidebar. Choose per client what it may show.
-- **Phone companion (optional)** — paired, encrypted Android notifications, history and explicitly authorized remote decisions.
+- **Phone companion (optional)** — paired, encrypted Android notifications, history and explicitly authorized remote decisions. Notifications auto-clear after 10 minutes; choose 3–30 minutes on the phone's Devices page. Continuing the same conversation withdraws its previous completion notifications.
 - English/Chinese UI that follows your system light/dark appearance.
 
 ## Download
@@ -29,7 +29,7 @@ Approve tool calls, answer questions and see when a task finishes — without sw
 | Platform | Package |
 | --- | --- |
 | Windows 10/11 x64 | [Installer (latest release)](https://github.com/DaliBerr/Vibe-Halo/releases/latest) — updates install after you confirm a restart |
-| Android 8+ | [Companion APK 0.7.0](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.7.0/Vibe-Halo-Mobile-0.7.0.apk) — preview |
+| Android 8+ | [Companion APK 0.7.1](https://github.com/DaliBerr/Vibe-Halo/releases/download/v0.7.1/Vibe-Halo-Mobile-0.7.1.apk) — preview |
 
 The installer is not publisher-signed, so Windows may show an unknown-publisher warning. Only Windows is released; macOS and Linux packages are no longer published.
 

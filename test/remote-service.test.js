@@ -39,6 +39,39 @@ async function registrationFixture(t) {
   return f;
 }
 
+test("continuing a session withdraws only its previous completions and plans with signed recipient-bound actions", async t => {
+  const { remote } = await fixture(t);
+  const sessionId = "thread-a";
+  const first = remote.recordReminder({ agentId: "codex", sessionId, output: "done" }, "completion");
+  const plan = remote.recordReminder({ agentId: "codex", sessionId, output: "plan" }, "plan");
+  const other = remote.recordReminder({ agentId: "codex", sessionId: "thread-b" }, "completion");
+  const otherClient = remote.recordReminder({ agentId: "claude-code", sessionId }, "completion");
+  const pending = remote.recordReminder({ agentId: "codex", sessionId, requestKey: "pending-input" }, "input");
+  remote.resolveSessionCompletions("codex", sessionId);
+  for (const id of [first, plan]) {
+    const value = remote.journal.events.get(id);
+    assert.equal(value.summary.state, "expired"); assert.equal(value.summary.eventRevision, 2);
+    assert.equal(value.summary.actionable, false);
+    const mobile = await remote.crypto.generateIdentity("mobile");
+    const binding = { bindingId: crypto.randomUUID(), revision: 1, mobile: await remote.crypto.publicDevice(mobile) };
+    const sealed = await remote.encryptNotification(value, binding);
+    const decoded = await remote.crypto.open(sealed, mobile.encryptionKey, remote.state.identity.signKey, "notification-preview");
+    assert.equal(decoded.notificationAction, "dismiss"); assert.equal(decoded.eventId, id);
+    assert.equal(decoded.eventRevision, 2); assert.equal(decoded.mobileId, mobile.deviceId);
+  }
+  assert.equal(remote.journal.events.get(first).toolInputText, "done");
+  assert.equal(remote.journal.events.get(other).summary.state, "resolved");
+  assert.equal(remote.journal.events.get(otherClient).summary.state, "resolved");
+  assert.equal(remote.journal.events.get(pending).summary.state, "pending");
+  remote.resolveSessionCompletions("codex", sessionId);
+  assert.equal(remote.journal.events.get(first).summary.eventRevision, 2);
+  const next = remote.recordReminder({ agentId: "codex", sessionId }, "completion");
+  assert.equal(remote.journal.events.get(next).summary.state, "resolved");
+  const unknown = remote.recordReminder({ agentId: "codex", sessionId: "codex:unknown" }, "completion");
+  remote.resolveSessionCompletions("codex", "codex:unknown");
+  assert.equal(remote.journal.events.get(unknown).summary.state, "resolved");
+});
+
 test("notification previews are bounded, recipient encrypted and bound to the exact event", async t => {
   const { remote } = await fixture(t), c = remote.crypto;
   const mobile = await c.generateIdentity("mobile"), other = await c.generateIdentity("mobile");

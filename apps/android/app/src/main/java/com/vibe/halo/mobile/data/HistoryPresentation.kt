@@ -65,7 +65,8 @@ object HistoryPresentation {
         val result = when (raw(value, "outcome").ifBlank { raw(meta, "state") }) {
             "allow", "once", "always" -> "已允许"; "deny", "reject" -> "已拒绝"; "submit", "answered" -> "已回答"
             "failed", "error" -> "失败"
-            "timeout", "expired" -> "已超时"; "disconnected" -> "连接已断开"; "dismissed", "closed" -> "已关闭"
+            "timeout", "expired" -> when(kind) { "completion" -> "任务已完成"; "plan" -> "计划已准备好"; else -> "已超时" }
+            "disconnected" -> "连接已断开"; "dismissed", "closed" -> "已关闭"
             "native", "fallback" -> "已交回客户端"; "pending" -> "待处理"
             else -> when(kind) { "completion" -> "任务已完成"; "plan" -> "计划已准备好"; else -> "已结束" }
         }

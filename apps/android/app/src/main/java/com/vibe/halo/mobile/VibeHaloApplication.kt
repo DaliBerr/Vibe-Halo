@@ -13,6 +13,11 @@ class VibeHaloApplication : Application() {
         super.onCreate()
         UiLanguage.mode = getSharedPreferences("ui-preferences", MODE_PRIVATE).getString("language", "system") ?: "system"
         CompanionNotifications.channels(this)
+        val retention = com.vibe.halo.mobile.notifications.NotificationRetention
+        if (getSystemService(android.app.NotificationManager::class.java).activeNotifications.any {
+            it.tag?.startsWith("pc_") == true &&
+                it.notification.extras.getInt(retention.MINUTES) != retention.minutes(this)
+        }) retention.enqueueRefresh(this)
         if (BuildConfig.FIREBASE_APP_ID.isNotEmpty() && FirebaseApp.getApps(this).isEmpty()) {
             FirebaseApp.initializeApp(this, FirebaseOptions.Builder().setApplicationId(BuildConfig.FIREBASE_APP_ID)
                 .setApiKey(BuildConfig.FIREBASE_API_KEY).setProjectId(BuildConfig.FIREBASE_PROJECT_ID).setGcmSenderId(BuildConfig.FIREBASE_SENDER_ID).build())

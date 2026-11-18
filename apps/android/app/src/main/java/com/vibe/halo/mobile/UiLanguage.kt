@@ -8,6 +8,9 @@ import java.util.Locale
 object UiLanguage {
     var mode by mutableStateOf("system")
     private val english = mapOf(
+        "通知自动清理" to "Auto-clear notifications", "分钟" to "minutes",
+        "3～30 分钟，默认 10 分钟。按收到通知的时间计算，已有通知会逐条更新。" to "3–30 minutes; default 10. Measured from receipt. Existing notifications update one by one.",
+        "只清理通知栏；应用内消息和待处理请求仍会保留。" to "Only clears the notification shade. Messages and pending requests stay in the app.",
         "应用更新" to "App updates", "当前版本" to "Current version", "可用版本" to "Available version",
         "检查更新" to "Check for updates", "下载更新" to "Download update", "安装更新" to "Install update", "允许安装更新" to "Allow update installation",
         "正在检查更新…" to "Checking for updates…", "已是最新版本" to "You're up to date", "正在下载更新…" to "Downloading update…",

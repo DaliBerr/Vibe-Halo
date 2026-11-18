@@ -7,7 +7,7 @@ import com.vibe.halo.mobile.security.Wire.Companion.values
 import org.json.JSONObject
 import java.time.Instant
 
-data class NotificationPreview(val agent: String, val context: String = "", val text: String = "") {
+data class NotificationPreview(val agent: String, val context: String = "", val text: String = "", val dismiss: Boolean = false) {
     companion object {
         fun snippet(value: String, limit: Int): String {
             val clean = value.replace(Regex("""\bBearer\s+[A-Za-z0-9._~+/\-]+""", RegexOption.IGNORE_CASE), "Bearer [REDACTED]")
@@ -91,8 +91,11 @@ data class NotificationPreview(val agent: String, val context: String = "", val 
             require(value.getString("mobileId") == mobileId && value.getString("bindingId") == grant.getString("bindingId") && value.getInt("bindingRevision") == grant.getInt("revision"))
             for (key in listOf("pcId", "eventId", "eventRevision", "pcSessionEpoch", "kind", "expiresAt")) require(value.get(key).toString() == data[key])
             require(Instant.parse(value.getString("expiresAt")).toEpochMilli() > System.currentTimeMillis())
+            val action = value.optString("notificationAction")
+            require(action in listOf("", "dismiss") && action == data["notificationAction"].orEmpty())
+            if (action == "dismiss") require(value.getString("kind") in listOf("completion", "plan"))
             val preview = value.getJSONObject("preview")
-            return NotificationPreview(snippet(preview.getString("agent"), 40), snippet(preview.getString("context"), 60), snippet(preview.getString("text"), 160))
+            return NotificationPreview(snippet(preview.getString("agent"), 40), snippet(preview.getString("context"), 60), snippet(preview.getString("text"), 160), action == "dismiss")
         }
     }
 }

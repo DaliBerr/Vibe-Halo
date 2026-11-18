@@ -22,6 +22,7 @@ class RemoteService extends EventEmitter {
     this.status = "disabled"; this.enabled = false; this.serial = Promise.resolve(); this.generation = 0;
     this.sentRevisions = new Map();
     this.reminderSources = new Map();
+    this.completionSources = new Map();
     this.onApprovals = () => this.captureApprovals();
     this.onFinalized = event => this.captureFinalized(event);
     approvals.on("changed", this.onApprovals); approvals.on("finalized", this.onFinalized);
@@ -330,6 +331,10 @@ class RemoteService extends EventEmitter {
       this.reminderSources.set(sourceKey, { eventId, sessionId: input.sessionId, agentId: input.agentId || "codex" });
       if (this.reminderSources.size > 500) this.reminderSources.delete(this.reminderSources.keys().next().value);
     }
+    if (["completion", "plan"].includes(kind) && typeof input.sessionId === "string" && input.sessionId && !input.sessionId.endsWith(":unknown")) {
+      this.completionSources.set(eventId, { sessionId: input.sessionId, agentId: input.agentId || "codex" });
+      if (this.completionSources.size > 500) this.completionSources.delete(this.completionSources.keys().next().value);
+    }
     if (this.journal.put(value) && ["completion", "plan"].includes(kind)) this.media.capture(`event:${eventId}`, content, input.cwd);
     notificationTiming(this.logger, "desktop_event_ready", eventId, 1, { sourceAtMs: input.createdAt, detectedAtMs: input.detectedAtMs });
     this.queuePublish(); return eventId;
@@ -344,6 +349,20 @@ class RemoteService extends EventEmitter {
   }
   resolveSessionReminders(agentId, sessionId, preserveKeys = new Set()) {
     for (const [key, value] of this.reminderSources) if (value.agentId === agentId && value.sessionId === sessionId && !preserveKeys.has(key)) this.resolveReminder(key);
+  }
+  resolveSessionCompletions(agentId, sessionId) {
+    if (!sessionId || sessionId.endsWith(":unknown")) return;
+    for (const [eventId, source] of this.completionSources) {
+      if (source.agentId !== agentId || source.sessionId !== sessionId) continue;
+      this.completionSources.delete(eventId);
+      const previous = this.journal.events.get(eventId);
+      if (!previous || previous.summary.state === "expired") continue;
+      // The completed task remains in history. Only its transient reminder ends.
+      const value = structuredClone(previous);
+      value.summary.state = "expired"; value.summary.eventRevision += 1;
+      this.journal.put(value);
+      this.queuePublish();
+    }
   }
   queuePublish() {
     clearTimeout(this.publishTimer); this.publishTimer = setTimeout(() => { this.serial = this.serial.then(() => this.publishAll()).catch(() => {}); }, 40); this.publishTimer.unref(); this.lan?.notify();
@@ -373,6 +392,7 @@ class RemoteService extends EventEmitter {
     const envelope = await this.crypto.seal({ protocolVersion: 1, relayOrigin: this.state.relayOrigin,
       pcId: this.pcId, mobileId: binding.mobile.deviceId, bindingId: binding.bindingId, bindingRevision: binding.revision,
       eventId, eventRevision, pcSessionEpoch, kind, expiresAt, preview: notificationPreview(value),
+      ...(["completion", "plan"].includes(kind) && value.summary.state === "expired" ? { notificationAction: "dismiss" } : {}),
     }, this.state.identity.signKey, binding.mobile.encryptionKey, "notification-preview");
     // Leave room for routing metadata within FCM's 4096-byte data budget.
     return envelope.length <= 3000 ? envelope : undefined;

@@ -255,6 +255,9 @@ class CompanionRepository(private val context: Context) {
             if (previous.summary.getLong("eventRevision") > summary.getLong("eventRevision")) return
             if (previous.summary.getString("state") != "pending" && summary.getString("state") == "pending") return
         }
+        if (summary.getString("kind") in listOf("completion", "plan") && summary.getString("state") == "expired") {
+            CompanionNotifications.clearEvent(context, computer.pcId, summary.getString("eventId"), summary.getLong("eventRevision"))
+        }
         val value = RemoteEvent(key, computer.key, detail, received)
         mutable.value = mutable.value.copy(events = mutable.value.events.filterNot { it.key == key } + value)
     }
@@ -569,6 +572,7 @@ class CompanionRepository(private val context: Context) {
         account.session = request(account, "/v1/auth/session", "POST", JSONObject().put("challengeId", challenge.getString("challengeId")).put("proof", account.crypto.sign(challenge, "device-session")), false)
     }
     private fun notifyLan(account: Account, pc: Computer, summary: JSONObject) {
+        if (summary.getString("kind") in listOf("completion", "plan") && summary.getString("state") == "expired") return
         if (summary.getString("kind") in listOf("completion", "plan") && Instant.parse(summary.getString("createdAt")).toEpochMilli() < System.currentTimeMillis() - 600000) return
         if (Instant.parse(summary.getString("expiresAt")).toEpochMilli() <= System.currentTimeMillis()) return
         if (summary.getString("kind") in listOf("approval", "question") && !summary.getBoolean("actionable")) return

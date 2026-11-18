@@ -401,6 +401,25 @@ currently installed application and signing identity before installation.
 
 ### Device notification acceptance
 
+Android **Devices → Auto-clear notifications** sets how long notification-shade
+cards remain visible: 3–30 minutes in one-minute steps, default 10 minutes.
+Changes update existing cards one by one from their original receipt time,
+using a local one-shot worker to respect Android's notification-update rate
+limit. Android owns the timeout, including while the app is not running. Event
+cards and the phone-only group summary expire together; duplicate delivery does
+not restart the timer. This only removes notification cards: in-app messages,
+history and pending-request validity retain their existing lifecycles.
+
+Desktop 0.7.1 also uses the existing prompt-submission Hook to expire earlier
+completion/plan reminders for the same client and conversation. LAN refreshes
+consume the signed terminal revision; background cloud delivery sends a
+recipient-encrypted, PC-signed `notificationAction: dismiss` bound to the exact
+event, revision, session epoch, relay origin and current pairing. A withdrawal
+never creates a visible notification or removes the stored completion message.
+Opening a session alone does not withdraw a notification. Clients without a
+prompt-submission signal, offline delivery and a restarted desktop's discarded
+in-memory conversation index fall back to the phone's local timeout.
+
 Test a synthetic request before any real command. Record phone model/Android/GMS,
 watch model/system and companion-app notification settings. Check same Wi-Fi
 foreground, Wi-Fi background/lock, cellular, denied notification permission,

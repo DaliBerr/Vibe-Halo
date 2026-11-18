@@ -357,6 +357,10 @@ function buildBody(payload, agentId = "codex") {
     pid_chain: processMeta.pidChain,
   };
   if (permissionMode) body.permission_mode = permissionMode;
+  if (event === "UserPromptSubmit") {
+    const rawEvent = cleanText(payload?.hook_event_name || payload?.hookEventName || payload?.event || payload?.type, 80);
+    body.prompt_submitted = rawEvent.toLowerCase().replace(/[.\-\s_]/g, "") !== "sessionstart";
+  }
   if (event === "PermissionRequest" || event === "Elicitation") {
     const input = normalizeToolInput(payload?.tool_input || payload?.toolInput || payload?.input || payload?.arguments) || {};
     body.tool_name = rawToolName || (event === "Elicitation" ? "Elicitation" : "Unknown");

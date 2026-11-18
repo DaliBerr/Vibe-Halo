@@ -27,6 +27,29 @@ import kotlin.concurrent.thread
 class NotificationSyncTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
+    @Test fun continuedConversationRemovesItsNotificationAndKeepsTheCompletedMessage() = runBlocking {
+        Fixture(context).use { fixture ->
+            val repo = CompanionRepository(context); repo.load(startDiscovery = false)
+            val first = fixture.event(); fixture.events = listOf(first)
+            val data = fixture.metadata(first)
+            com.vibe.halo.mobile.notifications.CompanionNotifications.show(context, data)
+            assertEquals(NotificationSyncResult.SYNCED, repo.syncNotification(fixture.target(first)))
+            val ended = fixture.event(id = data.getValue("eventId"), revision = 2, state = "expired")
+            fixture.events = listOf(ended)
+            assertEquals(NotificationSyncResult.SYNCED, repo.syncNotification(fixture.target(ended)))
+            val manager = context.getSystemService(android.app.NotificationManager::class.java)
+            val tag = "${data["pcId"]}/${data["eventId"]}"
+            val deadline = android.os.SystemClock.elapsedRealtime() + 5000
+            while (manager.activeNotifications.any { it.tag == tag } && android.os.SystemClock.elapsedRealtime() < deadline) delay(50)
+            assertFalse(manager.activeNotifications.any { it.tag == tag })
+            assertEquals("expired", repo.state.value.events.single().summary.getString("state"))
+            assertEquals("任务已完成", HistoryPresentation.model(repo.state.value.events.single().detail).result)
+            assertEquals(ended.getJSONObject("detail").getString("toolInputText"), repo.state.value.events.single().detail.getString("toolInputText"))
+            assertEquals("suppressed_by_user", com.vibe.halo.mobile.notifications.CompanionNotifications.show(context, data))
+            repo.close()
+        }
+    }
+
     @Test fun pushSchedulesReadOnlyFetchAndPersistsFullMessageWithoutOpeningActivity() = runBlocking {
         Fixture(context).use { fixture ->
             val repository = (context.applicationContext as VibeHaloApplication).repository

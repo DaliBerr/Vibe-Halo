@@ -1,5 +1,15 @@
 "use strict";
 
+require("node:test")("only a submitted prompt withdraws prior completion notifications, not opening a session", () => {
+  const assert = require("node:assert/strict");
+  const { isContinuationPrompt } = require("../src/completion-event");
+  const { buildBody } = require("../hooks/vibe-halo-hook");
+  assert.equal(isContinuationPrompt(buildBody({ hook_event_name: "UserPromptSubmit", session_id: "a" })), true);
+  assert.equal(isContinuationPrompt(buildBody({ hook_event_name: "SessionStart", session_id: "a" })), false);
+  assert.equal(isContinuationPrompt({ event: "UserPromptSubmit", nativeMeta: { hookEventName: "SessionStart" } }), false);
+  assert.equal(isContinuationPrompt({ event: "Stop" }), false);
+});
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { completionFromStop, permissionMode } = require("../src/completion-event");

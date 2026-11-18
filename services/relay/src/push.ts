@@ -83,8 +83,11 @@ export async function deliverPush(env: Env, pcId: string, mobileId: string, summ
   if (!binding) return "skip";
   const preferences = await env.DB.prepare("SELECT value_json FROM notification_preferences WHERE pc_id=? AND mobile_id=?").bind(pcId, mobileId).first<{ value_json: string }>();
   const pref = preferences ? JSON.parse(preferences.value_json) : { enabled: true, approvals: true, questions: true, completions: true };
+  const dismiss = ["completion", "plan"].includes(String(summary.kind)) && summary.state === "expired";
+  // Older auto-display clients must never turn a withdrawal into a new alert.
+  if (dismiss && (pref.delivery !== "data-v1" || !preview || preview.length > 3000)) return "skip";
   const category = summary.kind === "approval" ? "approvals" : summary.kind === "question" || summary.kind === "input" ? "questions" : "completions";
-  if (!pref.enabled || !pref[category]) return "skip";
+  if (!dismiss && (!pref.enabled || !pref[category])) return "skip";
   const row = await env.DB.prepare("SELECT ciphertext,revision FROM push_tokens WHERE device_id=? AND active=1").bind(mobileId).first<{ ciphertext: string; revision: number }>();
   if (!row) return "skip";
   try {
@@ -103,7 +106,9 @@ export async function deliverPush(env: Env, pcId: string, mobileId: string, summ
       data.agentId = typeof summary.agentId === "string" ? summary.agentId.slice(0, 80) : "";
       data.expiresAt = String(summary.expiresAt);
       if (preview && preview.length <= 3000) data.preview = preview;
+      if (dismiss) data.notificationAction = "dismiss";
       if (new TextEncoder().encode(JSON.stringify(data)).length > 3900) delete data.preview;
+      if (dismiss && !data.preview) return "skip";
     }
     const sendStart = performance.now();
     notificationTiming("relay_fcm_start", summary.eventId, summary.eventRevision);

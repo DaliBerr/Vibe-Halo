@@ -260,6 +260,8 @@ test("installed ZCode process hooks run without a shell and deliver every manage
   await waitFor(() => events.length === 3);
   assert.deepEqual(events.map(event => event.event), ["UserPromptSubmit", "Stop", "UserPromptSubmit"]);
   assert.deepEqual(events.map(event => event.agentId), ["zcode", "zcode", "zcode"]);
+  assert.equal(events[0].prompt_submitted, true);
+  assert.equal(events[2].prompt_submitted, false);
 
   const offlineRoot = path.join(root, "offline");
   fs.mkdirSync(offlineRoot, { recursive: true });

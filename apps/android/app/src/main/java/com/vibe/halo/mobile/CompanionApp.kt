@@ -84,6 +84,7 @@ import kotlinx.coroutines.launch
                     else -> {
                         AppUpdateCard()
                         DeviceNameCard(state, repo)
+                        NotificationRetentionCard()
                         Row { for ((label, mode) in listOf("跟随系统" to "system", "中文" to "zh-CN", "English" to "en-US")) TextButton(onClick = {
                             UiLanguage.mode = mode; context.getSharedPreferences("ui-preferences", Context.MODE_PRIVATE).edit().putString("language", mode).apply()
                             com.vibe.halo.mobile.notifications.CompanionNotifications.channels(context); scope.launch { repo.refresh() }

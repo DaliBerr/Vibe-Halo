@@ -38,7 +38,7 @@ const { DecisionService } = require("./decision-service");
 const { RemoteService } = require("./remote/remote-service");
 const { performCompanionAction } = require("./remote/companion-actions");
 const { CodexInputMonitor } = require("./codex-input-monitor");
-const { completionFromStop } = require("./completion-event");
+const { completionFromStop, isContinuationPrompt } = require("./completion-event");
 const { CompletionStore } = require("./completion-store");
 const { HookManager } = require("./hook-manager");
 const { approvalHistoryRecord, inputHistoryRecord, planHistoryRecord } = require("./history-events");
@@ -517,6 +517,7 @@ function startApplication() {
       for (const key of inputMonitor.pendingAsyncRequestKeys(sessionId)) preserveInputKeys.add(key);
     }
     if (data.event === "UserPromptSubmit") {
+      if (isContinuationPrompt(data)) remote?.resolveSessionCompletions(agentId, sessionId);
       remote?.resolveSessionReminders(agentId, sessionId, preserveInputKeys);
       completions.clear("new-prompt", sessionId, agentId);
       inputRequests.clearSession(sessionId, "new-prompt", agentId, preserveInputKeys);

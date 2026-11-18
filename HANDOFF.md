@@ -1,8 +1,60 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-13 (Android 0.7.0 build 11 published with all-client notification appearance)
-Current version: `0.7.0` (Windows); Android companion `0.7.0` (versionCode 11); macOS/Linux no longer published (last preview `0.6.3`)
+Updated: 2026-11-18 (0.7.1 notification lifecycle release candidate)
+Current source: `0.7.1` (Windows); Android companion `0.7.1` (versionCode 12). Published stable remains `0.7.0` pending release verification; macOS/Linux no longer published (last preview `0.6.3`).
 Source directory: `C:\Tools\Clawd-island`
+
+## 2026-11-18 — Notification lifetime and conversation continuation (0.7.1)
+
+The owner requested automatic notification-shade cleanup, default ten minutes
+with a three-to-thirty-minute setting, and then authorized including removal of
+the preceding completion notification when continuing the same conversation.
+
+Android Devices now has a localized one-minute-step lifetime slider. All five
+notification kinds and the phone-only summary have OS-managed timeouts. A
+bounded one-shot local worker updates existing cards from their original receipt
+time, paced to respect Android's notification-update rate limit; older cards are
+migrated at app startup. It preserves original age, silence, grouping and durable
+deduplication, and marks expired legacy cards before removing their summary.
+Notifications can expire with the app process absent. The preference is local to
+the phone and does not change history or approval/request validity.
+
+Desktop reuses UserPromptSubmit, with SessionStart explicitly excluded, and
+keeps a bounded in-memory index of completion/plan event IDs by client/session.
+A subsequent prompt advances only matching earlier reminders to a signed expired
+revision. Completed message content stays available and still presents as
+completed/plan-ready in phone history. Unknown sessions, unsupported prompt
+signals and a restarted desktop use the phone's local timeout as fallback.
+Existing asynchronous Codex questions retain their separate preservation logic.
+
+LAN synchronization clears the signed terminal event. Cloud pushes carry a
+recipient-encrypted, PC-signed dismissal bound to the current pairing, relay
+origin, event/revision and session epoch. The Android FCM callback verifies it
+before removing that exact card and scheduling its usual read-only cache sync.
+The relay skips unsigned/oversize withdrawals and legacy system-auto-display
+delivery, so withdrawal cannot create a new visible alert. Existing protocol
+schemas, database layout and approval decisions are unchanged.
+
+Local verification:
+
+- `npm ci`, `npm test`: 296 passed, one existing platform skip; protocol: six
+  passed. New coverage includes exact client/session matching, next-turn
+  isolation, plan/completion withdrawal, signed actions and SessionStart.
+- Relay typecheck, 20 Worker-runtime tests and production-config dry run passed;
+  tests verify terminal-revision outbox jobs, recipient-bound payloads and legacy
+  suppression.
+- Android debug/release builds, 15 JVM tests per variant and lint passed (zero
+  errors; 37 debug / 38 release warnings). API 34 emulator: 23 notification,
+  settings, appearance and cache tests passed in separate UI/background process
+  invocations. The final all-expired legacy-card case is being rerun.
+- Local Windows unpacked 0.7.1 package verification and Electron packaged-code
+  smoke passed, including DPAPI journal, exact-session clearing, signed
+  withdrawal and SessionStart exclusion.
+
+Release CI, signed Android publication, public asset verification and the native
+three-minute process-exit check are pending. Physical Xiaomi/watch presentation,
+real carrier/Doze FCM delivery and real-client continuation acceptance remain
+owner/device acceptance after updating both desktop and phone.
 
 ## 2026-11-13 — All-client Android notification appearance published
 
