@@ -1,7 +1,7 @@
 # Vibe Halo Project Handoff
 
-Updated: 2026-11-18 (0.7.1 notification lifecycle release candidate)
-Current source: `0.7.1` (Windows); Android companion `0.7.1` (versionCode 12). Published stable remains `0.7.0` pending release verification; macOS/Linux no longer published (last preview `0.6.3`).
+Updated: 2026-11-18 (0.7.1 published with notification expiry and conversation-aware withdrawal)
+Current version: `0.7.1` (Windows); Android companion `0.7.1` (versionCode 12); macOS/Linux no longer published (last preview `0.6.3`).
 Source directory: `C:\Tools\Clawd-island`
 
 ## 2026-11-18 — Notification lifetime and conversation continuation (0.7.1)
@@ -31,8 +31,9 @@ LAN synchronization clears the signed terminal event. Cloud pushes carry a
 recipient-encrypted, PC-signed dismissal bound to the current pairing, relay
 origin, event/revision and session epoch. The Android FCM callback verifies it
 before removing that exact card and scheduling its usual read-only cache sync.
-The relay skips unsigned/oversize withdrawals and legacy system-auto-display
-delivery, so withdrawal cannot create a new visible alert. Existing protocol
+The relay skips withdrawals with missing/oversize encrypted envelopes and legacy
+system-auto-display delivery; the phone verifies the signature before acting.
+Withdrawal never creates a new visible alert. Existing protocol
 schemas, database layout and approval decisions are unchanged.
 
 Local verification:
@@ -46,15 +47,50 @@ Local verification:
 - Android debug/release builds, 15 JVM tests per variant and lint passed (zero
   errors; 37 debug / 38 release warnings). API 34 emulator: 23 notification,
   settings, appearance and cache tests passed in separate UI/background process
-  invocations. The final all-expired legacy-card case is being rerun.
+  invocations, including the final all-expired legacy-card case. The settings
+  fixture waits for real background updates before aging synthetic cards, so it
+  does not race the worker or Android's update quota.
 - Local Windows unpacked 0.7.1 package verification and Electron packaged-code
   smoke passed, including DPAPI journal, exact-session clearing, signed
   withdrawal and SessionStart exclusion.
 
-Release CI, signed Android publication, public asset verification and the native
-three-minute process-exit check are pending. Physical Xiaomi/watch presentation,
-real carrier/Doze FCM delivery and real-client continuation acceptance remain
-owner/device acceptance after updating both desktop and phone.
+The native three-minute check also passed: after `am kill` (without force-stop),
+the app process was absent and both the event and summary remained active. At
+199 seconds after seeding, a system dump taken before restarting the app showed
+zero matching cards. A separate replay invocation verified durable suppression
+and restored the previous preference. The signed release APK successfully
+over-installed the emulator's older 0.6.0/code 2 release with the original key.
+
+Publication and independent verification:
+
+- Source/tag: `1e3520af3a920fe392e286c490148c7106025e3c`, immutable `v0.7.1`.
+  Mobile/relay CI `44409871291` and Windows stable release CI `44410800631`
+  passed. The latter verified the unpacked app and an actual NSIS install and
+  uninstall, including stable updater configuration.
+- Production relay deployed as version
+  `f2e9f79e-50ab-4903-abe0-04a95c1ef756`; `/healthz` returned protocol 1 with
+  expected service/capacity. No database or protocol migration was needed.
+- Published Windows 0.7.1 and Android 0.7.1/code 12 under the stable, Latest
+  GitHub release. The APK and five-entry checksum file were uploaded before
+  `android-update.json`; the Android additions preserved the new Windows asset
+  IDs/digests. Every asset from the older v0.7.0 release is unchanged.
+- Anonymous public discovery selected 0.7.1. Downloaded APK, installer,
+  blockmap, `latest.yml`, update manifest and checksums agree with GitHub asset
+  digests; Windows SHA-512 update metadata matches the downloaded installer.
+  The downloaded APK passed independent signature verification.
+- APK: 2,758,419 bytes; SHA-256
+  `4dc3b481dc926199218cfba43e80e4593020c18918992028d60fdcabf73d701c`.
+  Windows installer: 103,366,675 bytes; SHA-256
+  `e60f2c25bef343c38481c49b2afcb5c36539ac2034e76e515ddef98d5b5fb545`.
+- Local signed APK/manifest: `dist/companion-release-071/`; unpacked desktop:
+  `dist/release-071-local/win-unpacked/`. Public downloads and verification:
+  `.smoke/public-071/verification.json`; native timeout evidence:
+  `.smoke/notification-071-native-*-proof.json` and the seed/replay logs.
+
+Physical Xiaomi/watch presentation, real carrier/Doze FCM delivery and
+real-client continuation acceptance remain owner/device acceptance after
+updating both desktop and phone to 0.7.1. The phone's Devices → Check for updates
+path now offers code 12; Devices → Auto-clear notifications sets the lifetime.
 
 ## 2026-11-13 — All-client Android notification appearance published
 
